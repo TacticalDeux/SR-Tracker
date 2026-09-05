@@ -1,0 +1,8 @@
+build/
+dist/
+data/
+__pycache__/
+*.pyc
+*.pyo
+nul
+backup

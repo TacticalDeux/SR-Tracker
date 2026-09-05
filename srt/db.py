@@ -1,0 +1,382 @@
+"""SQLite persistence for session events.
+
+The schema mirrors the original Go storage layer. All writes go through a
+single shared connection guarded by a re-entrant lock — sqlite3 connections
+are not safe to share across threads without serialization.
+"""
+from __future__ import annotations
+
+import sqlite3
+import threading
+from datetime import datetime
+from pathlib import Path
+
+
+SCHEMA = [
+    """CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        started TEXT NOT NULL,
+        ended TEXT,
+        current_zone TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS kills (
+        session_id INTEGER NOT NULL,
+        enemy_id INTEGER NOT NULL,
+        mob_id INTEGER,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS drops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        drop_id INTEGER NOT NULL,
+        item_id INTEGER,
+        mob_id INTEGER,
+        amount INTEGER,
+        color_r INTEGER,
+        color_g INTEGER,
+        color_b INTEGER,
+        is_shiny INTEGER,
+        belongs_to INTEGER,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS xp_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        xp_gained INTEGER NOT NULL,
+        bonus_party INTEGER,
+        level INTEGER,
+        is_level_up INTEGER,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS spawn_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        rarity TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER,
+        event_type TEXT NOT NULL,
+        data TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS zone_visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        map_name TEXT NOT NULL,
+        display_name TEXT,
+        entered_at TEXT NOT NULL,
+        left_at TEXT,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE VIEW IF NOT EXISTS zone_stats AS
+        SELECT
+            zv.id AS zone_visits_id,
+            zv.session_id,
+            zv.map_name,
+            COALESCE(zv.display_name, zv.map_name) AS display_name,
+            zv.entered_at,
+            zv.left_at,
+            (SELECT COUNT(*) FROM kills k WHERE k.session_id = zv.session_id AND k.timestamp >= zv.entered_at
+                AND (zv.left_at IS NULL OR k.timestamp < zv.left_at)) AS kills,
+            (SELECT COUNT(*) FROM drops d WHERE d.session_id = zv.session_id AND d.item_id = 0
+                AND d.timestamp >= zv.entered_at
+                AND (zv.left_at IS NULL OR d.timestamp < zv.left_at)) AS soul_crystals,
+            (SELECT COUNT(*) FROM drops d WHERE d.session_id = zv.session_id
+                AND d.timestamp >= zv.entered_at
+                AND (zv.left_at IS NULL OR d.timestamp < zv.left_at)) AS drops,
+            (SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events x WHERE x.session_id = zv.session_id
+                AND x.timestamp >= zv.entered_at
+                AND (zv.left_at IS NULL OR x.timestamp < zv.left_at)) AS xp
+        FROM zone_visits zv
+    """,
+    """CREATE INDEX IF NOT EXISTS idx_kills_session_ts ON kills(session_id, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_drops_session_ts ON drops(session_id, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_xp_session_ts ON xp_events(session_id, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_zones_session ON zone_visits(session_id)""",
+]
+
+# Tables wiped by reset_session (everything per-session, but not the session row).
+_RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events")
+
+
+class Database:
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(str(path), check_same_thread=False, timeout=5.0)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.row_factory = sqlite3.Row
+        self._lock = threading.RLock()
+        self._migrate()
+
+    def _migrate(self) -> None:
+        with self._lock:
+            cur = self._conn.cursor()
+            for s in SCHEMA:
+                cur.execute(s)
+            # Additive migrations for DBs created before the columns
+            # were added to the CREATE TABLE. CREATE TABLE IF NOT EXISTS
+            # is a no-op when the table already exists, so we have to
+            # ALTER. entered_at is added with a default of '' so old
+            # rows (no timestamp) don't fail the view's NULL-unsafe
+            # comparisons like k.timestamp >= zv.entered_at.
+            self._ensure_column("zone_visits", "entered_at", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column("zone_visits", "left_at", "TEXT")
+            # The view was created with CREATE VIEW IF NOT EXISTS, so
+            # if the DB predates the entered_at/left_at columns being
+            # referenced inside the view, the view's stored definition
+            # is the old one. Drop and recreate to pick up the new
+            # columns.
+            cur.execute("DROP VIEW IF EXISTS zone_stats")
+            for s in SCHEMA:
+                cur.execute(s)
+            self._conn.commit()
+
+    def _ensure_column(self, table: str, column: str, decl: str) -> None:
+        cur = self._conn.execute(f"PRAGMA table_info({table})")
+        cols = {row[1] for row in cur.fetchall()}
+        if column not in cols:
+            self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
+
+    # --- session lifecycle ---
+    def start_session(self) -> int:
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO sessions (started) VALUES (?)",
+                (datetime.now().isoformat(timespec="seconds"),),
+            )
+            self._conn.commit()
+            return cur.lastrowid
+
+    def end_session(self, session_id: int) -> None:
+        ts = datetime.now().isoformat(timespec="seconds")
+        with self._lock:
+            self._conn.execute(
+                "UPDATE sessions SET ended = ? WHERE id = ?",
+                (ts, session_id),
+            )
+            # Close any still-open zone visit so per-zone aggregates
+            # have a precise end bound.
+            self._conn.execute(
+                "UPDATE zone_visits SET left_at = ? "
+                "WHERE session_id = ? AND left_at IS NULL",
+                (ts, session_id),
+            )
+            self._conn.commit()
+
+    def reset_session(self, session_id: int) -> None:
+        """Wipe all event rows for a session, keep the session itself."""
+        with self._lock:
+            for table in _RESET_TABLES:
+                # Handle zone_visits separately - it has a different schema
+                if table == 'zone_visits':
+                    continue  # zone_visits rows are kept for history; reset doesn't wipe
+                self._conn.execute(
+                    f"DELETE FROM {table} WHERE session_id = ?",
+                    (session_id,),
+                )
+            self._conn.commit()
+
+    def insert_kill(self, session_id: int, enemy_id: int, mob_id: int | None, ts: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO kills (session_id, enemy_id, mob_id, timestamp) VALUES (?,?,?,?)",
+                (session_id, enemy_id, mob_id, ts),
+            )
+            self._conn.commit()
+
+    def insert_drop(self, session_id: int, drop_id: int, item_id: int | None,
+                    mob_id: int | None, amount: int | None,
+                    belongs_to: int | None, ts: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO drops (session_id, drop_id, item_id, mob_id, amount, belongs_to, timestamp)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (session_id, drop_id, item_id, mob_id, amount, belongs_to, ts),
+            )
+            self._conn.commit()
+
+    def insert_xp(self, session_id: int, xp: int, level: int | None,
+                  is_level_up: bool, ts: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO xp_events (session_id, xp_gained, level, is_level_up, timestamp) VALUES (?,?,?,?,?)",
+                (session_id, xp, level, int(is_level_up), ts),
+            )
+            self._conn.commit()
+
+    def insert_spawn_notification(self, session_id: int, name: str, rarity: str, ts: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO spawn_notifications (session_id, name, rarity, timestamp) VALUES (?,?,?,?)",
+                (session_id, name, rarity, ts),
+            )
+            self._conn.commit()
+
+    def insert_zone_visit(self, session_id: int, map_name: str, display_name: str, ts: str) -> None:
+        # Close the previous zone visit (if any) for this session by stamping
+        # left_at on the most recent row with no left_at yet.
+        with self._lock:
+            self._conn.execute(
+                "UPDATE zone_visits SET left_at = ? "
+                "WHERE session_id = ? AND left_at IS NULL AND map_name != ?",
+                (ts, session_id, map_name),
+            )
+            self._conn.execute(
+                "INSERT INTO zone_visits (session_id, map_name, display_name, entered_at) VALUES (?,?,?,?)",
+                (session_id, map_name, display_name, ts),
+            )
+            self._conn.execute(
+                "UPDATE sessions SET current_zone = ? WHERE id = ?",
+                (map_name, session_id),
+            )
+            self._conn.commit()
+
+    def close_open_zones(self, session_id: int, ts: str) -> None:
+        """Stamp left_at on any still-open zone visits (called on session end)."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE zone_visits SET left_at = ? "
+                "WHERE session_id = ? AND left_at IS NULL",
+                (ts, session_id),
+            )
+            self._conn.commit()
+
+    # --- read paths ---
+    def summary(self, session_id: int) -> dict:
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM kills WHERE session_id = ?", (session_id,))
+            kills = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM drops WHERE session_id = ? AND item_id = 0", (session_id,))
+            sc = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events WHERE session_id = ?", (session_id,))
+            xp = cur.fetchone()[0] or 0
+            cur.execute("SELECT COALESCE(MAX(level), 0) FROM xp_events WHERE session_id = ?", (session_id,))
+            level = cur.fetchone()[0] or 0
+            cur.execute("SELECT COUNT(*) FROM drops WHERE session_id = ?", (session_id,))
+            drops = cur.fetchone()[0]
+            return {
+                "session_id": session_id,
+                "kills": kills,
+                "soul_crystals": sc,
+                "xp": int(xp),
+                "level": int(level),
+                "drops": drops,
+            }
+
+    def zone_stats(self, session_id: int) -> list[dict]:
+        """Per-zone aggregated stats for a session (kills/sc/drops/xp + time spent)."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT zv.map_name,
+                          COALESCE(MAX(zv.display_name), zv.map_name) AS display_name,
+                          zv.entered_at,
+                          zv.left_at,
+                          zs.kills,
+                          zs.soul_crystals,
+                          zs.drops,
+                          zs.xp
+                   FROM zone_visits zv
+                   LEFT JOIN zone_stats zs ON zs.zone_visits_id = zv.id
+                   WHERE zv.session_id = ?
+                   ORDER BY zv.entered_at""",
+                (session_id,),
+            )
+            return [{
+                "map_name": r[0],
+                "display_name": r[1],
+                "entered_at": r[2],
+                "left_at": r[3],
+                "kills": r[4] or 0,
+                "soul_crystals": r[5] or 0,
+                "drops": r[6] or 0,
+                "xp": r[7] or 0,
+            } for r in cur.fetchall()]
+
+    def past_sessions(self, limit: int = 50) -> list[dict]:
+        """All sessions, newest first, with summary stats."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT s.id, s.started, s.ended, s.current_zone,
+                          (SELECT COUNT(*) FROM kills WHERE session_id = s.id) AS kills,
+                          (SELECT COUNT(*) FROM drops WHERE session_id = s.id AND item_id = 0) AS sc,
+                          (SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events WHERE session_id = s.id) AS xp,
+                          (SELECT COALESCE(MAX(level), 0) FROM xp_events WHERE session_id = s.id) AS lvl,
+                          (SELECT COUNT(*) FROM drops WHERE session_id = s.id) AS drops
+                   FROM sessions s
+                   ORDER BY s.id DESC
+                   LIMIT ?""",
+                (limit,),
+            )
+            return [{
+                "id": r[0], "started": r[1], "ended": r[2], "current_zone": r[3],
+                "kills": r[4], "soul_crystals": r[5], "xp": r[6] or 0,
+                "level": r[7] or 0, "drops": r[8],
+            } for r in cur.fetchall()]
+
+    def session_zone_timeline(self, session_id: int) -> list[dict]:
+        """Zone visits for a session, with start/end timestamps."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT id, map_name, COALESCE(display_name, map_name),
+                          entered_at, left_at
+                   FROM zone_visits WHERE session_id = ?
+                   ORDER BY entered_at""",
+                (session_id,),
+            )
+            return [{
+                "id": r[0], "map_name": r[1], "display_name": r[2],
+                "entered_at": r[3], "left_at": r[4],
+            } for r in cur.fetchall()]
+
+    def recent_kills(self, session_id: int, limit: int = 200, names=None) -> list[dict]:
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT id, enemy_id, mob_id, timestamp
+                   FROM kills WHERE session_id = ? ORDER BY id DESC LIMIT ?""",
+                (session_id, limit),
+            )
+            return [
+                {"id": r[0], "enemy_id": r[1], "mob_id": r[2], "ts": r[3],
+                 "name": (names.monster(r[2]) if (names and r[2]) else None)
+                         or f"Mob#{r[2] or '?'}"}
+                for r in cur.fetchall()
+            ]
+
+    def recent_drops(self, session_id: int, limit: int = 200, names=None) -> list[dict]:
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT id, drop_id, item_id, mob_id, amount, belongs_to, timestamp
+                   FROM drops WHERE session_id = ? ORDER BY id DESC LIMIT ?""",
+                (session_id, limit),
+            )
+            return [{
+                "id": r[0], "drop_id": r[1], "item_id": r[2], "mob_id": r[3],
+                "amount": r[4], "belongs_to": r[5], "ts": r[6],
+                "item_name": (names.item(r[2]) if (names and r[2] is not None) else None),
+            } for r in cur.fetchall()]
+
+    def sessions(self) -> list[dict]:
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT s.id, s.started, s.ended,
+                          (SELECT COUNT(*) FROM kills WHERE session_id = s.id) AS kills,
+                          (SELECT COUNT(*) FROM drops WHERE session_id = s.id) AS drops
+                   FROM sessions s ORDER BY s.id DESC LIMIT 50"""
+            )
+            return [
+                {"id": r[0], "started": r[1], "ended": r[2], "kills": r[3], "drops": r[4]}
+                for r in cur.fetchall()
+            ]
