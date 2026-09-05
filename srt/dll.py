@@ -181,9 +181,14 @@ class TrackerDLL:
 
         # Per-process consumer state. _tail is private (not in the
         # shared section). _last_generation lets us reset on game
-        # restarts without replaying old-session events.
+        # restarts without replaying old-session events. _resync holds
+        # the reason for the last lossy resync (fell behind / corrupt /
+        # torn record) for the consumer to surface in the Debug console
+        # via pop_resync() — previously these were silent, which made
+        # a stall indistinguishable from an idle game.
         self._tail = 0
         self._last_generation = 0
+        self._resync: str | None = None
 
     @property
     def path(self) -> Path:
@@ -218,29 +223,58 @@ class TrackerDLL:
 
     def next_event(self) -> str | None:
         head = self._read_head()
+        self._maybe_reset_on_generation_bump()
         if head <= self._tail:
             return None
         if head - self._tail > _SHM_CAP:
             # Consumer fell behind; drop the gap and resync.
+            dropped = head - self._tail
             self._tail = head
+            self._resync = (
+                f"fell behind by {dropped} bytes (>64KB ring) — "
+                f"skipped to producer head"
+            )
             return None
         length_bytes = self._read_at(self._tail, 4)
         if len(length_bytes) != 4:
             self._tail = head
+            self._resync = "short length read — resynced to producer head"
             return None
         (length,) = struct.unpack("<I", length_bytes)
         if length == 0 or length > _SHM_CAP - 4:
             # Corrupt length - resync to head.
             self._tail = head
+            self._resync = f"corrupt length prefix {length} — resynced to head"
             return None
         payload = self._read_at(self._tail + 4, length)
         nul = self._read_at(self._tail + 4 + length, 1)
         if nul != b"\x00":
             # Producer's NUL sentinel missing -> record was torn. Resync.
             self._tail = head
+            self._resync = "torn record (NUL sentinel missing) — resynced to head"
             return None
         self._tail += 4 + length + 1
         return payload.decode("utf-8", errors="replace")
+
+    def pop_resync(self) -> str | None:
+        """Take-and-clear the last lossy-resync reason, if any."""
+        reason, self._resync = self._resync, None
+        return reason
+
+    def debug_state(self) -> dict:
+        """Producer head / consumer tail / generation for stall diagnosis
+        (used by the status bar idle readout). Never raises."""
+        try:
+            head = self._read_head()
+        except Exception:
+            head = -1
+        try:
+            gen = struct.unpack_from("<I", bytes(self._shm[8:12]))[0]
+        except Exception:
+            gen = -1
+        return {"head": head, "tail": self._tail,
+                "pending": head - self._tail if head >= 0 else -1,
+                "generation": gen}
 
     def cube(self) -> int:
         return self._lib.sr_tracker_get_cube()

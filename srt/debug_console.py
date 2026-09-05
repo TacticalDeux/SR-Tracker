@@ -16,7 +16,7 @@ from collections import Counter
 from typing import Iterable
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
@@ -118,8 +118,12 @@ class DebugConsole(QWidget):
         doc = self._text.document()
         if doc.blockCount() > _MAX_LINES:
             cursor = self._text.textCursor()
-            cursor.movePosition(cursor.Start)
-            cursor.movePosition(cursor.Down, cursor.KeepAnchor,
+            # Fully scoped enums: Start/Down are MoveOperation,
+            # KeepAnchor is MoveMode. Unscoped access (cursor.Start)
+            # raises AttributeError on current PySide6.
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            cursor.movePosition(QTextCursor.MoveOperation.Down,
+                                QTextCursor.MoveMode.KeepAnchor,
                                 doc.blockCount() - _MAX_LINES)
             cursor.removeSelectedText()
             cursor.deleteChar()

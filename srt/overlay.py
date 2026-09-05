@@ -18,7 +18,7 @@ Behavior:
 from __future__ import annotations
 from typing import Callable
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter
 from PySide6.QtWidgets import (
     QCheckBox, QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
     QSlider, QVBoxLayout, QWidget,
@@ -41,6 +41,18 @@ _FIELDS = (
     ("level", "LEVEL",         22),
     ("zone",  "ZONE",          14),
 )
+
+#: Toggleable fields for settings UIs (the main window's Overlay tab
+#: builds its checkboxes from this, so the two never drift apart).
+OVERLAY_FIELDS = (
+    ("kills", "Kills"),
+    ("sc", "Soul crystals"),
+    ("xp", "Experience"),
+    ("level", "Level"),
+    ("zone", "Zone"),
+)
+
+_ORIENTATIONS = ("vertical", "horizontal")
 
 
 # ---------------------------------------------------------------------------
@@ -92,14 +104,25 @@ class _CrystalNumber(QWidget):
         # "muted" the same way the crystal does.
         ink = QColor(theme.ASH) if self._dim else QColor(theme.PARCH_BG)
         p.setPen(ink)
-        f = QFont("Consolas", self._number_size)
-        f.setBold(True)
-        f.setStyleHint(QFont.Monospace)
-        p.setFont(f)
         rect = QRect(
             crystal_size + 12, 0,
             self.width() - crystal_size - 12, self.height(),
         )
+        # Fit-text: soul-crystal and kill totals grow past 10k in a long
+        # session, and a fixed 22pt font gets clipped by the row width.
+        # Shrink the point size until the text fits (floor of 8pt) so a
+        # big count reads smaller instead of being cut off.
+        size = self._number_size
+        f = QFont("Consolas", size)
+        f.setBold(True)
+        f.setStyleHint(QFont.Monospace)
+        while size > 8:
+            f.setPointSize(size)
+            if QFontMetrics(f).horizontalAdvance(self._number) <= rect.width():
+                break
+            size -= 1
+        f.setPointSize(size)
+        p.setFont(f)
         p.drawText(rect, Qt.AlignVCenter | Qt.AlignRight, self._number)
         p.end()
 
@@ -156,34 +179,22 @@ class OverlayWindow(QWidget):
         layout.addWidget(_hairline())
         layout.addSpacing(10)
 
-        # --- metric rows ---
+        # --- metric rows (rebuildable: an orientation switch throws the
+        # whole box away and re-creates it, which is simpler and safer
+        # than swapping layouts on live widgets) ---
         self._rows: dict[str, tuple[QLabel, _CrystalNumber]] = {}
         # Each entry: (rule widget, key of the row above it, key of the
         # row below it) — lets us keep a divider hidden when both the
         # rows it separates are hidden, instead of leaving it floating.
         self._hairlines: list[tuple[QFrame, str, str]] = []
-        for i, (key, label_text, num_size) in enumerate(_FIELDS):
-            row_wrap = QVBoxLayout()
-            row_wrap.setSpacing(0)
-            line = QHBoxLayout()
-            line.setSpacing(10)
-            lbl = QLabel(label_text)
-            lbl.setObjectName("OverlayLabel")
-            lbl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-            line.addWidget(lbl, 1)
-            num = _CrystalNumber(num_size)
-            num.setMinimumWidth(150)
-            line.addWidget(num, 0)
-            row_wrap.addLayout(line)
-            layout.addLayout(row_wrap)
-            self._rows[key] = (lbl, num)
-
-            if i < len(_FIELDS) - 1:
-                layout.addSpacing(8)
-                rule = _hairline()
-                layout.addWidget(rule)
-                layout.addSpacing(8)
-                self._hairlines.append((rule, key, _FIELDS[i + 1][0]))
+        self._fields_host = QVBoxLayout()
+        self._fields_host.setContentsMargins(0, 0, 0, 0)
+        self._fields_host.setSpacing(0)
+        layout.addLayout(self._fields_host)
+        # Last formatted values, so a rebuild can re-paint the rows
+        # without waiting for the next poll.
+        self._last_values: dict[str, str] = {}
+        self._build_fields_box()
 
         # --- settings drawer (collapsed by default) ---
         self._drawer = QFrame()
@@ -206,6 +217,24 @@ class OverlayWindow(QWidget):
         self._opacity_slider.valueChanged.connect(self._on_opacity_changed)
         op_row.addWidget(self._opacity_slider, 1)
         d_layout.addLayout(op_row)
+
+        # Locking dims the card to overlay_locked_opacity, which the main
+        # slider never touched — so locking looked "hardcoded". A second
+        # slider owns the locked value; set both while unlocked.
+        locked_row = QHBoxLayout()
+        locked_lbl = QLabel("LOCKED OPACITY")
+        locked_lbl.setObjectName("OverlayLabel")
+        locked_row.addWidget(locked_lbl)
+        self._locked_opacity_slider = QSlider(Qt.Horizontal)
+        self._locked_opacity_slider.setRange(20, 100)
+        self._locked_opacity_slider.setSingleStep(5)
+        self._locked_opacity_slider.setPageStep(10)
+        self._locked_opacity_slider.setValue(
+            int(self._settings.overlay_locked_opacity * 100))
+        self._locked_opacity_slider.valueChanged.connect(
+            self._on_locked_opacity_changed)
+        locked_row.addWidget(self._locked_opacity_slider, 1)
+        d_layout.addLayout(locked_row)
 
         self._field_checks: dict[str, QCheckBox] = {}
         for key, label_text, _ in _FIELDS:
@@ -242,7 +271,10 @@ class OverlayWindow(QWidget):
         self._drag_active = False
 
         # Initial geometry
-        self.resize(280, 360)
+        if self._is_horizontal():
+            self.resize(880, 200)
+        else:
+            self.resize(280, 360)
         self.move(self._settings.overlay_pos_x, self._settings.overlay_pos_y)
         self._apply_opacity()
         self._apply_field_visibility()
@@ -250,11 +282,115 @@ class OverlayWindow(QWidget):
         if self._settings.overlay_locked:
             self._apply_lock_state(True)
 
+    def _is_horizontal(self) -> bool:
+        return self._settings.overlay_orientation == "horizontal"
+
+    def _build_fields_box(self) -> None:
+        """(Re)create the metric rows for the current orientation.
+
+        Vertical mode stacks label-left/number-right rows with rules
+        between them. Horizontal mode lays the fields out as columns —
+        label on top, crystal-number below — with plain spacing instead
+        of rules. The old box is detached and scheduled for deletion;
+        values, dim state and visibility are re-applied afterwards."""
+        while self._fields_host.count():
+            item = self._fields_host.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._rows = {}
+        self._hairlines = []
+        horizontal = self._is_horizontal()
+
+        box = QWidget()
+        if horizontal:
+            box_lay = QHBoxLayout(box)
+            box_lay.setSpacing(20)
+        else:
+            box_lay = QVBoxLayout(box)
+            box_lay.setSpacing(0)
+        box_lay.setContentsMargins(0, 0, 0, 0)
+
+        for i, (key, label_text, num_size) in enumerate(_FIELDS):
+            row = QWidget()
+            lbl = QLabel(label_text)
+            lbl.setObjectName("OverlayLabel")
+            num = _CrystalNumber(num_size)
+            if horizontal:
+                rl = QVBoxLayout(row)
+                rl.setContentsMargins(0, 0, 0, 0)
+                rl.setSpacing(2)
+                lbl.setAlignment(Qt.AlignCenter)
+                rl.addWidget(lbl)
+                num.setMinimumWidth(140)
+                rl.addWidget(num)
+            else:
+                rl = QHBoxLayout(row)
+                rl.setContentsMargins(0, 0, 0, 0)
+                rl.setSpacing(10)
+                lbl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+                rl.addWidget(lbl, 1)
+                num.setMinimumWidth(190)
+                rl.addWidget(num, 0)
+            box_lay.addWidget(row)
+            self._rows[key] = (lbl, num)
+            if not horizontal and i < len(_FIELDS) - 1:
+                box_lay.addSpacing(8)
+                rule = _hairline()
+                box_lay.addWidget(rule)
+                box_lay.addSpacing(8)
+                self._hairlines.append((rule, key, _FIELDS[i + 1][0]))
+
+        self._fields_host.addWidget(box)
+        for key, value in self._last_values.items():
+            if key in self._rows:
+                self._rows[key][1].set_value(value)
+        for _, num in self._rows.values():
+            num.set_dim(self._settings.overlay_locked)
+        self._apply_field_visibility()
+        self._card.adjustSize()
+        self.adjustSize()
+        self._clamp_to_screen()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def is_overlay_locked(self) -> bool:
         return self._settings.overlay_locked
+
+    def reload_settings(self) -> None:
+        """Re-read the settings store and apply everything live. Called
+        by the main window's Overlay tab, so settings change mid-session
+        without touching the overlay's own drawer."""
+        fresh = self._settings_store.load()
+        if fresh.overlay_orientation not in _ORIENTATIONS:
+            fresh.overlay_orientation = "vertical"
+        orientation_changed = (
+            fresh.overlay_orientation != self._settings.overlay_orientation
+        )
+        self._settings = fresh
+        if orientation_changed:
+            self._build_fields_box()
+        self._sync_controls()
+        self._apply_lock_state(self._settings.overlay_locked)
+        self._apply_opacity()
+        self._apply_field_visibility()
+
+    def _sync_controls(self) -> None:
+        """Push the current settings into the drawer widgets (sliders,
+        checkboxes) so they agree with changes made elsewhere."""
+        self._opacity_slider.blockSignals(True)
+        self._opacity_slider.setValue(int(self._settings.overlay_opacity * 100))
+        self._opacity_slider.blockSignals(False)
+        self._locked_opacity_slider.blockSignals(True)
+        self._locked_opacity_slider.setValue(
+            int(self._settings.overlay_locked_opacity * 100))
+        self._locked_opacity_slider.blockSignals(False)
+        for key, cb in self._field_checks.items():
+            cb.blockSignals(True)
+            cb.setChecked(getattr(self._settings, f"overlay_show_{key}"))
+            cb.blockSignals(False)
 
     def set_locked(self, locked: bool) -> None:
         if locked == self._settings.overlay_locked:
@@ -311,21 +447,29 @@ class OverlayWindow(QWidget):
             num.set_dim(locked)
 
     def _set_pass_through(self, pass_through: bool) -> None:
-        # WA_TransparentForMouseEvents has to be set on the top-level
-        # window itself for clicks to actually fall through to whatever
-        # is behind it on the desktop — setting it only on children (as
-        # before) just forwards events to this window, not past it.
-        # The lock pill is already hidden whenever we're locked, so it
-        # doesn't need a special case here.
+        # WA_TransparentForMouseEvents alone doesn't give real
+        # click-through for a top-level window on Windows — Qt still
+        # takes the click. WindowTransparentForInput is the flag that
+        # makes the OS skip the window for hit-testing, so the game
+        # underneath gets the click. Toggling a window flag on a
+        # visible window requires a re-show to take effect.
         self.setAttribute(Qt.WA_TransparentForMouseEvents, pass_through)
         for w in self.findChildren(QWidget):
             w.setAttribute(Qt.WA_TransparentForMouseEvents, pass_through)
+        self.setWindowFlag(Qt.WindowTransparentForInput, pass_through)
+        if self.isVisible():
+            self.show()
 
     # ------------------------------------------------------------------
     # Opacity / fields / drawer
     # ------------------------------------------------------------------
     def _on_opacity_changed(self, value: int) -> None:
         self._settings.overlay_opacity = value / 100.0
+        self._apply_opacity()
+        self._save_settings()
+
+    def _on_locked_opacity_changed(self, value: int) -> None:
+        self._settings.overlay_locked_opacity = value / 100.0
         self._apply_opacity()
         self._save_settings()
 
@@ -375,26 +519,29 @@ class OverlayWindow(QWidget):
     # ------------------------------------------------------------------
     def _refresh(self) -> None:
         sid = self._get_session_id()
-        for key, (_lbl, num) in self._rows.items():
-            if sid is None:
+        if sid is None:
+            for _, num in self._rows.values():
                 num.set_value("—")
-                continue
-            try:
-                s = self._db.summary(sid)
-            except Exception:
-                return
-            vmap = {
-                "kills": s["kills"],
-                "sc": s["soul_crystals"],
-                "xp": s["xp"],
-                "level": s["level"],
-                "zone": s.get("current_zone", "—"),
-            }
-            num.set_value(self._format(key, vmap[key]))
+            return
+        try:
+            s = self._db.summary(sid)
+        except Exception:
+            return
+        vmap = {
+            "kills": _mine_total(s["my_kills"], s["kills"]),
+            "sc": _mine_total(s["my_soul_crystals"], s["soul_crystals"]),
+            "xp": s["xp"],
+            "level": s["level"],
+            "zone": s.get("current_zone") or "—",
+        }
+        for key, (_lbl, num) in self._rows.items():
+            text = self._format(key, vmap[key])
+            self._last_values[key] = text
+            num.set_value(text)
 
     @staticmethod
-    def _format(key: str, value: int) -> str:
-        if key == "xp":
+    def _format(key: str, value) -> str:
+        if key == "xp" and isinstance(value, int):
             return f"{value:,}"
         return str(value)
 
@@ -428,6 +575,15 @@ class OverlayWindow(QWidget):
     def closeEvent(self, e) -> None:
         e.ignore()
         self.hide()
+
+
+def _mine_total(mine: int, total: int) -> str:
+    """'yours/total' when they differ, else the plain total. Kept local
+    (rather than importing from main_window) to avoid a circular import —
+    main_window already imports this module."""
+    if mine != total:
+        return f"{mine}/{total}"
+    return str(total)
 
 
 def _hairline() -> QFrame:

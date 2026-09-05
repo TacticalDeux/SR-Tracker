@@ -29,6 +29,7 @@ class Settings:
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False
+    overlay_orientation: str = "vertical"  # "vertical" (stacked rows) or "horizontal" (strip)
 
     @classmethod
     def defaults(cls) -> "Settings":
