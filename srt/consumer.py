@@ -33,6 +33,9 @@ _GAMEPLAY_TYPES = frozenset({
     "damage_dealt",
     "enemy_death",
     "drop_creation",
+    "pickup",
+    "pickup_denied",
+    "player_death",
     "exp_update",
     "level_up",
     "zone_change",
@@ -266,6 +269,37 @@ class EventConsumer(QObject):
                 int(data.get("belongs_to", 0)) if "belongs_to" in data else None,
                 ts,
             )
+        elif etype == "pickup":
+            # packets: someone picked a drop up. The drop_creation row
+            # (keyed by drop entity id) gains the picker so the Drops tab
+            # can show who took it; "mine" is derived at query time from
+            # sessions.local_account_id.
+            try:
+                picker = int(data.get("picker", 0)) or None
+                drop_id = int(data.get("drop_id", 0))
+            except (TypeError, ValueError):
+                return
+            if drop_id:
+                self._db.mark_drop_pickup(sid, drop_id, picker, ts)
+        elif etype == "drop_destroyed":
+            # packets: a drop vanished unclaimed (expired/destroyed).
+            try:
+                drop_id = int(data.get("drop_id", 0))
+            except (TypeError, ValueError):
+                return
+            if drop_id:
+                self._db.mark_drop_destroyed(sid, drop_id)
+        elif etype == "player_death":
+            # packets death screen: the local player died, with the
+            # exact toll attached (exp/money/items). XP loss is tracked
+            # on the death row itself — xp_events stays gains-only.
+            try:
+                exp_lost = int(data.get("exp_lost", 0))
+                money_lost = int(data.get("money_lost", 0))
+                items_lost = int(data.get("items_lost", 0))
+            except (TypeError, ValueError):
+                return
+            self._db.insert_death(sid, exp_lost, money_lost, items_lost, ts)
         elif etype == "exp_update":
             self._db.insert_xp(
                 sid,

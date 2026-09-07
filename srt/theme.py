@@ -15,8 +15,8 @@ dark-fantasy / ruined-arena. The UI borrows from that world:
 The overlay gets the warm parchment treatment so it reads as part of
 the game world; the main window stays in Ink so the user's eyes have
 a calm landing place between sessions. The signature element is the
-pixel-art soul crystal (see `srt.crystal`) used as a counter chip
-in the overlay and as a hero element on the main window's summary.
+pixel-art soul crystal (see `srt.crystal`), used as a hero element
+on the main window's summary.
 
 Type uses three voices, chosen for what they DO not for novelty:
 
@@ -31,8 +31,13 @@ Type uses three voices, chosen for what they DO not for novelty:
 """
 from __future__ import annotations
 
-from PySide6.QtGui import QColor, QFont, QPalette
+from PySide6.QtCore import Qt
+from PySide6.QtGui import (
+    QColor, QFont, QPalette, QPainter, QPen, QPixmap,
+)
 from PySide6.QtWidgets import QApplication
+
+from . import paths as _paths
 
 
 # --- palette tokens ---
@@ -91,7 +96,43 @@ def _palette() -> QPalette:
 
 
 # --- global stylesheet ---
-_GLOBAL_QSS = f"""
+# NOTE: never put a bare `background: ...` (no selector) inline
+# stylesheet on a container widget (tab pages, hosts, panels). A
+# selector-less rule matches *every descendant*, and an inline sheet
+# beats the app sheet — so it silently overrides state rules like
+# QPushButton:checked on all child buttons. That is exactly how the
+# Overlay tab's "Unlock" lost its blue background and rendered as a
+# blank dark box. Containers already get INK_0 from the QWidget rule
+# below; if a container truly needs its own background, scope it with
+# an object-name selector (#MyPanel { ... }).
+def _checkbox_check_path() -> str:
+    """Render a 16px check tick next to the settings file; QSS `image:`
+    needs a real file (no data-URI support), so it is drawn once per
+    launch. Returns "" when rendering/saving fails — the checked box
+    then falls back to a crystal border with no glyph."""
+    try:
+        px = QPixmap(16, 16)
+        px.fill(Qt.transparent)
+        p = QPainter(px)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(QPen(QColor(PARCH_BG), 2.2,
+                      Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.drawLine(4, 9, 7, 12)
+        p.drawLine(7, 12, 12, 4)
+        p.end()
+        dest = _paths.user_data_dir() / "checkbox_check.png"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if px.save(str(dest), "PNG"):
+            return dest.as_posix()
+    except Exception:
+        pass
+    return ""
+
+
+def _global_qss() -> str:
+    check = _checkbox_check_path()
+    check_rule = f'\n        image: url("{check}");' if check else ""
+    return f"""
     QMainWindow, QWidget {{
         background-color: {INK_0};
         color: {PARCH_BG};
@@ -144,7 +185,7 @@ _GLOBAL_QSS = f"""
     }}
     QPushButton:pressed {{
         background: {CRYSTAL_DEEP};
-        color: {INK_0};
+        color: {PARCH_BG};
     }}
     QPushButton:checked {{
         background: {CRYSTAL};
@@ -217,8 +258,44 @@ _GLOBAL_QSS = f"""
         background: {INK_1};
     }}
     QCheckBox::indicator:hover {{ border-color: {RUNE}; }}
+    /* Checked keeps the dark box and draws a real check glyph: the
+    old solid-crystal fill read as an undifferentiated blue square
+    with no visible "checked" mark. The glyph is rendered at launch
+    (see _checkbox_check_path); without it the crystal border alone
+    still distinguishes the state. */
     QCheckBox::indicator:checked {{
-        background: {CRYSTAL}; border-color: {CRYSTAL};
+        background: {INK_1}; border-color: {CRYSTAL};{check_rule}
+    }}
+    QCheckBox::indicator:checked:hover {{
+        border-color: {RUNE};{check_rule}
+    }}
+
+    /* Dropdown popups: the closed combo keeps native rendering, but
+    the popup list gets dark rows with hover + selected states, so
+    hovering a dropdown always shows what a click would pick. (The
+    hover rule needs mouse tracking on the popup view — MainWindow
+    enables it for every combo at build time.) */
+    QComboBox QAbstractItemView {{
+        background-color: {INK_1};
+        color: {PARCH_BG};
+        border: 1px solid {INK_BORDER_2};
+        outline: 0;
+        selection-background-color: {CRYSTAL};
+        selection-color: {INK_0};
+        font-family: "Segoe UI", sans-serif;
+        font-size: 10px;
+    }}
+    QComboBox QAbstractItemView::item {{
+        padding: 6px 10px;
+        border: 0;
+    }}
+    QComboBox QAbstractItemView::item:hover {{
+        background-color: {INK_2};
+        color: {CRYSTAL_LIGHT};
+    }}
+    QComboBox QAbstractItemView::item:selected {{
+        background-color: {CRYSTAL};
+        color: {INK_0};
     }}
 """
 
@@ -228,7 +305,7 @@ def apply(app: QApplication) -> None:
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
     app.setPalette(_palette())
-    app.setStyleSheet(_GLOBAL_QSS)
+    app.setStyleSheet(_global_qss())
 
 
 # --- overlay-specific tokens (exported for srt.overlay) ---
@@ -239,10 +316,33 @@ def apply(app: QApplication) -> None:
 # accent. The only places that differ are the layout (tall narrow card
 # vs wide window) and the lock interaction.
 OVERLAY_QSS = f"""
+    /* Unnamed inner containers (the fields box, metric rows) would
+    otherwise inherit the app sheet's `QWidget {{ background: INK_0 }}`
+    as a fully-opaque slab behind the rows — the "box inside a box"
+    that never faded with the opacity slider, which only repaints the
+    card. Scoped to the overlay subtree, this makes every container
+    transparent; the #OverlayCard ID rule below still wins for the
+    card itself (ID beats type), and named controls (pills, labels,
+    checkboxes, sliders) keep their own more-specific rules. */
+    QWidget {{
+        background: transparent;
+    }}
+    /* Unnamed inner containers (the fields box, metric rows) would
+    otherwise inherit the app sheet's `QWidget {{ background: INK_0 }}`
+    as a fully-opaque slab behind the rows — the "box inside a box"
+    that never faded with the opacity slider, which only repaints the
+    card. Scoped to the overlay subtree, this makes every container
+    transparent; the #OverlayCard ID rule below still wins for the
+    card itself (ID beats type), and named controls (pills, labels,
+    checkboxes, sliders) keep their own more-specific rules. */
     #OverlayCard {{
         background: {INK_1};
         border: 1px solid {INK_BORDER_2};
         border-radius: 0;
+    }}
+    #OverlayDrawer {{
+        background: transparent;
+        border: 0;
     }}
     #OverlayHandle {{
         color: {CRYSTAL_LIGHT};

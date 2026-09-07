@@ -15,10 +15,12 @@ import time
 from datetime import datetime
 
 from PySide6.QtCore import QSize, Qt, QTimer
-from PySide6.QtGui import QFont, QGuiApplication
+from PySide6.QtGui import QColor, QFont, QGuiApplication
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame,
+    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
+    QDialog, QDialogButtonBox, QFrame,
     QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem,
     QMainWindow, QMessageBox, QPushButton, QScrollArea, QSlider, QStatusBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -32,7 +34,10 @@ from .debug_console import DebugConsole, is_dev_mode
 from . import names as _names
 from .overlay import OverlayWindow
 from .settings import Settings, SettingsStore
-from .charts import BarChart, Bar, RateBarChart
+from .charts import (
+    Point, SeriesChart, SpiderChart, SpiderSeries,
+    SPIDER_COLORS,
+)
 
 # ---------------------------------------------------------------------------
 # The signature element, scaled up for the main window's summary tab.
@@ -100,8 +105,11 @@ class _SummaryPanel(QWidget):
         self._sc      = self._make_metric("SOUL CRYSTALS")
         self._xp      = self._make_metric("EXPERIENCE")
         self._level   = self._make_metric("LEVEL")
+        self._deaths  = self._make_metric("DEATHS")
+        self._xp_lost = self._make_metric("XP LOST")
 
-        for w in (self._kills, self._sc, self._xp, self._level):
+        for w in (self._kills, self._sc, self._xp, self._level,
+                  self._deaths, self._xp_lost):
             right.addWidget(w)
         right.addStretch(1)
 
@@ -162,6 +170,8 @@ class _SummaryPanel(QWidget):
             _mine_total(s["my_soul_crystals"], s["soul_crystals"]))
         self._xp._num.setText(f"{s['xp']:,}")
         self._level._num.setText(str(s["level"]))
+        self._deaths._num.setText(str(s.get("deaths", 0)))
+        self._xp_lost._num.setText(f"{s.get('xp_lost', 0):,}")
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +223,22 @@ class MainWindow(QMainWindow):
         self._build_zones_tab()
         self._build_graphs_tab()
         self._build_overlay_tab()
+        # Dropdown popups track the mouse so the hovered row always
+        # highlights (see the QComboBox QAbstractItemView rules in
+        # theme.py) — without tracking, the list only marks the
+        # last-clicked row and hovering gives no feedback at all.
+        for _cb in self.findChildren(QComboBox):
+            _cb.view().setMouseTracking(True)
+        # Snapshot tab pages by role. Refreshes match on widget
+        # identity, never on hardcoded indices — the Debug tab only
+        # exists in dev mode, so indices shift between dev and frozen.
+        self._tab_summary = self._tabs.widget(0)
+        self._tab_sessions = self._tabs.widget(1)
+        self._tab_kills = self._tabs.widget(2)
+        self._tab_drops = self._tabs.widget(3)
+        self._tab_zones = self._tabs.widget(4)
+        self._tab_graphs = self._tabs.widget(5)
+        self._tab_overlay = self._tabs.widget(6)
         self._tabs.currentChanged.connect(self._on_tab_changed)
         # Dev mode only: a streaming event log so you can see exactly
         # what the DLL is producing. Not built into frozen exes.
@@ -288,7 +314,7 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
 
         # Brand mark on the left
-        brand = QLabel("SOULS  REMAINING")
+        brand = QLabel("SOUL'S REMNANT")
         brand.setFont(QFont("Georgia", 11, QFont.Bold))
         brand.setStyleSheet(
             f"color: {theme.CRYSTAL}; letter-spacing: 4px;"
@@ -320,7 +346,6 @@ class MainWindow(QMainWindow):
 
     def _build_summary_tab(self) -> None:
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(0, 0, 0, 0)
         self._summary = _SummaryPanel()
@@ -329,7 +354,6 @@ class MainWindow(QMainWindow):
 
     def _build_sessions_tab(self) -> None:
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
@@ -382,7 +406,6 @@ class MainWindow(QMainWindow):
 
     def _build_kills_tab(self) -> None:
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
@@ -425,7 +448,6 @@ class MainWindow(QMainWindow):
 
     def _build_drops_tab(self) -> None:
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
@@ -455,16 +477,18 @@ class MainWindow(QMainWindow):
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         layout.addWidget(rule)
 
-        self.tbl_drops = QTableWidget(0, 5)
+        self.tbl_drops = QTableWidget(0, 6)
         self.tbl_drops.setHorizontalHeaderLabels(
-            ["TIME", "DROP", "ITEM", "QTY", "OWNER"]
+            ["TIME", "DROP", "ITEM", "QTY", "OWNER", "STATUS"]
         )
         self.tbl_drops.horizontalHeaderItem(4).setToolTip(
             "Drop owner: You, Unclaimed, or the owning account id")
+        self.tbl_drops.horizontalHeaderItem(5).setToolTip(
+            "Pickup lifecycle: still on the ground, who picked it up, or gone")
         self.tbl_drops.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         _align_headers(self.tbl_drops,
                        [Qt.AlignLeft, Qt.AlignRight, Qt.AlignLeft,
-                        Qt.AlignRight, Qt.AlignLeft])
+                        Qt.AlignRight, Qt.AlignLeft, Qt.AlignLeft])
         self.tbl_drops.verticalHeader().setVisible(False)
         self.tbl_drops.setShowGrid(False)
         self.tbl_drops.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -477,7 +501,6 @@ class MainWindow(QMainWindow):
     def _build_zones_tab(self) -> None:
         """Per-zone aggregated stats for the active session (or latest if no session)."""
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
@@ -523,30 +546,84 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._zones_empty)
         self._tabs.addTab(tab, "Zones")
 
+    # (metric key, menu label, value format). The Graphs tab charts
+    # per-zone values for whichever of these is selected.
+    _GRAPH_METRICS = (
+        ("kills",   "Kills",           "{:.0f}"),
+        ("drops",   "Drops",           "{:.0f}"),
+        ("sc",      "Soul crystals",   "{:.0f}"),
+        ("xp",      "Experience",      "{:.0f}"),
+        ("kpm",     "Kills / min",     "{:.1f}"),
+        ("drops_m", "Drops / min",     "{:.1f}"),
+        ("sc_m",    "Soul cryst. / min", "{:.1f}"),
+        ("xp_m",    "Experience / min", "{:.0f}"),
+        ("minutes", "Minutes in zone", "{:.1f}"),
+    )
+
     def _build_graphs_tab(self) -> None:
-        """Per-session rate charts: KPM, drops/m, SC/m."""
+        """One configurable chart: session + metric + chart-type selectors
+        drive a single per-zone chart, with the session totals as a strip
+        above it. Replaces the old wall of fixed KPM/drops/SC charts —
+        every combination the old charts showed is one selection away,
+        plus XP and per-minute rates the old tab had no room for."""
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
+        self._graphs_tab = tab
         outer = QVBoxLayout(tab)
         outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(20)
+        outer.setSpacing(12)
 
         # Session selector
         selector_row = QHBoxLayout()
-        selector_title = QLabel("SESSION")
-        selector_title.setFont(QFont("Georgia", 9))
-        selector_title.setStyleSheet(
-            f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
-        )
-        selector_row.addWidget(selector_title)
+        selector_row.addWidget(_mini_title("SESSION"))
         self.cmb_sessions = QComboBox()
         self.cmb_sessions.currentIndexChanged.connect(self._refresh_graphs)
         self.cmb_sessions.setMinimumWidth(280)
         selector_row.addWidget(self.cmb_sessions, 1)
+        btn_details = QPushButton("Details…")
+        btn_details.setToolTip("Open the detail view for the selected session")
+        btn_details.clicked.connect(self._open_selected_session_detail)
+        selector_row.addWidget(btn_details)
         btn = QPushButton("Re-read")
         btn.clicked.connect(self._refresh_sessions_combo)
         selector_row.addWidget(btn)
         outer.addLayout(selector_row)
+
+        # Metric + chart-type + zone selectors. Line is the default view:
+        # it reads the shape of a session at a glance, which is what the
+        # tab is for; bars suit exact read-offs, candles the pace over
+        # time, spider the zone-vs-zone balance.
+        cfg_row = QHBoxLayout()
+        cfg_row.addWidget(_mini_title("CHART"))
+        self.cmb_metric = QComboBox()
+        for key, label, _fmt in self._GRAPH_METRICS:
+            self.cmb_metric.addItem(label, key)
+        self.cmb_metric.setCurrentIndex(4)  # Kills / min
+        self.cmb_metric.currentIndexChanged.connect(self._refresh_graphs)
+        self.cmb_metric.setMinimumWidth(200)
+        cfg_row.addWidget(self.cmb_metric)
+        self.cmb_chart_type = QComboBox()
+        self.cmb_chart_type.addItem("Line", "line")
+        self.cmb_chart_type.addItem("Cumulative", "cumulative")
+        self.cmb_chart_type.addItem("Bars", "bars")
+        self.cmb_chart_type.addItem("Share", "share")
+        self.cmb_chart_type.addItem("Spider", "spider")
+        self.cmb_chart_type.setCurrentIndex(0)
+        self.cmb_chart_type.currentIndexChanged.connect(self._refresh_graphs)
+        cfg_row.addWidget(self.cmb_chart_type)
+        cfg_row.addWidget(_mini_title("ZONE"))
+        self.cmb_zone = QComboBox()
+        self.cmb_zone.setMinimumWidth(200)
+        self.cmb_zone.setToolTip(
+            "All zones charts the stat over the whole session; picking "
+            "a zone scopes every chart to the time spent in that "
+            "visit. Repeat visits are numbered first-entered-first "
+            "(#1, #2, …). Share always splits the whole session by "
+            "zone, and spider always compares all zones, highlighting "
+            "the picked one.")
+        self.cmb_zone.currentIndexChanged.connect(self._refresh_graphs)
+        cfg_row.addWidget(self.cmb_zone)
+        cfg_row.addStretch(1)
+        outer.addLayout(cfg_row)
 
         rule = QFrame()
         rule.setFrameShape(QFrame.NoFrame)
@@ -554,42 +631,32 @@ class MainWindow(QMainWindow):
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         outer.addWidget(rule)
 
-        # Charts live in a scroll area: the per-zone lists grow with the
-        # session, and a fixed tab would squash them to nothing.
+        # Session totals strip: what the session amounted to overall.
+        self._graphs_totals = QLabel("")
+        self._graphs_totals.setFont(QFont("Consolas", 10))
+        self._graphs_totals.setStyleSheet(f"color: {theme.ASH_BRIGHT};")
+        self._graphs_totals.setWordWrap(True)
+        outer.addWidget(self._graphs_totals)
+
+        # The chart lives in a scroll area: long per-zone lists grow
+        # with the session, and a fixed tab would squash them to nothing.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
         charts_host = QWidget()
-        charts_host.setStyleSheet(f"background: {theme.INK_0};")
         charts_lay = QVBoxLayout(charts_host)
         charts_lay.setContentsMargins(0, 0, 12, 0)
         charts_lay.setSpacing(20)
 
-        # Three charts stacked: KPM, drops/m, SC/m
-        charts_label = QLabel("RATES")
-        charts_label.setFont(QFont("Georgia", 9))
-        charts_label.setStyleSheet(
-            f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
-        )
-        charts_lay.addWidget(charts_label)
-
-        self.chart_kpm = RateBarChart()
-        self.chart_drops_m = RateBarChart()
-        self.chart_sc_m = RateBarChart()
-        for c in (self.chart_kpm, self.chart_drops_m, self.chart_sc_m):
-            c.setMinimumHeight(140)
-            charts_lay.addWidget(c)
-
-        # Per-zone breakdown in selected session
-        zone_label = QLabel("PER-ZONE  IN  THIS  SESSION")
-        zone_label.setFont(QFont("Georgia", 9))
-        zone_label.setStyleSheet(
-            f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
-        )
-        charts_lay.addWidget(zone_label)
-        self.chart_zones = BarChart(bar_height=22, value_format="{:.1f}")
-        self.chart_zones.setMinimumHeight(180)
-        charts_lay.addWidget(self.chart_zones)
+        self._graphs_section_title = _mini_title("PER-ZONE  IN  THIS  SESSION")
+        charts_lay.addWidget(self._graphs_section_title)
+        self.chart_main = SeriesChart(mode="line")
+        self.chart_main.setMinimumHeight(300)
+        charts_lay.addWidget(self.chart_main)
+        self.chart_spider = SpiderChart()
+        self.chart_spider.setMinimumHeight(340)
+        self.chart_spider.setVisible(False)
+        charts_lay.addWidget(self.chart_spider)
         charts_lay.addStretch(1)
 
         scroll.setWidget(charts_host)
@@ -605,7 +672,6 @@ class MainWindow(QMainWindow):
         always-synced way to change the same values."""
         from .overlay import OVERLAY_FIELDS
         tab = QWidget()
-        tab.setStyleSheet(f"background: {theme.INK_0};")
         outer = QVBoxLayout(tab)
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
@@ -646,7 +712,7 @@ class MainWindow(QMainWindow):
 
         op_row = QHBoxLayout()
         self._ov_opacity = QSlider(Qt.Horizontal)
-        self._ov_opacity.setRange(20, 100)
+        self._ov_opacity.setRange(0, 100)
         self._ov_opacity.valueChanged.connect(
             lambda _v: self._push_overlay_settings())
         op_row.addWidget(self._ov_opacity, 1)
@@ -654,11 +720,11 @@ class MainWindow(QMainWindow):
         self._ov_opacity_val.setFont(QFont("Consolas", 10))
         self._ov_opacity_val.setMinimumWidth(48)
         op_row.addWidget(self._ov_opacity_val)
-        form.addRow("Opacity:", op_row)
+        form.addRow("Background:", op_row)
 
         lop_row = QHBoxLayout()
         self._ov_locked_opacity = QSlider(Qt.Horizontal)
-        self._ov_locked_opacity.setRange(20, 100)
+        self._ov_locked_opacity.setRange(0, 100)
         self._ov_locked_opacity.valueChanged.connect(
             lambda _v: self._push_overlay_settings())
         lop_row.addWidget(self._ov_locked_opacity, 1)
@@ -666,7 +732,69 @@ class MainWindow(QMainWindow):
         self._ov_locked_opacity_val.setFont(QFont("Consolas", 10))
         self._ov_locked_opacity_val.setMinimumWidth(48)
         lop_row.addWidget(self._ov_locked_opacity_val)
-        form.addRow("Locked opacity:", lop_row)
+        form.addRow("Locked background:", lop_row)
+
+        wop_row = QHBoxLayout()
+        self._ov_window_opacity = QSlider(Qt.Horizontal)
+        self._ov_window_opacity.setRange(0, 100)
+        self._ov_window_opacity.setToolTip(
+            "Fades background and text together")
+        self._ov_window_opacity.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        wop_row.addWidget(self._ov_window_opacity, 1)
+        self._ov_window_opacity_val = QLabel("")
+        self._ov_window_opacity_val.setFont(QFont("Consolas", 10))
+        self._ov_window_opacity_val.setMinimumWidth(48)
+        wop_row.addWidget(self._ov_window_opacity_val)
+        form.addRow("Opacity:", wop_row)
+
+        lwop_row = QHBoxLayout()
+        self._ov_locked_window_opacity = QSlider(Qt.Horizontal)
+        self._ov_locked_window_opacity.setRange(0, 100)
+        self._ov_locked_window_opacity.setToolTip(
+            "Fades background and text together")
+        self._ov_locked_window_opacity.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        lwop_row.addWidget(self._ov_locked_window_opacity, 1)
+        self._ov_locked_window_opacity_val = QLabel("")
+        self._ov_locked_window_opacity_val.setFont(QFont("Consolas", 10))
+        self._ov_locked_window_opacity_val.setMinimumWidth(48)
+        lwop_row.addWidget(self._ov_locked_window_opacity_val)
+        form.addRow("Locked opacity:", lwop_row)
+
+        scale_tab_row = QHBoxLayout()
+        self._ov_scale = QSlider(Qt.Horizontal)
+        self._ov_scale.setRange(70, 150)
+        self._ov_scale.setToolTip("Scales the overlay text")
+        self._ov_scale.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        scale_tab_row.addWidget(self._ov_scale, 1)
+        self._ov_scale_val = QLabel("")
+        self._ov_scale_val.setFont(QFont("Consolas", 10))
+        self._ov_scale_val.setMinimumWidth(48)
+        scale_tab_row.addWidget(self._ov_scale_val)
+        form.addRow("Scale:", scale_tab_row)
+
+        color_row = QHBoxLayout()
+        self._ov_color_btn = QPushButton()
+        self._ov_color_btn.setToolTip("Pick the overlay stats text color")
+        self._ov_color_btn.setCursor(Qt.PointingHandCursor)
+        self._ov_color_btn.clicked.connect(
+            self._on_pick_overlay_text_color)
+        color_row.addWidget(self._ov_color_btn)
+        color_row.addStretch(1)
+        form.addRow("Stats text color:", color_row)
+
+        locked_color_row = QHBoxLayout()
+        self._ov_locked_color_btn = QPushButton()
+        self._ov_locked_color_btn.setToolTip(
+            "Pick the overlay numbers' color while locked")
+        self._ov_locked_color_btn.setCursor(Qt.PointingHandCursor)
+        self._ov_locked_color_btn.clicked.connect(
+            self._on_pick_overlay_locked_text_color)
+        locked_color_row.addWidget(self._ov_locked_color_btn)
+        locked_color_row.addStretch(1)
+        form.addRow("Locked stats text color:", locked_color_row)
         outer.addLayout(form)
 
         fields_label = QLabel("FIELDS")
@@ -675,14 +803,36 @@ class MainWindow(QMainWindow):
             f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
         )
         outer.addWidget(fields_label)
+        # One list owns both toggles and order: checkable rows the user
+        # can drag (or nudge with the arrows) into display order.
         fields_row = QHBoxLayout()
-        self._ov_checks: dict[str, QCheckBox] = {}
-        for key, label in OVERLAY_FIELDS:
-            cb = QCheckBox(label)
-            cb.toggled.connect(lambda _c: self._push_overlay_settings())
-            fields_row.addWidget(cb)
-            self._ov_checks[key] = cb
-        fields_row.addStretch(1)
+        self._ov_fields = QListWidget()
+        self._ov_fields.setDragDropMode(
+            QAbstractItemView.InternalMove)
+        self._ov_fields.setDefaultDropAction(Qt.MoveAction)
+        self._ov_fields.setSelectionMode(
+            QAbstractItemView.SingleSelection)
+        self._ov_fields.setMaximumHeight(178)
+        self._ov_fields.itemChanged.connect(
+            lambda _i: self._push_overlay_settings())
+        self._ov_fields.model().rowsMoved.connect(
+            lambda *_a: self._push_overlay_settings())
+        fields_row.addWidget(self._ov_fields, 1)
+        move_col = QVBoxLayout()
+        self._ov_field_up = QPushButton("▲")
+        self._ov_field_up.setToolTip("Move the selected field up")
+        self._ov_field_up.setFixedWidth(36)
+        self._ov_field_up.clicked.connect(
+            lambda: self._on_ov_field_move(-1))
+        move_col.addWidget(self._ov_field_up)
+        self._ov_field_down = QPushButton("▼")
+        self._ov_field_down.setToolTip("Move the selected field down")
+        self._ov_field_down.setFixedWidth(36)
+        self._ov_field_down.clicked.connect(
+            lambda: self._on_ov_field_move(+1))
+        move_col.addWidget(self._ov_field_down)
+        move_col.addStretch(1)
+        fields_row.addLayout(move_col)
         outer.addLayout(fields_row)
 
         outer.addStretch(1)
@@ -759,18 +909,27 @@ class MainWindow(QMainWindow):
             self._set_status(f"Session #{sid} started.")
 
     def _toggle_overlay(self) -> None:
-        if self._overlay is None or not self._overlay.isVisible():
+        # Reuse the window: building a fresh OverlayWindow on every show
+        # leaked the old one — its poll timer kept running against the
+        # DB twice a second — and reset its screen position. A closed
+        # overlay is only ever hidden (see OverlayWindow.closeEvent),
+        # never destroyed, so self._overlay stays usable across hides.
+        if self._overlay is None:
             self._overlay = OverlayWindow(
                 self._db,
                 self._settings_store,
                 lambda: self._display_session_id(),
                 on_settings_changed=self._on_overlay_settings_changed,
             )
-            self._overlay.show()
-            self.btn_overlay.setText("Hide overlay")
-        else:
+        if self._overlay.isVisible():
             self._overlay.hide()
             self.btn_overlay.setText("Show overlay")
+        else:
+            # Pick up anything changed while hidden (orientation,
+            # opacity, field set) before showing.
+            self._overlay.reload_settings()
+            self._overlay.show()
+            self.btn_overlay.setText("Hide overlay")
         self._refresh_overlay_tab()
 
     def _reset_session(self) -> None:
@@ -801,24 +960,50 @@ class MainWindow(QMainWindow):
     # Lock / unlock
     # ------------------------------------------------------------------
     def _on_lock_button_clicked(self) -> None:
-        desired = self.btn_lock.isChecked()
-        if self._overlay is None or not self._overlay.isVisible():
-            self._toggle_overlay()
-        if self._overlay is not None:
-            self._overlay.set_locked(desired)
+        self._set_overlay_locked(self.btn_lock.isChecked())
+
+    def _set_overlay_locked(self, locked: bool) -> None:
+        """Single funnel for every lock/unlock path (header chip, Overlay
+        tab, overlay pill). The settings store is the one source of
+        truth — written first, then re-read — so the two buttons can
+        never disagree with each other or with the overlay. (They used
+        to read different copies: the tab read the store, the header
+        read in-memory state, and whichever refreshed last won.)"""
+        s = self._settings_store.load()
+        s.overlay_locked = locked
+        self._settings_store.save(s)
+        self._settings = s
+        if self._overlay is None:
+            self._overlay = OverlayWindow(
+                self._db,
+                self._settings_store,
+                lambda: self._display_session_id(),
+                on_settings_changed=self._on_overlay_settings_changed,
+            )
+        if not self._overlay.isVisible():
+            self._overlay.reload_settings()
+            self._overlay.show()
+            self.btn_overlay.setText("Hide overlay")
+        self._overlay.set_locked(locked)
         self._refresh_lock_button()
+        self._refresh_overlay_tab()
 
     def _refresh_lock_button(self) -> None:
-        locked = self._settings.overlay_locked
-        self.btn_lock.blockSignals(True)
-        self.btn_lock.setChecked(locked)
-        self.btn_lock.setText("Unlock" if locked else "Lock")
-        self.btn_lock.blockSignals(False)
+        locked = self._settings_store.load().overlay_locked
+        self._settings.overlay_locked = locked
+        buttons = [self.btn_lock]
         if hasattr(self, "_ov_lock_btn"):
-            self._ov_lock_btn.blockSignals(True)
-            self._ov_lock_btn.setChecked(locked)
-            self._ov_lock_btn.setText("Unlock" if locked else "Lock")
-            self._ov_lock_btn.blockSignals(False)
+            buttons.append(self._ov_lock_btn)
+        for btn in buttons:
+            btn.blockSignals(True)
+            btn.setChecked(locked)
+            btn.setText("Unlock" if locked else "Lock")
+            # "Unlock" is wider than "Lock" — pin the chip to the wider
+            # label so flipping never reflows the header or the form.
+            need = max(btn.fontMetrics().horizontalAdvance(t)
+                       for t in ("Lock", "Unlock")) + 30
+            btn.setMinimumWidth(need)
+            btn.blockSignals(False)
 
     def _on_overlay_settings_changed(self, settings: Settings) -> None:
         self._settings = settings
@@ -833,7 +1018,7 @@ class MainWindow(QMainWindow):
         # never show values the overlay's own drawer changed earlier.
         # (The per-second tick deliberately leaves this tab alone — a
         # refresh mid-drag would fight the slider being dragged.)
-        if hasattr(self, "_overlay_tab_idx") and idx == self._overlay_tab_idx:
+        if self._tabs.widget(idx) is self._tab_overlay:
             self._refresh_overlay_tab()
 
     def _refresh_overlay_tab(self) -> None:
@@ -861,10 +1046,25 @@ class MainWindow(QMainWindow):
         self._ov_locked_opacity.blockSignals(False)
         self._ov_locked_opacity_val.setText(
             f"{int(s.overlay_locked_opacity * 100)}%")
-        for key, cb in self._ov_checks.items():
-            cb.blockSignals(True)
-            cb.setChecked(getattr(s, f"overlay_show_{key}", True))
-            cb.blockSignals(False)
+        self._ov_window_opacity.blockSignals(True)
+        self._ov_window_opacity.setValue(
+            int(s.overlay_window_opacity * 100))
+        self._ov_window_opacity.blockSignals(False)
+        self._ov_window_opacity_val.setText(
+            f"{int(s.overlay_window_opacity * 100)}%")
+        self._ov_locked_window_opacity.blockSignals(True)
+        self._ov_locked_window_opacity.setValue(
+            int(s.overlay_locked_window_opacity * 100))
+        self._ov_locked_window_opacity.blockSignals(False)
+        self._ov_locked_window_opacity_val.setText(
+            f"{int(s.overlay_locked_window_opacity * 100)}%")
+        self._ov_scale.blockSignals(True)
+        self._ov_scale.setValue(int(round(s.overlay_scale * 100)))
+        self._ov_scale.blockSignals(False)
+        self._ov_scale_val.setText(f"{int(round(s.overlay_scale * 100))}%")
+        self._sync_ov_color_button(s.overlay_text_color)
+        self._sync_ov_locked_color_button(s.overlay_locked_text_color)
+        self._refresh_ov_fields(s)
 
     def _push_overlay_settings(self) -> None:
         """Read the Overlay tab's controls into the settings store and
@@ -874,28 +1074,134 @@ class MainWindow(QMainWindow):
             self._ov_orient.currentData() or "vertical")
         s.overlay_opacity = self._ov_opacity.value() / 100.0
         s.overlay_locked_opacity = self._ov_locked_opacity.value() / 100.0
-        for key, cb in self._ov_checks.items():
-            setattr(s, f"overlay_show_{key}", cb.isChecked())
+        s.overlay_window_opacity = self._ov_window_opacity.value() / 100.0
+        s.overlay_locked_window_opacity = (
+            self._ov_locked_window_opacity.value() / 100.0)
+        s.overlay_scale = self._ov_scale.value() / 100.0
+        order = []
+        for i in range(self._ov_fields.count()):
+            item = self._ov_fields.item(i)
+            key = item.data(Qt.UserRole)
+            order.append(key)
+            setattr(s, f"overlay_show_{key}",
+                    item.checkState() == Qt.Checked)
+        s.overlay_field_order = order
         self._settings_store.save(s)
         self._settings = s
         self._ov_opacity_val.setText(f"{self._ov_opacity.value()}%")
         self._ov_locked_opacity_val.setText(
             f"{self._ov_locked_opacity.value()}%")
+        self._ov_window_opacity_val.setText(
+            f"{self._ov_window_opacity.value()}%")
+        self._ov_locked_window_opacity_val.setText(
+            f"{self._ov_locked_window_opacity.value()}%")
+        self._ov_scale_val.setText(f"{self._ov_scale.value()}%")
         if self._overlay is not None and self._overlay.isVisible():
             self._overlay.reload_settings()
         self._refresh_lock_button()
+
+    @staticmethod
+    def _paint_ov_swatch(btn: QPushButton, hex_color: str) -> None:
+        """Show a color as hex on a swatch button."""
+        if not QColor(hex_color).isValid():
+            hex_color = theme.PARCH_BG
+        name = QColor(hex_color).name()
+        c = QColor(name)
+        lum = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+        fg = "#1a1424" if lum > 128 else "#e8dfc8"
+        btn.setText(name)
+        # A leaf button, not a container: a bare background here
+        # affects only this button.
+        btn.setStyleSheet(f"background: {name}; color: {fg};")
+
+    def _sync_ov_color_button(self, hex_color: str) -> None:
+        """Show the stats-text color as hex on a swatch button."""
+        self._paint_ov_swatch(self._ov_color_btn, hex_color)
+
+    def _sync_ov_locked_color_button(self, hex_color: str) -> None:
+        """Show the locked-text color as hex on a swatch button."""
+        self._paint_ov_swatch(self._ov_locked_color_btn, hex_color)
+
+    def _on_pick_overlay_text_color(self) -> None:
+        s = self._settings_store.load()
+        picked = QColorDialog.getColor(QColor(s.overlay_text_color),
+                                       self, "Overlay stats text color")
+        if not picked.isValid():
+            return
+        s.overlay_text_color = picked.name()
+        self._settings_store.save(s)
+        self._settings = s
+        self._sync_ov_color_button(s.overlay_text_color)
+        if self._overlay is not None:
+            self._overlay.reload_settings()
+
+    def _on_pick_overlay_locked_text_color(self) -> None:
+        s = self._settings_store.load()
+        picked = QColorDialog.getColor(
+            QColor(s.overlay_locked_text_color),
+            self, "Overlay locked text color")
+        if not picked.isValid():
+            return
+        s.overlay_locked_text_color = picked.name()
+        self._settings_store.save(s)
+        self._settings = s
+        self._sync_ov_locked_color_button(s.overlay_locked_text_color)
+        if self._overlay is not None:
+            self._overlay.reload_settings()
+
+    def _refresh_ov_fields(self, s) -> None:
+        """Rebuild the field list when the order changed; always re-apply
+        the checks. Rebuilding only on change keeps the selection (and
+        avoids fighting a drag in progress) on plain check toggles."""
+        from .overlay import OVERLAY_FIELDS
+        labels = dict(OVERLAY_FIELDS)
+        order = list(getattr(s, "overlay_field_order", None)
+                     or [k for k, _ in OVERLAY_FIELDS])
+        current = [self._ov_fields.item(i).data(Qt.UserRole)
+                   for i in range(self._ov_fields.count())]
+        if current != order:
+            self._ov_fields.blockSignals(True)
+            try:
+                self._ov_fields.clear()
+                for key in order:
+                    item = QListWidgetItem(labels.get(key, key))
+                    item.setData(Qt.UserRole, key)
+                    item.setFlags(Qt.ItemIsEnabled
+                                  | Qt.ItemIsSelectable
+                                  | Qt.ItemIsUserCheckable
+                                  | Qt.ItemIsDragEnabled)
+                    self._ov_fields.addItem(item)
+            finally:
+                self._ov_fields.blockSignals(False)
+        for i in range(self._ov_fields.count()):
+            item = self._ov_fields.item(i)
+            self._ov_fields.blockSignals(True)
+            try:
+                item.setCheckState(
+                    Qt.Checked
+                    if getattr(s, f"overlay_show_{item.data(Qt.UserRole)}",
+                               True)
+                    else Qt.Unchecked)
+            finally:
+                self._ov_fields.blockSignals(False)
+
+    def _on_ov_field_move(self, delta: int) -> None:
+        """Nudge the selected field up (-1) or down (+1) in the order."""
+        row = self._ov_fields.currentRow()
+        dest = row + delta
+        if row < 0 or dest < 0 or dest >= self._ov_fields.count():
+            return
+        item = self._ov_fields.takeItem(row)
+        self._ov_fields.insertItem(dest, item)
+        self._ov_fields.setCurrentRow(dest)
+        self._push_overlay_settings()
 
     def _on_ov_show_hide(self) -> None:
         self._toggle_overlay()
         self._refresh_overlay_tab()
 
     def _on_ov_lock_toggled(self) -> None:
-        desired = self._ov_lock_btn.isChecked()
-        if self._overlay is None or not self._overlay.isVisible():
-            self._toggle_overlay()
-        if self._overlay is not None:
-            self._overlay.set_locked(desired)
-        self._refresh_overlay_tab()
+        self._set_overlay_locked(self._ov_lock_btn.isChecked())
 
     # ------------------------------------------------------------------
     # Refreshes
@@ -990,12 +1296,18 @@ class MainWindow(QMainWindow):
             self.tbl_drops.setItem(i, 2, _cell(_drop_label(r)))
             self.tbl_drops.setItem(i, 3, _cell(str(r["amount"] or ""), align=Qt.AlignRight))
             self.tbl_drops.setItem(i, 4, _cell(_owner_label(r["belongs_to"], acct)))
+            self.tbl_drops.setItem(i, 5, _cell(_drop_status(r, acct)))
         self._show_empty(self.tbl_drops, self._drops_empty, len(rows) == 0)
 
     def _open_session_detail(self, item: QTableWidgetItem) -> None:
-        """Double-click on a Sessions row opens a read-only detail view
-        for that session (totals, zones, kills, drops)."""
-        sid = item.data(Qt.UserRole) if item is not None else None
+        """Double-click ANYWHERE on a Sessions row opens that session's
+        detail view. The session id rides on the row's first cell
+        (UserRole), so resolve through the row — not the clicked cell,
+        which only carries it in column 0."""
+        if item is None:
+            return
+        first = self.tbl_sessions.item(item.row(), 0)
+        sid = first.data(Qt.UserRole) if first is not None else None
         if sid is None:
             return
         dlg = _SessionDetailDialog(self._db, self._names, int(sid), self)
@@ -1122,69 +1434,334 @@ class MainWindow(QMainWindow):
         self.cmb_sessions.blockSignals(False)
         self._refresh_graphs()
 
+    def _zone_metrics(self, sid: int) -> list[dict]:
+        """Per-visit totals + minutes for a session, ready to chart.
+
+        An still-open visit in the ACTIVE session measures against now
+        so the current zone stays live; anywhere else an open visit
+        contributes no time (its end is unknown). Repeat visits to the
+        same zone are numbered first-entered-first ("Snowy Mountain
+        #1", "Snowy Mountain #2") so the picker and the spider can
+        tell them apart; a zone visited once keeps its bare name.
+        Each entry also carries its visit window ("entered_at" /
+        "left_at", effective ISO strings, left_at possibly None for a
+        stale open visit) so charts can scope to the time spent in
+        that visit."""
+        now_iso = None
+        if sid == self._consumer.session_id:
+            now_iso = datetime.now().isoformat(timespec="milliseconds")
+        out = []
+        for z in self._db.zone_stats(sid):
+            left = z["left_at"] or now_iso
+            secs = _zone_seconds(z["entered_at"], left)
+            minutes = (secs / 60.0) if secs else 0.0
+            out.append({
+                "display": z["display_name"],
+                "map_name": z["map_name"],
+                "entered_at": z["entered_at"],
+                "left_at": left,
+                "kills": z["kills"],
+                "drops": z["drops"],
+                "sc": z["soul_crystals"],
+                "xp": z["xp"],
+                "minutes": minutes,
+                "kpm": (z["kills"] / minutes) if minutes > 0 else 0.0,
+                "drops_m": (z["drops"] / minutes) if minutes > 0 else 0.0,
+                "sc_m": (z["soul_crystals"] / minutes) if minutes > 0 else 0.0,
+                "xp_m": (z["xp"] / minutes) if minutes > 0 else 0.0,
+            })
+        # zone_stats arrives ordered by entered_at, so enumeration
+        # order IS first-entered-first.
+        repeats = {}
+        for m in out:
+            repeats[m["map_name"]] = repeats.get(m["map_name"], 0) + 1
+        seen: dict[str, int] = {}
+        for m in out:
+            if repeats[m["map_name"]] > 1:
+                seen[m["map_name"]] = seen.get(m["map_name"], 0) + 1
+                m["display"] = f"{m['display']} #{seen[m['map_name']]}"
+        return out
+
+    def _visit_window(self, m: dict) -> tuple[datetime, datetime] | None:
+        """A zone entry's time window as datetimes, or None when the
+        entry has no usable start. An open end measures against now."""
+        try:
+            start = datetime.fromisoformat(m["entered_at"])
+        except (TypeError, ValueError):
+            return None
+        try:
+            end = (datetime.fromisoformat(m["left_at"])
+                   if m.get("left_at") else datetime.now())
+        except (TypeError, ValueError):
+            end = datetime.now()
+        return (start, end)
+
+    # Metric key -> cumulative event stream behind it. Rate metrics
+    # chart their base quantity (Kills/min shares are kill shares);
+    # minutes chart elapsed session time itself.
+    _BASE_QUANTITY = {
+        "kills": "kills", "kpm": "kills",
+        "drops": "drops", "drops_m": "drops",
+        "sc": "sc", "sc_m": "sc",
+        "xp": "xp", "xp_m": "xp",
+        "minutes": "minutes",
+    }
+
+    # Metric key -> per-bin value behind it. "minutes" is cumulative
+    # elapsed time (per-bin minutes would be a flat line at the bin
+    # width); everything else is gained-in-the-bin, with rate metrics
+    # dividing by the bin width.
+    _TIME_RATE = {"kpm", "drops_m", "sc_m", "xp_m"}
+
+    def _time_series(self, sid: int, key: str,
+                     window: tuple[datetime, datetime] | None) -> list[Point]:
+        """The selected stat over time as per-bin points (bin count
+        adapts to the span — see _bin_count).
+
+        Unscoped, the span is the metric's own first-to-last event; a
+        picked zone scopes both span and events to that visit's window
+        ("over the time spent on that zone"). A single-moment span
+        yields one bin; "minutes" charts cumulative elapsed time."""
+        def _parse(ts: str):
+            try:
+                return datetime.fromisoformat(ts)
+            except (TypeError, ValueError):
+                return None
+
+        kind = self._BASE_QUANTITY.get(key, "kills")
+        if window is not None:
+            start, end = window
+            if end < start:
+                return []
+        else:
+            start = end = None
+
+        if kind == "minutes":
+            if start is None:
+                stamps = []
+                for k in ("kills", "xp", "drops", "sc"):
+                    stamps += [ts for ts, _d
+                               in self._db.cumulative_events(sid, k)]
+                moments = sorted({_parse(ts) for ts in stamps} - {None})
+                if len(moments) < 2:
+                    return []
+                start, end = moments[0], moments[-1]
+            span_s = (end - start).total_seconds()
+            if span_s <= 0:
+                return []
+            n = _bin_count(span_s)
+            return [Point(
+                label=_tick_label(start + (end - start) * b / n, span_s),
+                value=(start + (end - start) * (b + 1) / n
+                       - start).total_seconds() / 60.0,
+            ) for b in range(n)]
+
+        events = []
+        for ts, delta in self._db.cumulative_events(sid, kind):
+            t = _parse(ts)
+            if t is None:
+                continue
+            if window is not None and not (start <= t <= end):
+                continue
+            events.append((t, delta))
+        if not events:
+            return []
+        if start is None:
+            events.sort(key=lambda e: e[0])
+            start, end = events[0][0], events[-1][0]
+        span_s = (end - start).total_seconds()
+        if span_s <= 0:
+            # Every event landed on the same instant: one bin holding
+            # the total (a rate over zero time is meaningless, so rate
+            # metrics show the raw count here rather than a 60x spike).
+            total = sum(d for _t, d in events)
+            return [Point(label=_tick_label(start, 0.0), value=total)]
+        n = _bin_count(span_s)
+        bins = [0.0] * n
+        for t, delta in events:
+            i = min(int((t - start).total_seconds() / span_s * n), n - 1)
+            bins[i] += delta
+        width_min = span_s / n / 60.0
+        out = []
+        for b in range(n):
+            bs = start + (end - start) * b / n
+            v = bins[b] / width_min if key in self._TIME_RATE else bins[b]
+            out.append(Point(label=_tick_label(bs, span_s), value=v))
+        return out
+
+    _SPIDER_AXES = ("Kills", "Drops", "SC", "XP", "Minutes")
+
+    def _sync_zone_combo(self, metrics: list[dict]) -> None:
+        """Rebuild the zone picker for the current session, keeping the
+        selection when the same zone is still there."""
+        cur_text = self.cmb_zone.currentText()
+        self.cmb_zone.blockSignals(True)
+        self.cmb_zone.clear()
+        self.cmb_zone.addItem("All zones", None)
+        for i, m in enumerate(metrics):
+            self.cmb_zone.addItem(m["display"], i)
+        idx = self.cmb_zone.findText(cur_text)
+        self.cmb_zone.setCurrentIndex(idx if idx >= 0 else 0)
+        self.cmb_zone.blockSignals(False)
+
+    @staticmethod
+    def _cumulative_points(points: list[Point]) -> list[Point]:
+        """Running totals over per-bin points — the session's climb.
+
+        Each point keeps its bin label and gains a "+n" sublabel, so
+        the tooltip reads both the total and what the bin added."""
+        out = []
+        run = 0.0
+        for pt in points:
+            run += pt.value
+            out.append(Point(label=pt.label, value=run,
+                             sublabel=f"+{pt.value:g}",
+                             fmt=pt.fmt, color=pt.color))
+        return out
+
+    def _zone_share(self, sid: int, base: str) -> list[Point]:
+        """Whole-session totals per zone for the share donut.
+
+        Zero-total zones are dropped — they would paint no slice and
+        only crowd the legend. An all-zero session yields [], which the
+        chart renders as "No data"."""
+        return [Point(label=m["display"], value=m.get(base, 0.0))
+                for m in self._zone_metrics(sid)
+                if m.get(base, 0.0) > 0]
+
     def _refresh_graphs(self) -> None:
-        """Per-zone rates for the selected session."""
+        """The selected stat, charted in the selected style and scope.
+
+        Line/cumulative/bars chart the stat over time (per-bin gains,
+        or cumulative elapsed time for "minutes"; cumulative keeps a
+        running total so the climb reads directly). A picked zone
+        scopes the span and the events to that visit's window — "over
+        the time spent on that zone". Share and spider are the
+        exceptions: both always cover every zone (share splits the
+        session total, spider compares zones on one radar web) and
+        spider dims all but the picked zone (if any)."""
         sid = self.cmb_sessions.currentData()
         if sid is None:
-            self.chart_kpm.clear()
-            self.chart_drops_m.clear()
-            self.chart_sc_m.clear()
-            self.chart_zones.clear()
+            self.chart_main.clear()
+            self.chart_spider.clear()
+            self._graphs_totals.setText("")
             return
-        zones = self._db.zone_stats(sid)
-        kpm_bars = []
-        drops_bars = []
-        sc_bars = []
-        for z in zones:
-            # Compute time spent
-            try:
-                from datetime import datetime
-                t0 = datetime.fromisoformat(z["entered_at"])
-                t1 = datetime.fromisoformat(z["left_at"]) if z["left_at"] else None
-            except Exception:
-                t0 = t1 = None
-            if t0 and t1:
-                secs = (t1 - t0).total_seconds()
-                minutes = secs / 60
+        sid = int(sid)
+        key = self.cmb_metric.currentData() or "kills"
+        mode = self.cmb_chart_type.currentData() or "line"
+        fmt = next((f for k, _l, f in self._GRAPH_METRICS if k == key),
+                   "{:.0f}")
+        metrics = self._zone_metrics(int(sid))
+        self._sync_zone_combo(metrics)
+        zone_idx = self.cmb_zone.currentData()  # None == all zones
+        window = (self._visit_window(metrics[zone_idx])
+                  if zone_idx is not None else None)
+        scope = (metrics[zone_idx]["display"]
+                 if zone_idx is not None else "Whole session")
+
+        if mode == "share":
+            # Whole-session by construction — the totals strip below
+            # sums the session instead of echoing a stale zone pick.
+            zone_idx = None
+            window = None
+            scope = "Whole session"
+        self.chart_main.setVisible(mode in ("line", "cumulative",
+                                            "bars", "share"))
+        self.chart_spider.setVisible(mode == "spider")
+        # Share is whole-session by construction — a zone-scoped share
+        # would be one 100% slice — so the picker steps aside for it.
+        self.cmb_zone.setEnabled(mode != "share")
+
+        if mode == "share":
+            self._graphs_section_title.setText(
+                f"{key.upper()}  SHARE  BY  ZONE")
+            self.chart_main.set_mode("share")
+            self.chart_main.set_value_format(fmt)
+            self.chart_main.set_points(
+                self._zone_share(sid,
+                                 self._BASE_QUANTITY.get(key, "kills")))
+        elif mode == "spider":
+            self._graphs_section_title.setText("ZONES  COMPARED  (SPIDER)")
+            biggest = sorted(range(len(metrics)),
+                             key=lambda i: (metrics[i]["kills"],
+                                            metrics[i]["xp"]),
+                             reverse=True)[:8]
+            self.chart_spider.set_axes(list(self._SPIDER_AXES))
+            self.chart_spider.set_value_format("{:.0f}")
+            self.chart_spider.set_series([
+                SpiderSeries(
+                    label=metrics[i]["display"],
+                    values=[metrics[i]["kills"], metrics[i]["drops"],
+                            metrics[i]["sc"], metrics[i]["xp"],
+                            metrics[i]["minutes"]],
+                    color=QColor(SPIDER_COLORS[j % len(SPIDER_COLORS)]),
+                    dimmed=(zone_idx is not None and i != zone_idx),
+                )
+                for j, i in enumerate(biggest)
+            ])
+        elif mode in ("line", "cumulative", "bars"):
+            if mode == "cumulative" and key != "minutes":
+                self._graphs_section_title.setText(
+                    f"{scope.upper()}  OVER  TIME  (RUNNING TOTAL)")
             else:
-                minutes = 0
-            label = z["display_name"]
-            if minutes > 0:
-                kpm = z["kills"] / minutes
-                drops_m = z["drops"] / minutes
-                sc_m = z["soul_crystals"] / minutes
-            else:
-                kpm = drops_m = sc_m = 0
-            kpm_bars.append(Bar(label=label, value=kpm, sublabel=f"{z['kills']} kills"))
-            drops_bars.append(Bar(label=label, value=drops_m, sublabel=f"{z['drops']} drops"))
-            sc_bars.append(Bar(label=label, value=sc_m, sublabel=f"{_mine_total(z['my_soul_crystals'], z['soul_crystals'])} SC"))
-        self.chart_kpm.set_bars(kpm_bars)
-        self.chart_drops_m.set_bars(drops_bars)
-        self.chart_sc_m.set_bars(sc_bars)
-        # Per-zone totals bar chart
-        totals_bars = [Bar(label=z["display_name"], value=z["kills"], sublabel=f"{_mine_total(z['my_soul_crystals'], z['soul_crystals'])} SC")
-                       for z in zones]
-        self.chart_zones.set_bars(totals_bars)
+                self._graphs_section_title.setText(
+                    f"{scope.upper()}  OVER  TIME")
+            # "minutes" is already an elapsed-time curve, so cumulative
+            # shows it as-is; everything else accumulates per-bin gains.
+            self.chart_main.set_mode("line" if mode == "cumulative"
+                                     else mode)
+            self.chart_main.set_value_format(fmt)
+            pts = self._time_series(sid, key, window)
+            if mode == "cumulative" and key != "minutes":
+                pts = self._cumulative_points(pts)
+            self.chart_main.set_points(pts)
+
+        if zone_idx is not None:
+            m = metrics[zone_idx]
+            self._graphs_totals.setText(
+                f"{m['display']}: {m['kills']} kills  ·  {m['sc']} SC  ·  "
+                f"{m['xp']:,} XP  ·  {m['drops']} drops  ·  "
+                f"{m['minutes']:.1f} min"
+            )
+            return
+        tot_k = sum(m["kills"] for m in metrics)
+        tot_d = sum(m["drops"] for m in metrics)
+        tot_s = sum(m["sc"] for m in metrics)
+        tot_x = sum(m["xp"] for m in metrics)
+        tot_m = sum(m["minutes"] for m in metrics)
+        kpm = f"{(tot_k / tot_m):.2f}" if tot_m > 0 else "—"
+        self._graphs_totals.setText(
+            f"{tot_k} kills  ·  {tot_s} SC  ·  {tot_x:,} XP  ·  "
+            f"{tot_d} drops  ·  {kpm} KPM  ·  {_fmt_duration(tot_m * 60)}"
+        )
+
+    def _open_selected_session_detail(self) -> None:
+        """Details… button next to the Graphs session selector."""
+        sid = self.cmb_sessions.currentData()
+        if sid is None:
+            return
+        dlg = _SessionDetailDialog(self._db, self._names, int(sid), self)
+        dlg.exec()
 
     def _refresh_current_tab(self) -> None:
         """Refresh whichever of Sessions/Kills/Drops/Zones/Graphs is on screen right
         now, so switching tabs — or just leaving one open — doesn't show
-        data that's a click behind reality."""
-        idx = self._tabs.currentIndex()
-        if idx == 1:
+        data that's a click behind reality. Matches on widget identity:
+        hardcoded indices would silently refresh the wrong tab in the
+        frozen exe, where the dev-only Debug tab doesn't exist."""
+        cur = self._tabs.currentWidget()
+        if cur is self._tab_sessions:
             self._refresh_sessions()
-        elif idx == 2:
+        elif cur is self._tab_kills:
             self._refresh_kills()
-        elif idx == 3:
+        elif cur is self._tab_drops:
             self._refresh_drops()
-        elif idx == 4:
+        elif cur is self._tab_zones:
             self._refresh_zones()
-        elif idx == 5:
+        elif cur is self._tab_graphs:
             self._refresh_graphs()
-        elif idx == 6:
-            pass  # overlay tab refreshes on switch/change, never on tick
-        elif idx == 7 and hasattr(self, "_debug"):
-            pass  # debug tab is its own thing
+        # Overlay tab refreshes on switch/change, never on tick; the
+        # debug tab is its own thing.
 
     def _on_event_seen(self, raw: str) -> None:
         """Slot for the consumer's `event_seen` signal. Routes the raw
@@ -1407,6 +1984,19 @@ def _owner_label(belongs_to: int | None, local_account: int | None) -> str:
     return f"#{belongs_to}"
 
 
+def _drop_status(r: dict, local_account: int | None) -> str:
+    """Lifecycle state of a drop row: who picked it up, or whether it
+    vanished unclaimed (packets) — else still on the ground."""
+    picker = r.get("picked_up_by")
+    if picker is not None:
+        if local_account is not None and picker == local_account:
+            return "Picked up (you)"
+        return f"Picked up (#{picker})"
+    if r.get("destroyed"):
+        return "Gone"
+    return "On ground"
+
+
 def _zone_seconds(entered_at: str | None, left_at: str | None) -> float | None:
     """Seconds between two ISO timestamps, or None when the visit is
     still open or either side is unparseable."""
@@ -1419,6 +2009,22 @@ def _zone_seconds(entered_at: str | None, left_at: str | None) -> float | None:
         return None
     secs = (t1 - t0).total_seconds()
     return secs if secs >= 0 else None
+
+
+def _bin_count(span_s: float, cap: int = 24) -> int:
+    """Bin count that adapts to the span: ~15s bins, at least 6
+    points so a 5-minute session charts per-minute detail instead
+    of one or two dots, at most `cap` so long sessions stay
+    readable. Zero span collapses to a single bin."""
+    if span_s <= 0:
+        return 1
+    return max(6, min(cap, round(span_s / 15.0)))
+
+
+def _tick_label(moment: datetime, span_s: float) -> str:
+    """Bin tag with seconds on short spans (where HH:MM tags would
+    all read the same) and plain HH:MM otherwise."""
+    return moment.strftime("%H:%M:%S" if span_s < 600 else "%H:%M")
 
 
 def _fmt_duration(secs: float | None) -> str:
@@ -1493,6 +2099,16 @@ def _section_label(text: str) -> QLabel:
     return lbl
 
 
+def _mini_title(text: str) -> QLabel:
+    """Small tracked section caption for control rows (SESSION, CHART)."""
+    lbl = QLabel(text)
+    lbl.setFont(QFont("Georgia", 9))
+    lbl.setStyleSheet(
+        f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
+    )
+    return lbl
+
+
 class _SessionDetailDialog(QDialog):
     """Click-through detail for one session: totals, per-zone breakdown,
     and the session's kills/drops with ownership marked. Read-only."""
@@ -1500,9 +2116,21 @@ class _SessionDetailDialog(QDialog):
     def __init__(self, db, names, session_id: int, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Session #{session_id}")
-        self.setMinimumSize(760, 620)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
+        # The old dialog laid every section straight on the window with
+        # a minimum size smaller than the content — long sessions
+        # overflowed, widgets overlapped, and Close could end up
+        # off-screen. All content now lives in a scroll area; Close
+        # stays pinned outside it so it can never be cut off.
+        self.resize(820, 700)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(24, 24, 24, 24)
+        outer.setSpacing(12)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        body = QWidget()
+        layout = QVBoxLayout(body)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
         s = db.summary(session_id)
@@ -1527,6 +2155,11 @@ class _SessionDetailDialog(QDialog):
                            f"{s['soul_crystals']} total"))
         form.addRow("Experience:",
                     QLabel(f"{s['xp']:,}  (level {s['level']})"))
+        if s.get("deaths"):
+            form.addRow("Deaths:",
+                        QLabel(f"{s['deaths']}  ·  lost {s['xp_lost']:,} XP"
+                               + (f", {s['items_lost']} items"
+                                  if s.get("items_lost") else "")))
         hrs = _session_hours(meta["started"] if meta else None,
                              meta["ended"] if meta else None)
         mins = hrs * 60.0
@@ -1557,7 +2190,10 @@ class _SessionDetailDialog(QDialog):
             zones.setItem(i, 5, _cell(
                 _mine_total(z["my_drops"], z["drops"]), align=Qt.AlignRight))
             zones.setItem(i, 6, _cell(f"{z['xp']:,}", align=Qt.AlignRight))
+        # Capped: a long zone list scrolls inside the table instead of
+        # stretching the dialog past the screen.
         zones.setMinimumHeight(140)
+        zones.setMaximumHeight(300)
         layout.addWidget(zones)
 
         layout.addWidget(_section_label("KILLS"))
@@ -1571,6 +2207,7 @@ class _SessionDetailDialog(QDialog):
             kills.setItem(i, 2, _cell("✓" if r["is_mine"] else "—",
                                        align=Qt.AlignCenter))
         kills.setMinimumHeight(140)
+        kills.setMaximumHeight(300)
         layout.addWidget(kills)
 
         layout.addWidget(_section_label("DROPS"))
@@ -1585,18 +2222,22 @@ class _SessionDetailDialog(QDialog):
         filt_row.addWidget(self._drops_filter)
         layout.addLayout(filt_row)
         self._drops_table = _ro_table(
-            4, ["TIME", "ITEM", "QTY", "OWNER"],
-            [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignRight, Qt.AlignLeft])
+            5, ["TIME", "ITEM", "QTY", "OWNER", "STATUS"],
+            [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignRight, Qt.AlignLeft,
+             Qt.AlignLeft])
         self._drops_table.setMinimumHeight(140)
+        self._drops_table.setMaximumHeight(300)
         layout.addWidget(self._drops_table)
         self._drops_rows = db.recent_drops(session_id, 200, names=names,
                                            local_account=acct)
         self._drops_acct = acct
         self._populate_drops()
 
+        scroll.setWidget(body)
+        outer.addWidget(scroll, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        outer.addWidget(buttons)
 
     def _populate_drops(self) -> None:
         """Fill the dialog's drops table, honoring the name filter."""
@@ -1614,3 +2255,5 @@ class _SessionDetailDialog(QDialog):
                                   align=Qt.AlignRight))
             t.setItem(i, 3, _cell(
                 _owner_label(r["belongs_to"], self._drops_acct)))
+            t.setItem(i, 4, _cell(
+                _drop_status(r, self._drops_acct)))

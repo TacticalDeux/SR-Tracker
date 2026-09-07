@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -18,14 +18,37 @@ from . import paths
 
 @dataclass
 class Settings:
-    # Overlay window
-    overlay_opacity: float = 0.88        # 0.0 (invisible) .. 1.0
-    overlay_locked_opacity: float = 0.55 # opacity while locked
+    # Overlay window. overlay_opacity drives the card BACKGROUND fill
+    # only (text stays full-bright); overlay_window_opacity fades the
+    # whole window, background and text together (see
+    # OverlayWindow._apply_bg / _apply_window_opacity).
+    # overlay_text_color paints the stats text (labels + numbers);
+    # it matches theme.PARCH_BG by default (kept a literal so this
+    # module stays Qt-free).
+    overlay_opacity: float = 0.88        # card bg alpha 0.0 .. 1.0
+    overlay_locked_opacity: float = 0.55 # card bg alpha while locked
+    overlay_window_opacity: float = 1.0  # whole window 0.0 .. 1.0
+    overlay_locked_window_opacity: float = 1.0  # whole window while locked
+    overlay_text_color: str = "#e8dfc8"  # stats text (labels + numbers)
+    # overlay_locked_text_color paints the numbers while locked (labels
+    # stay at overlay_text_color); matches the old hardcoded dim gray.
+    overlay_locked_text_color: str = "#3a3a48"
+    # Content scale for the overlay stats (numbers, labels, handle).
+    # 1.0 == designed size; the scale slider writes 0.7 .. 1.5.
+    overlay_scale: float = 1.0
     overlay_show_kills: bool = True
     overlay_show_sc: bool = True
     overlay_show_xp: bool = True
     overlay_show_level: bool = True
     overlay_show_zone: bool = True
+    overlay_show_deaths: bool = True
+    overlay_show_xp_lost: bool = True
+    # Display order of the overlay fields, top to bottom. Unknown keys
+    # are ignored and missing known keys append at the end, so older
+    # files and future fields both degrade gracefully.
+    overlay_field_order: list[str] = field(
+        default_factory=lambda: ["kills", "sc", "xp", "level", "zone",
+                                 "deaths", "xp_lost"])
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False

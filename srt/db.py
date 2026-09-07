@@ -41,6 +41,18 @@ SCHEMA = [
         color_b INTEGER,
         is_shiny INTEGER,
         belongs_to INTEGER,
+        picked_up_by INTEGER,
+        picked_up_at TEXT,
+        destroyed INTEGER NOT NULL DEFAULT 0,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS deaths (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        exp_lost INTEGER NOT NULL DEFAULT 0,
+        money_lost INTEGER NOT NULL DEFAULT 0,
+        items_lost INTEGER NOT NULL DEFAULT 0,
         timestamp TEXT NOT NULL,
         FOREIGN KEY(session_id) REFERENCES sessions(id)
     )""",
@@ -125,10 +137,12 @@ SCHEMA = [
     """CREATE INDEX IF NOT EXISTS idx_xp_session_ts ON xp_events(session_id, timestamp)""",
     """CREATE INDEX IF NOT EXISTS idx_zones_session ON zone_visits(session_id)""",
     """CREATE INDEX IF NOT EXISTS idx_damage_session_enemy ON damage(session_id, enemy_id)""",
+    """CREATE INDEX IF NOT EXISTS idx_deaths_session_ts ON deaths(session_id, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_drops_session_drop ON drops(session_id, drop_id)""",
 ]
 
 # Tables wiped by reset_session (everything per-session, but not the session row).
-_RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage")
+_RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage", "deaths")
 
 
 class Database:
@@ -167,6 +181,11 @@ class Database:
             self._ensure_column("drops", "mob_id", "INTEGER")
             self._ensure_column("drops", "amount", "INTEGER")
             self._ensure_column("drops", "belongs_to", "INTEGER")
+            # Pickup/destroy lifecycle (packets): who took the
+            # drop and when, or whether it vanished unclaimed.
+            self._ensure_column("drops", "picked_up_by", "INTEGER")
+            self._ensure_column("drops", "picked_up_at", "TEXT")
+            self._ensure_column("drops", "destroyed", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column("xp_events", "level", "INTEGER")
             self._ensure_column("xp_events", "is_level_up", "INTEGER")
             self._ensure_column("xp_events", "bonus_party", "INTEGER")
@@ -341,12 +360,12 @@ class Database:
         with self._lock:
             for table in ("damage", "kills", "drops", "xp_events",
                           "spawn_notifications", "zone_visits", "events",
-                          "sessions"):
+                          "deaths", "sessions"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.execute(
                 "DELETE FROM sqlite_sequence WHERE name IN "
                 "('sessions','drops','xp_events','spawn_notifications',"
-                "'zone_visits','events','damage')"
+                "'zone_visits','events','damage','deaths')"
             )
             self._conn.commit()
             self._conn.execute("VACUUM")
@@ -361,6 +380,64 @@ class Database:
                 (session_id, drop_id, item_id, mob_id, amount, belongs_to, ts),
             )
             self._conn.commit()
+
+    def insert_death(self, session_id: int, exp_lost: int, money_lost: int,
+                     items_lost: int, ts: str) -> None:
+        """Record a local-player death (packets death screen). The XP
+        loss rides on this row directly — it is NOT folded into xp_events,
+        which tracks gains only."""
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO deaths (session_id, exp_lost, money_lost, items_lost, timestamp)"
+                " VALUES (?,?,?,?,?)",
+                (session_id, exp_lost, money_lost, items_lost, ts),
+            )
+            self._conn.commit()
+
+    def mark_drop_pickup(self, session_id: int, drop_id: int,
+                         picker: int | None, ts: str) -> None:
+        """Attribute a drop to whoever picked it up (packets). Matches
+        the latest drop_creation row for this drop entity; a pickup for
+        an unknown drop (missed creation while hooks were blind) is
+        ignored rather than inventing a row."""
+        with self._lock:
+            self._conn.execute(
+                """UPDATE drops SET picked_up_by = ?, picked_up_at = ?
+                   WHERE id = (SELECT id FROM drops
+                               WHERE session_id = ? AND drop_id = ?
+                                 AND picked_up_by IS NULL
+                               ORDER BY id DESC LIMIT 1)""",
+                (picker, ts, session_id, drop_id),
+            )
+            self._conn.commit()
+
+    def mark_drop_destroyed(self, session_id: int, drop_id: int) -> None:
+        """Flag a drop as vanished unclaimed (packets expiry/destroy).
+        Already-picked-up rows keep their pickup — destroy loses the race."""
+        with self._lock:
+            self._conn.execute(
+                """UPDATE drops SET destroyed = 1
+                   WHERE id = (SELECT id FROM drops
+                               WHERE session_id = ? AND drop_id = ?
+                                 AND picked_up_by IS NULL AND destroyed = 0
+                               ORDER BY id DESC LIMIT 1)""",
+                (session_id, drop_id),
+            )
+            self._conn.commit()
+
+    def deaths_for_session(self, session_id: int) -> list[dict]:
+        """Every recorded death in a session, oldest first."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT exp_lost, money_lost, items_lost, timestamp
+                   FROM deaths WHERE session_id = ? ORDER BY id""",
+                (session_id,),
+            )
+            return [
+                {"exp_lost": r[0] or 0, "money_lost": r[1] or 0,
+                 "items_lost": r[2] or 0, "ts": r[3]}
+                for r in cur.fetchall()
+            ]
 
     def insert_xp(self, session_id: int, xp: int, level: int | None,
                   is_level_up: bool, ts: str) -> None:
@@ -443,6 +520,21 @@ class Database:
                 (session_id, session_id),
             )
             my_drops = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*) FROM drops WHERE session_id = ? AND picked_up_by = "
+                "(SELECT local_account_id FROM sessions WHERE id = ?)",
+                (session_id, session_id),
+            )
+            my_pickups = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*), COALESCE(SUM(exp_lost), 0), "
+                "COALESCE(SUM(money_lost), 0), COALESCE(SUM(items_lost), 0) "
+                "FROM deaths WHERE session_id = ?",
+                (session_id,),
+            )
+            drow = cur.fetchone()
+            deaths, xp_lost, money_lost, items_lost = (
+                drow[0], int(drow[1]), int(drow[2]), int(drow[3]))
             cur.execute("SELECT current_zone FROM sessions WHERE id = ?",
                         (session_id,))
             row = cur.fetchone()
@@ -466,6 +558,11 @@ class Database:
                 "level": int(level),
                 "drops": drops,
                 "my_drops": my_drops,
+                "my_pickups": my_pickups,
+                "deaths": deaths,
+                "xp_lost": xp_lost,
+                "money_lost": money_lost,
+                "items_lost": items_lost,
                 "current_zone": zone_display,
             }
 
@@ -548,6 +645,45 @@ class Database:
                 "entered_at": r[3], "left_at": r[4],
             } for r in cur.fetchall()]
 
+    def cumulative_events(self, session_id: int, kind: str) -> list[tuple[str, float]]:
+        """Raw (timestamp, delta) event stream for candle charts.
+
+        kind: 'kills' (delta 1 per kill), 'xp' (xp_gained; level-up
+        marker rows carry no gain and are skipped), 'drops' (1 per
+        drop), 'sc' (amount of item_id 0 drops). Ordered oldest-first.
+        Timestamps are the stored ISO strings; callers parse them."""
+        with self._lock:
+            if kind == "kills":
+                cur = self._conn.execute(
+                    "SELECT timestamp FROM kills WHERE session_id = ? "
+                    "ORDER BY timestamp",
+                    (session_id,),
+                )
+                return [(r[0], 1.0) for r in cur.fetchall() if r[0]]
+            if kind == "xp":
+                cur = self._conn.execute(
+                    "SELECT timestamp, xp_gained FROM xp_events "
+                    "WHERE session_id = ? AND COALESCE(xp_gained, 0) > 0 "
+                    "ORDER BY timestamp",
+                    (session_id,),
+                )
+                return [(r[0], float(r[1])) for r in cur.fetchall() if r[0]]
+            if kind == "drops":
+                cur = self._conn.execute(
+                    "SELECT timestamp FROM drops WHERE session_id = ? "
+                    "ORDER BY timestamp",
+                    (session_id,),
+                )
+                return [(r[0], 1.0) for r in cur.fetchall() if r[0]]
+            if kind == "sc":
+                cur = self._conn.execute(
+                    "SELECT timestamp, COALESCE(amount, 1) FROM drops "
+                    "WHERE session_id = ? AND item_id = 0 ORDER BY timestamp",
+                    (session_id,),
+                )
+                return [(r[0], float(r[1])) for r in cur.fetchall() if r[0]]
+            raise ValueError(f"unknown candle kind: {kind!r}")
+
     def recent_kills(self, session_id: int, limit: int = 200, names=None) -> list[dict]:
         with self._lock:
             cur = self._conn.execute(
@@ -567,15 +703,18 @@ class Database:
                      local_account: int | None = None) -> list[dict]:
         with self._lock:
             cur = self._conn.execute(
-                """SELECT id, drop_id, item_id, mob_id, amount, belongs_to, timestamp
+                """SELECT id, drop_id, item_id, mob_id, amount, belongs_to,
+                          picked_up_by, picked_up_at, destroyed, timestamp
                    FROM drops WHERE session_id = ? ORDER BY id DESC LIMIT ?""",
                 (session_id, limit),
             )
             return [{
                 "id": r[0], "drop_id": r[1], "item_id": r[2], "mob_id": r[3],
-                "amount": r[4], "belongs_to": r[5], "ts": r[6],
+                "amount": r[4], "belongs_to": r[5], "picked_up_by": r[6],
+                "picked_up_at": r[7], "destroyed": bool(r[8]), "ts": r[9],
                 "item_name": (names.item(r[2]) if (names and r[2] is not None) else None),
                 "mine": (local_account is not None and r[5] == local_account),
+                "picked_by_me": (local_account is not None and r[6] == local_account),
             } for r in cur.fetchall()]
 
     def sessions(self) -> list[dict]:

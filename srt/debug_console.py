@@ -32,7 +32,6 @@ class DebugConsole(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setStyleSheet(f"background: {theme.INK_0};")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
