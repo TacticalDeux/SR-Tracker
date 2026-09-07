@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections import deque
 from datetime import datetime
 
 from PySide6.QtCore import QObject, Signal
@@ -26,6 +27,11 @@ from .dll import TrackerDLL
 # key_rotation, shm_open, hook_install, dll_heartbeat) or ambient noise
 # (character_spawn fires for any player walking by). The gameplay-silence watchdog watches
 # these; heartbeats deliberately do NOT reset it.
+# How long a portal sighting stays eligible for same-zone arrival
+# correlation (seconds, monotonic clock).
+_SIGHT_WINDOW_S = 10.0
+
+
 _GAMEPLAY_TYPES = frozenset({
     "local_account",
     "enemy_spawn",
@@ -39,6 +45,7 @@ _GAMEPLAY_TYPES = frozenset({
     "exp_update",
     "level_up",
     "mirage_exit",
+    "portal_sight",
     "zone_change",
 })
 
@@ -73,6 +80,12 @@ class EventConsumer(QObject):
         # rows can carry a displayable monster name.
         self._local_account_id: int | None = None
         self._mob_of_enemy: dict[int, int] = {}
+        # Recent portal sightings as (monotonic-ts, text, cost), oldest
+        # first. A free non-housing sighting shortly before a same-zone
+        # arrival marks the new visit as a mirage run.
+        self._portal_sights: deque = deque(maxlen=16)
+        # Map name of the current visit, for same-zone arrival checks.
+        self._current_zone: str | None = None
         # Monotonic timestamp of the last event handed to _handle.
         # The status bar shows "Ns since last event" from this so an
         # idle game (no packets) is distinguishable from a dead bridge.
@@ -125,6 +138,8 @@ class EventConsumer(QObject):
         self._events_dropped = 0
         self._local_account_id = None
         self._mob_of_enemy = {}
+        self._portal_sights = deque(maxlen=16)
+        self._current_zone = None
         self._last_event_at = time.monotonic()
         self._last_gameplay_at = time.monotonic()
         self._session_id = self._db.start_session()
@@ -329,13 +344,43 @@ class EventConsumer(QObject):
             # zone change closes the visit, so flag-then-close ordering
             # holds: the open visit is still open here.
             self._db.mark_current_visit_mirage(sid, ts)
+        elif etype == "portal_sight":
+            # A portal listing with its label and pass cost. Remembered
+            # briefly for same-zone arrival correlation below.
+            try:
+                if "text" not in data or "cost" not in data:
+                    return
+                text = str(data.get("text", ""))
+                cost = int(data.get("cost", 0))
+            except (TypeError, ValueError):
+                return
+            self._portal_sights.append((time.monotonic(), text, cost))
         elif etype == "zone_change":
+            new_map = str(data.get("map_name", ""))
+            same_zone = (
+                self._current_zone is not None and new_map == self._current_zone
+            )
             self._db.insert_zone_visit(
                 sid,
-                str(data.get("map_name", "")),
+                new_map,
                 str(data.get("display_name", "")),
                 ts,
             )
+            if same_zone:
+                # Same-map arrival shortly after a free non-housing
+                # listing means mirage entry. Insert first so the flag
+                # lands on the NEW visit, then consume the sighting.
+                now = time.monotonic()
+                self._portal_sights = deque(
+                    ((t, x, c) for (t, x, c) in self._portal_sights
+                     if now - t <= _SIGHT_WINDOW_S),
+                    maxlen=16)
+                for sight in list(self._portal_sights):
+                    if sight[2] == 0 and sight[1] != "Housing":
+                        self._db.mark_current_visit_mirage(sid, ts)
+                        self._portal_sights.remove(sight)
+                        break
+            self._current_zone = new_map
         elif etype == "spawn_notification":
             self._db.insert_spawn_notification(
                 sid,
