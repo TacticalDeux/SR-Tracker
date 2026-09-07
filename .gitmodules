@@ -1,0 +1,6 @@
+[submodule "dll"]
+	path = dll
+	url = https://github.com/TacticalDeux/SR-Tracker-dll.git
+[submodule "tools/private"]
+	path = tools/private
+	url = https://github.com/TacticalDeux/SR-Tracker-tools.git

@@ -23,11 +23,12 @@ srt/                  Application package
   main_window.py      Main tracker window (sessions, kills, drops tabs)
 
 tools/
-  inject.py           Inject the DLL into the running game process
   build.py            Build a standalone exe with PyInstaller
-  REMOVED.py    List the DLL's exports (debug helper)
+  private/           Private submodule (inject + DLL-probing helpers,
+                     not publicly visible — see SR-Tracker-tools)
 
-dll/sr_tracker.dll    Compiled hook DLL (precompiled, not source)
+dll/                  Private submodule: hook DLL source + binary
+                      (not publicly visible — see SR-Tracker-dll)
 sr_tracker.py         Thin launcher that calls srt.app.main()
 REMOVED.py         End-to-end smoke test against the srt package
 ```
@@ -43,8 +44,8 @@ live in `data/settings.json` while developing. To inject the DLL into
 the game:
 
 ```sh
-python -m tools.inject --launch        # launch the game + inject
-python -m tools.inject 12345           # inject into a specific PID
+python -m REMOVED --launch   # launch the game + inject
+python -m REMOVED 12345      # inject into a specific PID
 ```
 
 ## Building a standalone exe

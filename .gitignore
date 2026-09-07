@@ -6,3 +6,9 @@ __pycache__/
 *.pyo
 nul
 backup
+# Private-submodule contents: these patterns only match when the
+# submodule is NOT initialized (a real directory instead of a gitlink),
+# so files dropped there by mistake can't be committed to the public
+# history. They never match the mounted submodules themselves.
+dll/*
+tools/private/*

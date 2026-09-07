@@ -1,7 +1,7 @@
 """Name lookup tables for monsters and items.
 
 Loaded once at startup from `data/monsters.json` and `data/items.json`,
-both of which are produced by `tools/REMOVED.py` from the
+both of which are produced by `tools/private/REMOVED.py` from the
 recovered game pck. The DLL emits numeric IDs on the wire; the consumer
 uses these tables to display the human-readable name in the Kills and
 Drops tabs.

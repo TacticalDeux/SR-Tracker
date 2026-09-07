@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from . import paths as _paths
 from . import theme
-from tools import inject as _inject_tool
+from REMOVED import inject as _inject_tool
 from .consumer import EventConsumer
 from .crystal import crystal_pixmap
 from .debug_console import DebugConsole, is_dev_mode
