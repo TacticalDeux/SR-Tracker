@@ -2,8 +2,9 @@
 
 Visual identity (see `srt.theme`): a dark card pinned to the side of the
 screen. Ash-gray tracked labels in Segoe UI, monospace numerals in
-Consolas — numbers shrink to fit instead of clipping, zone names elide
-instead of stretching the window.
+Consolas — every row sizes to its full text (numbers, zone names)
+instead of clipping, and the window shrink-wraps the widest row so
+all rows stay visually equal.
 
 Behavior:
   - Frameless, always-on-top, no taskbar (Tool flag).
@@ -23,7 +24,7 @@ Behavior:
 """
 from __future__ import annotations
 from typing import Callable
-from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
@@ -98,11 +99,37 @@ def _contrast_text(hex_color: str) -> str:
     return "#1a1424" if lum > 128 else "#e8dfc8"
 
 
+def _compact_number(value: int) -> str:
+    """Compact large counts with K/M/B/T suffixes (1.2K, 3.4M, 5.6B, 7.8T).
+
+    Values under 1000 render exactly; larger ones keep one decimal and
+    strip a trailing .0 so 1000 -> "1K", 1500 -> "1.5K". The sign is
+    preserved. T is the largest suffix — anything bigger stays in T."""
+    sign = "-" if value < 0 else ""
+    n = abs(value)
+    if n < 1000:
+        return f"{sign}{n}"
+    for threshold, suffix in ((10 ** 12, "T"), (10 ** 9, "B"),
+                              (10 ** 6, "M"), (10 ** 3, "K")):
+        if n >= threshold:
+            v = n / threshold
+            text = f"{v:.1f}".rstrip("0").rstrip(".")
+            return f"{sign}{text}{suffix}"
+    return f"{sign}{n}"  # unreachable, kept for safety
+
+
+def _exact_number(value: int) -> str:
+    """Full exact count with commas for tooltips (1,234,567)."""
+    return f"{value:,}"
+
+
 # ---------------------------------------------------------------------------
-# Field labels: tracked uppercase names that elide instead of forcing
-# the window wider. At small content scales the rows get narrow and a
-# fixed label ("SOUL CRYSTALS") would clip; eliding keeps the row
-# inside the shrunken window.
+# Field labels: tracked uppercase names that size to their full text.
+# sizeHint/minimumSizeHint report the full-text width (measured with
+# QFontMetrics at the active font) so the window shrink-wraps the
+# widest row and every row stretches to that same width — visually
+# equal and balanced. Eliding survives only as a last-resort fallback
+# when the window is squeezed (e.g. clamped to a screen edge).
 # ---------------------------------------------------------------------------
 class _FitLabel(QLabel):
     def __init__(self, text: str, align=Qt.AlignVCenter | Qt.AlignLeft,
@@ -129,19 +156,34 @@ class _FitLabel(QLabel):
         super().setText(QFontMetrics(self.font()).elidedText(
             self._full, Qt.ElideRight, avail))
 
+    def _full_width(self) -> int:
+        return QFontMetrics(self.font()).horizontalAdvance(self._full) + 8
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return QSize(max(self._full_width(), hint.width()), hint.height())
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        return QSize(max(self._full_width(), hint.width(), 40),
+                     hint.height())
+
 
 # ---------------------------------------------------------------------------
-# Value labels: right-aligned monospace numerals that shrink to fit
-# instead of clipping. Long counts (10k+ souls in a good session)
-# step down from their configured size to a 6pt floor so the number
-# reads smaller rather than being cut off at the row edge — the floor
-# matters most when the whole overlay is scaled down.
+# Value labels: right-aligned monospace numerals that size to their
+# full text instead of clipping. The minimum width is measured with
+# QFontMetrics at the active scaled size, so long values (zone names
+# like "Snowy Mountain", big counts) widen the window rather than
+# truncating to "Snowy Mo...". The window shrink-wraps the widest row
+# so all rows stay visually equal. Font-shrinkage survives only as a
+# last-resort fallback when the window is squeezed.
 # ---------------------------------------------------------------------------
 class _FitNumber(QLabel):
     def __init__(self, number_size: int, align=Qt.AlignRight | Qt.AlignVCenter,
                  parent=None):
         super().__init__(parent)
         self._base_size = number_size
+        self._floor = 0
         self._dim = False
         self._normal = theme.PARCH_BG
         self._locked_color = theme.ASH
@@ -150,10 +192,30 @@ class _FitNumber(QLabel):
         self.setAlignment(align)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
+    def set_floor(self, px: int) -> None:
+        """Stable floor width (scaled) so short values don't jitter the
+        window; content wider than the floor still widens it."""
+        self._floor = max(0, int(px))
+        self._update_minimum()
+
+    def _base_font(self) -> QFont:
+        f = QFont("Consolas", self._base_size)
+        f.setBold(True)
+        f.setStyleHint(QFont.Monospace)
+        return f
+
+    def _content_width(self) -> int:
+        return QFontMetrics(self._base_font()).horizontalAdvance(
+            self.text()) + 12
+
+    def _update_minimum(self) -> None:
+        self.setMinimumWidth(max(self._floor, self._content_width(), 20))
+
     def set_value(self, text: str) -> None:
         if text == self.text():
             return
         self.setText(text)
+        self._update_minimum()
         self._refit()
 
     def set_colors(self, normal: str, locked: str) -> None:
@@ -273,8 +335,10 @@ class OverlayWindow(QWidget):
         self._fields_host.setSpacing(0)
         layout.addLayout(self._fields_host)
         # Last formatted values, so a rebuild can re-paint the rows
-        # without waiting for the next poll.
+        # without waiting for the next poll. Tips carry the exact
+        # full counts behind compact K/M/B/T text.
         self._last_values: dict[str, str] = {}
+        self._last_tips: dict[str, str] = {}
         self._build_fields_box()
 
         # --- settings drawer (collapsed by default). Transparent on
@@ -494,10 +558,11 @@ class OverlayWindow(QWidget):
                 rl.setSpacing(2)
                 rl.addWidget(lbl)
                 # Narrow floors so a scaled-down strip shrink-wraps
-                # instead of holding the window wide while the text
-                # inside already shrank (_FitNumber steps to 6pt,
-                # labels elide).
-                num.setMinimumWidth(max(50, int(round(90 * scale))))
+                # instead of holding the window wide; content wider
+                # than the floor (zone names, big counts measured at
+                # the scaled size) still widens the window via
+                # _FitNumber._update_minimum, keeping all columns equal.
+                num.set_floor(max(50, int(round(90 * scale))))
                 rl.addWidget(num)
             else:
                 lbl = _FitLabel(label_text,
@@ -507,7 +572,7 @@ class OverlayWindow(QWidget):
                 rl.setContentsMargins(0, 0, 0, 0)
                 rl.setSpacing(10)
                 rl.addWidget(lbl, 1)
-                num.setMinimumWidth(max(60, int(round(120 * scale))))
+                num.set_floor(max(60, int(round(120 * scale))))
                 rl.addWidget(num, 0)
             box_lay.addWidget(row)
             self._rows[key] = (lbl, num)
@@ -523,6 +588,8 @@ class OverlayWindow(QWidget):
         for key, value in self._last_values.items():
             if key in self._rows:
                 self._rows[key][1].set_value(value)
+                if key in self._last_tips:
+                    self._rows[key][1].setToolTip(self._last_tips[key])
         for _, num in self._rows.values():
             num.set_dim(self._settings.overlay_locked)
         self._apply_field_visibility()
@@ -934,36 +1001,63 @@ class OverlayWindow(QWidget):
         if sid is None:
             for _, num in self._rows.values():
                 num.set_value("—")
+                num.setToolTip("")
             return
         try:
             s = self._db.summary(sid)
         except Exception:
             return
+        zone_text = s.get("current_zone") or "—"
         vmap = {
             "kills": _mine_total(s["my_kills"], s["kills"]),
-            "sc": _mine_total(s["my_soul_crystals"], s["soul_crystals"]),
+            "sc": _mine_total(s["sc_picked"],
+                               s["sc_picked"] + s["sc_unpicked"]),
             "xp": s["xp"],
             "level": s["level"],
-            "zone": s.get("current_zone") or "—",
+            "zone": zone_text,
             "deaths": s["deaths"],
             "xp_lost": s["xp_lost"],
         }
+        # Exact full values behind the compact display text — the main
+        # window already shows full counts, and the overlay tooltip
+        # carries them here so nothing is lost to K/M/B/T.
+        exact = {
+            "kills": _exact_mine_total(s["my_kills"], s["kills"]),
+            "sc": _exact_mine_total(s["sc_picked"],
+                                      s["sc_picked"] + s["sc_unpicked"]),
+            "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
+            else str(s["xp"]),
+            "level": str(s["level"]),
+            "zone": zone_text,
+            "deaths": _exact_number(s["deaths"])
+            if isinstance(s["deaths"], int) else str(s["deaths"]),
+            "xp_lost": _exact_number(s["xp_lost"])
+            if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
+        }
         for key, (_lbl, num) in self._rows.items():
+            # Full text always: each _FitNumber sizes its minimum width
+            # to the content (measured at the scaled size), so the
+            # window widens for "Snowy Mountain" instead of eliding to
+            # "Snowy Mo...", and all rows stretch to that widest row.
             text = self._format(key, vmap[key])
-            if key == "zone":
-                # Zone names come from game data and can be long; elide
-                # to the row width instead of stretching the window.
-                font = QFont("Consolas", num.base_size())
-                font.setBold(True)
-                text = QFontMetrics(font).elidedText(
-                    text, Qt.ElideRight, num.width() or 190)
             self._last_values[key] = text
+            tip = exact.get(key, text)
+            self._last_tips[key] = tip
             num.set_value(text)
+            num.setToolTip(tip)
+        # Values can widen the content (new zone, bigger counts), so
+        # re-shrink-wrap; a no-op when the hint didn't change.
+        self._refit_window()
 
     @staticmethod
     def _format(key: str, value) -> str:
-        if key in ("xp", "xp_lost") and isinstance(value, int):
-            return f"{value:,}"
+        # Large counts compact to K/M/B/T (endgame XP hits billions/
+        # trillions); level and zone always render exactly. kills/sc
+        # arrive pre-compacted from _mine_total, so plain strings pass
+        # through untouched.
+        if key in ("xp", "xp_lost", "kills", "sc", "deaths") \
+                and isinstance(value, int):
+            return _compact_number(value)
         return str(value)
 
     # ------------------------------------------------------------------
@@ -999,12 +1093,20 @@ class OverlayWindow(QWidget):
 
 
 def _mine_total(mine: int, total: int) -> str:
-    """'yours/total' when they differ, else the plain total. Kept local
-    (rather than importing from main_window) to avoid a circular import —
-    main_window already imports this module."""
+    """Compact 'yours/total' when they differ, else the plain total.
+    Kept local (rather than importing from main_window) to avoid a
+    circular import — main_window already imports this module. Exact
+    full counts stay available via _exact_mine_total for tooltips."""
     if mine != total:
-        return f"{mine}/{total}"
-    return str(total)
+        return f"{_compact_number(mine)}/{_compact_number(total)}"
+    return _compact_number(total)
+
+
+def _exact_mine_total(mine: int, total: int) -> str:
+    """Full exact 'yours/total' with commas for tooltips."""
+    if mine != total:
+        return f"{mine:,}/{total:,}"
+    return f"{total:,}"
 
 
 def _hairline() -> QFrame:

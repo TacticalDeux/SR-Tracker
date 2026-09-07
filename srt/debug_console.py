@@ -4,13 +4,18 @@ A read-only text view that streams events as the consumer sees them. Only
 mounted in the main window when running from source — frozen builds
 don't include it, so the dev signal stays out of the distributed exe.
 
-The console shows the raw JSON for each event (one line per event) so
-you can see exactly what the DLL is producing, plus a short running
-counter for kills/drops/xp parsed in real time.
+The console shows one line per event so you can see what the DLL is
+producing, plus a short running counter for kills/drops/xp parsed in
+real time.
+
+Each line passes through `display_event` before display, which
+reduces handshake/connection records to a short shape. Gameplay
+debugging (counts, drop ids, xp amounts, death tolls) is unaffected.
 """
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections import Counter
 from typing import Iterable
@@ -25,6 +30,51 @@ from . import theme
 
 
 _MAX_LINES = 5000  # cap the log so the text widget stays responsive
+
+# Numbered packet types map to a generic descriptive name; the
+# "session setup" handshake has its own type.
+_OP_TYPE_RE = re.compile(r"^op\s*(\d+)$", re.IGNORECASE)
+
+# Payload keys omitted from every event type.
+_OMIT_FIELDS = frozenset({
+    "cube", "key", "keys", "pending", "seed", "secret", "nonce", "peer",
+    "address", "ip", "host",
+})
+
+
+def display_event(raw: str) -> str:
+    """Return the display form of a raw event JSON string.
+
+    - any numbered packet type -> {"type": "packet_parsed", "status": "parsed"}
+    - session_setup itself is reduced to {"type": "session_setup", "status": "parsed"}
+    - net_connect keeps the socket flow signal without the peer address
+    - any other event has _OMIT_FIELDS keys stripped; gameplay fields
+      (ids, counts, xp amounts, death tolls) pass through untouched
+    Non-JSON input is returned unchanged (the caller tags it [bad-json]).
+    """
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return raw
+    if not isinstance(data, dict):
+        return raw
+    etype = data.get("type", "unknown")
+    if isinstance(etype, str):
+        m = _OP_TYPE_RE.match(etype.strip())
+        if m:
+            return json.dumps({"type": "packet_parsed", "status": "parsed"})
+    if etype == "session_setup":
+        return json.dumps({"type": "session_setup", "status": "parsed"})
+    if etype == "net_connect":
+        clean: dict = {"type": "net_connect"}
+        if "sock" in data:
+            clean["sock"] = data["sock"]
+        clean["status"] = "connected"
+        return json.dumps(clean)
+    stripped = {k: v for k, v in data.items() if k not in _OMIT_FIELDS}
+    if len(stripped) != len(data):
+        return json.dumps(stripped)
+    return raw
 
 
 class DebugConsole(QWidget):
@@ -87,13 +137,21 @@ class DebugConsole(QWidget):
 
     # ------------------------------------------------------------------
     def append_event(self, raw: str) -> None:
-        """Called by the consumer for every event seen."""
+        """Called by the consumer for every event seen.
+
+        The line passes through `display_event` first; gameplay flow
+        (counts, drop ids, xp, deaths) stays fully visible.
+        """
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             line = f"[bad-json] {raw[:200]}"
         else:
-            etype = data.get("type", "unknown")
+            raw = display_event(raw)
+            try:
+                etype = json.loads(raw).get("type", "unknown")
+            except json.JSONDecodeError:
+                etype = data.get("type", "unknown")
             self._counts[etype] += 1
             self._refresh_counters()
             line = f"{_ts()}  {raw}"

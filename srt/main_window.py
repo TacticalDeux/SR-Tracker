@@ -165,13 +165,21 @@ class _SummaryPanel(QWidget):
         self._crystal.set_dim(False)
         self._empty_holder.hide()
         self._right_widget.show()
+        sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._kills._num.setText(_mine_total(s["my_kills"], s["kills"]))
-        self._sc._num.setText(
-            _mine_total(s["my_soul_crystals"], s["soul_crystals"]))
+        self._kills._num.setToolTip(
+            f"{s['my_kills']} yours / {s['kills']} session total")
+        self._sc._num.setText(_mine_total(s["sc_picked"], sc_total))
+        self._sc._num.setToolTip(f"{s['sc_picked']:,} picked up / {sc_total:,} total")
         self._xp._num.setText(f"{s['xp']:,}")
+        self._xp._num.setToolTip(f"{s['xp']:,} session total")
         self._level._num.setText(str(s["level"]))
+        self._level._num.setToolTip(f"Current level {s['level']}")
         self._deaths._num.setText(str(s.get("deaths", 0)))
+        self._deaths._num.setToolTip(f"{s.get('deaths', 0)} deaths this session")
         self._xp_lost._num.setText(f"{s.get('xp_lost', 0):,}")
+        self._xp_lost._num.setToolTip(
+            f"{s.get('xp_lost', 0):,} XP lost to deaths")
 
 
 # ---------------------------------------------------------------------------
@@ -386,10 +394,10 @@ class MainWindow(QMainWindow):
         self.tbl_sessions.setHorizontalHeaderLabels(
             ["I", "BEGUN", "ENDED", "KILLS", "DROPS"]
         )
-        # KILLS / DROPS read "yours/total" (e.g. 8/12). Double-click a
-        # row to open that session's detail view.
-        self.tbl_sessions.horizontalHeaderItem(3).setToolTip("Your kills / all kills")
-        self.tbl_sessions.horizontalHeaderItem(4).setToolTip("Your drops / all drops")
+        # KILLS / DROPS read "yours/session-total" (e.g. 8/12).
+        # Double-click a row to open that session's detail view.
+        self.tbl_sessions.horizontalHeaderItem(3).setToolTip("Yours / session total kills")
+        self.tbl_sessions.horizontalHeaderItem(4).setToolTip("Yours / session total drops")
         self.tbl_sessions.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         _align_headers(self.tbl_sessions,
                        [Qt.AlignCenter, Qt.AlignLeft, Qt.AlignLeft,
@@ -529,8 +537,8 @@ class MainWindow(QMainWindow):
             ["ZONE", "ENTERED", "LEFT", "TIME", "KILLS", "SC", "SC/HR",
              "DROPS", "D/HR", "XP", "XP/HR", "KPM"]
         )
-        self.tbl_zones.horizontalHeaderItem(4).setToolTip("Your kills / all kills")
-        self.tbl_zones.horizontalHeaderItem(7).setToolTip("Your drops / all drops")
+        self.tbl_zones.horizontalHeaderItem(4).setToolTip("Yours / session total kills")
+        self.tbl_zones.horizontalHeaderItem(7).setToolTip("Yours / session total drops")
         self.tbl_zones.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         _align_headers(self.tbl_zones,
                        [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignLeft,
@@ -1235,9 +1243,10 @@ class MainWindow(QMainWindow):
             self._set_status(f"(error: {e})")
             return
         self._summary.set_summary(s)
+        sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._set_status(
-            f"Session #{sid}  ·  {_mine_total(s['my_kills'], s['kills'])} kills"
-            f"  ·  {_mine_total(s['my_soul_crystals'], s['soul_crystals'])} SC"
+            f"Session #{sid}  ·  {s['my_kills']} yours / {s['kills']} session total kills"
+            f"  ·  {s['sc_picked']:,} picked up / {sc_total:,} total SC"
         )
 
     def _refresh_sessions(self) -> None:
@@ -1252,12 +1261,16 @@ class MainWindow(QMainWindow):
             self.tbl_sessions.setItem(i, 0, item0)
             self.tbl_sessions.setItem(i, 1, _cell(r["started"]))
             self.tbl_sessions.setItem(i, 2, _cell(r["ended"] or "—"))
-            self.tbl_sessions.setItem(
-                i, 3, _cell(_mine_total(r["my_kills"], r["kills"]),
-                            align=Qt.AlignRight))
-            self.tbl_sessions.setItem(
-                i, 4, _cell(_mine_total(r["my_drops"], r["drops"]),
-                            align=Qt.AlignRight))
+            kills_item = _cell(_mine_total(r["my_kills"], r["kills"]),
+                                align=Qt.AlignRight)
+            kills_item.setToolTip(
+                f"{r['my_kills']} yours / {r['kills']} session total")
+            self.tbl_sessions.setItem(i, 3, kills_item)
+            drops_item = _cell(_mine_total(r["my_drops"], r["drops"]),
+                                align=Qt.AlignRight)
+            drops_item.setToolTip(
+                f"{r['my_drops']} yours / {r['drops']} session total")
+            self.tbl_sessions.setItem(i, 4, drops_item)
         self._show_empty(self.tbl_sessions, self._sessions_empty, len(rows) == 0)
 
     def _refresh_kills(self) -> None:
@@ -1767,7 +1780,8 @@ class MainWindow(QMainWindow):
         """Slot for the consumer's `event_seen` signal. Routes the raw
         event to the debug console (if present) and, in any case, kicks
         a refresh of the visible table so a kill or drop appears the
-        moment it's recorded, not on the next 1-second tick."""
+        moment it's recorded, not on the next 1-second tick.
+        """
         if hasattr(self, "_debug") and self._debug is not None:
             self._debug.append_event(raw)
         # Refresh whichever table is on screen, throttled: a combat
@@ -1986,7 +2000,7 @@ def _owner_label(belongs_to: int | None, local_account: int | None) -> str:
 
 def _drop_status(r: dict, local_account: int | None) -> str:
     """Lifecycle state of a drop row: who picked it up, or whether it
-    vanished unclaimed (packets) — else still on the ground."""
+    vanished unclaimed (expiry/destroy) — else still on the ground."""
     picker = r.get("picked_up_by")
     if picker is not None:
         if local_account is not None and picker == local_account:
@@ -2147,17 +2161,17 @@ class _SessionDetailDialog(QDialog):
         form.addRow("Period:", QLabel(f"{started}  →  {ended}"))
         form.addRow("Account:", QLabel(str(acct) if acct is not None else "unknown"))
         form.addRow("Kills:",
-                    QLabel(f"{s['my_kills']} yours / {s['kills']} total"))
+                    QLabel(f"{s['my_kills']} yours / {s['kills']} session total"))
         form.addRow("Drops:",
-                    QLabel(f"{s['my_drops']} yours / {s['drops']} total"))
+                    QLabel(f"{s['my_drops']} yours / {s['drops']} session total"))
         form.addRow("Soul crystals:",
-                    QLabel(f"{s['my_soul_crystals']} yours / "
-                           f"{s['soul_crystals']} total"))
+                    QLabel(f"{s['sc_picked']:,} picked up / "
+                           f"{s['sc_picked'] + s['sc_unpicked']:,} total"))
         form.addRow("Experience:",
-                    QLabel(f"{s['xp']:,}  (level {s['level']})"))
+                    QLabel(f"{s['xp']:,} session total  (level {s['level']})"))
         if s.get("deaths"):
             form.addRow("Deaths:",
-                        QLabel(f"{s['deaths']}  ·  lost {s['xp_lost']:,} XP"
+                        QLabel(f"{s['deaths']} deaths  ·  lost {s['xp_lost']:,} XP"
                                + (f", {s['items_lost']} items"
                                   if s.get("items_lost") else "")))
         hrs = _session_hours(meta["started"] if meta else None,
@@ -2176,6 +2190,9 @@ class _SessionDetailDialog(QDialog):
                           [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignLeft,
                            Qt.AlignRight, Qt.AlignRight, Qt.AlignRight,
                            Qt.AlignRight])
+        zones.horizontalHeaderItem(4).setToolTip("Yours / session total kills")
+        zones.horizontalHeaderItem(5).setToolTip("Yours / session total drops")
+        zones.horizontalHeaderItem(6).setToolTip("Session total experience")
         for z in db.zone_stats(session_id):
             i = zones.rowCount()
             zones.insertRow(i)

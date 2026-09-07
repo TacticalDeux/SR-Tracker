@@ -22,9 +22,9 @@ from .dll import TrackerDLL
 
 
 # Event types that mean the game is actually doing something, as opposed
-# to bridge chatter (net_seen, net_connect, net_close, handshake, shm_open,
-# hook_install, dll_heartbeat) or ambient noise (character_spawn fires
-# for any player walking by). The gameplay-silence watchdog watches
+# to bridge chatter (net_seen, net_connect, net_close, session_setup,
+# key_rotation, shm_open, hook_install, dll_heartbeat) or ambient noise
+# (character_spawn fires for any player walking by). The gameplay-silence watchdog watches
 # these; heartbeats deliberately do NOT reset it.
 _GAMEPLAY_TYPES = frozenset({
     "local_account",
@@ -67,7 +67,7 @@ class EventConsumer(QObject):
         self._events_parsed = 0
         self._events_dropped = 0
         # Attribution state, reset per session in start(): the account id
-        # behind this client (packets), and a map from unique enemy
+        # behind this client, and a map from unique enemy
         # instance id -> mob type id built from spawn events so death
         # rows can carry a displayable monster name.
         self._local_account_id: int | None = None
@@ -78,7 +78,7 @@ class EventConsumer(QObject):
         self._last_event_at = time.monotonic()
         # Monotonic timestamp of the last GAMEPLAY event (spawns,
         # deaths, damage, drops, xp, zones). Bridge chatter — net_seen,
-        # handshake, dll_heartbeat — resets _last_event_at but not this, so
+        # session_setup, key_rotation, dll_heartbeat — resets _last_event_at but not this, so
         # "DLL alive, hooks blind" (heartbeats flowing, nothing else) is
         # still reported as a stall instead of looking healthy.
         self._last_gameplay_at = time.monotonic()
@@ -224,7 +224,7 @@ class EventConsumer(QObject):
             except (TypeError, ValueError):
                 pass
         elif etype == "local_account":
-            # packets: the account id behind this client. Drops carry
+            # The account id behind this client. Drops carry
             # belongs_to and kills are credited via the damage table,
             # both keyed off this id.
             try:
@@ -270,7 +270,7 @@ class EventConsumer(QObject):
                 ts,
             )
         elif etype == "pickup":
-            # packets: someone picked a drop up. The drop_creation row
+            # Someone picked a drop up. The drop_creation row
             # (keyed by drop entity id) gains the picker so the Drops tab
             # can show who took it; "mine" is derived at query time from
             # sessions.local_account_id.
@@ -282,7 +282,7 @@ class EventConsumer(QObject):
             if drop_id:
                 self._db.mark_drop_pickup(sid, drop_id, picker, ts)
         elif etype == "drop_destroyed":
-            # packets: a drop vanished unclaimed (expired/destroyed).
+            # A drop vanished unclaimed (expired/destroyed).
             try:
                 drop_id = int(data.get("drop_id", 0))
             except (TypeError, ValueError):
@@ -290,7 +290,7 @@ class EventConsumer(QObject):
             if drop_id:
                 self._db.mark_drop_destroyed(sid, drop_id)
         elif etype == "player_death":
-            # packets death screen: the local player died, with the
+            # Death screen: the local player died, with the
             # exact toll attached (exp/money/items). XP loss is tracked
             # on the death row itself — xp_events stays gains-only.
             try:
@@ -301,13 +301,26 @@ class EventConsumer(QObject):
                 return
             self._db.insert_death(sid, exp_lost, money_lost, items_lost, ts)
         elif etype == "exp_update":
-            self._db.insert_xp(
-                sid,
-                int(data.get("exp_gained", 0)),
-                int(data.get("level", 0)) if "level" in data else None,
-                False,
-                ts,
-            )
+            # The wire carries exp_gained as an UNSIGNED 64-bit delta,
+            # but a death toll arrives as the two's-complement wrap of a
+            # negative i64 (e.g. 2^64-12028224 for a -12028224 toll).
+            # player_death (with the exact exp/money/items toll)
+            # is the SOLE authoritative death recorder — this wrapped
+            # echo of the same death (~ms apart in the live log) must
+            # neither insert a death row (double-count) nor pollute
+            # xp_events with a bogus giant gain, so it is dropped
+            # silently. (character_death is likewise informational only
+            # and has no branch here — it falls through safely ignored.)
+            try:
+                raw_gain = int(data.get("exp_gained", 0))
+                level = int(data.get("level", 0)) if "level" in data else None
+            except (TypeError, ValueError):
+                return
+            if raw_gain >= 2**63:
+                raw_gain -= 2**64
+            if raw_gain < 0:
+                return
+            self._db.insert_xp(sid, raw_gain, level, False, ts)
         elif etype == "level_up":
             self._db.insert_xp(sid, 0, int(data.get("level", 0)), True, ts)
         elif etype == "zone_change":
@@ -324,3 +337,18 @@ class EventConsumer(QObject):
                 "boss",
                 ts,
             )
+        elif etype in (
+            # Bridge/session flow signals: nothing to persist.
+            "session_setup",
+            "key_rotation",
+            "net_seen",
+            "net_connect",
+            "net_close",
+            "shm_open",
+            "hook_install",
+            "hook_patched",
+            "hook_eat",
+            "dll_heartbeat",
+            "dll_warning",
+        ):
+            return

@@ -144,6 +144,26 @@ SCHEMA = [
 # Tables wiped by reset_session (everything per-session, but not the session row).
 _RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage", "deaths")
 
+# SQLite INTEGER is a signed 64-bit int. Python ints are unbounded, so
+# any wire value that doesn't fit (e.g. a u64-wrapped death toll
+# reaching an INSERT directly) raises OverflowError and kills the
+# consumer's handling of that event. Clamp every integer at the DB
+# boundary so no INSERT can ever overflow.
+_I64_MIN = -(2**63)
+_I64_MAX = 2**63 - 1
+
+
+def _i64(value: int | None) -> int | None:
+    """Coerce an int into SQLite INTEGER range (None passes through)."""
+    if value is None:
+        return None
+    value = int(value)
+    if value < _I64_MIN:
+        return _I64_MIN
+    if value > _I64_MAX:
+        return _I64_MAX
+    return value
+
 
 class Database:
     def __init__(self, path: Path):
@@ -181,8 +201,8 @@ class Database:
             self._ensure_column("drops", "mob_id", "INTEGER")
             self._ensure_column("drops", "amount", "INTEGER")
             self._ensure_column("drops", "belongs_to", "INTEGER")
-            # Pickup/destroy lifecycle (packets): who took the
-            # drop and when, or whether it vanished unclaimed.
+            # Drop lifecycle: who took the drop and when, or whether it
+            # vanished unclaimed.
             self._ensure_column("drops", "picked_up_by", "INTEGER")
             self._ensure_column("drops", "picked_up_at", "TEXT")
             self._ensure_column("drops", "destroyed", "INTEGER NOT NULL DEFAULT 0")
@@ -299,12 +319,12 @@ class Database:
             self._conn.commit()
 
     def insert_damage(self, session_id: int, enemy_id: int, attacker: int,
-                      damage: int, ts: str) -> None:
+                       damage: int, ts: str) -> None:
         with self._lock:
             self._conn.execute(
                 "INSERT INTO damage (session_id, enemy_id, attacker, damage, timestamp) "
                 "VALUES (?,?,?,?,?)",
-                (session_id, enemy_id, attacker, damage, ts),
+                (session_id, _i64(enemy_id), _i64(attacker), _i64(damage), ts),
             )
             self._conn.commit()
 
@@ -371,32 +391,33 @@ class Database:
             self._conn.execute("VACUUM")
 
     def insert_drop(self, session_id: int, drop_id: int, item_id: int | None,
-                    mob_id: int | None, amount: int | None,
-                    belongs_to: int | None, ts: str) -> None:
+                     mob_id: int | None, amount: int | None,
+                     belongs_to: int | None, ts: str) -> None:
         with self._lock:
             self._conn.execute(
                 """INSERT INTO drops (session_id, drop_id, item_id, mob_id, amount, belongs_to, timestamp)
                    VALUES (?,?,?,?,?,?,?)""",
-                (session_id, drop_id, item_id, mob_id, amount, belongs_to, ts),
+                (session_id, _i64(drop_id), _i64(item_id), _i64(mob_id),
+                 _i64(amount), _i64(belongs_to), ts),
             )
             self._conn.commit()
 
     def insert_death(self, session_id: int, exp_lost: int, money_lost: int,
                      items_lost: int, ts: str) -> None:
-        """Record a local-player death (packets death screen). The XP
+        """Record a local-player death (death screen). The XP
         loss rides on this row directly — it is NOT folded into xp_events,
         which tracks gains only."""
         with self._lock:
             self._conn.execute(
                 "INSERT INTO deaths (session_id, exp_lost, money_lost, items_lost, timestamp)"
                 " VALUES (?,?,?,?,?)",
-                (session_id, exp_lost, money_lost, items_lost, ts),
+                (session_id, _i64(exp_lost), _i64(money_lost), _i64(items_lost), ts),
             )
             self._conn.commit()
 
     def mark_drop_pickup(self, session_id: int, drop_id: int,
                          picker: int | None, ts: str) -> None:
-        """Attribute a drop to whoever picked it up (packets). Matches
+        """Attribute a drop to whoever picked it up. Matches
         the latest drop_creation row for this drop entity; a pickup for
         an unknown drop (missed creation while hooks were blind) is
         ignored rather than inventing a row."""
@@ -412,7 +433,7 @@ class Database:
             self._conn.commit()
 
     def mark_drop_destroyed(self, session_id: int, drop_id: int) -> None:
-        """Flag a drop as vanished unclaimed (packets expiry/destroy).
+        """Flag a drop as vanished unclaimed (expiry/destroy).
         Already-picked-up rows keep their pickup — destroy loses the race."""
         with self._lock:
             self._conn.execute(
@@ -440,11 +461,11 @@ class Database:
             ]
 
     def insert_xp(self, session_id: int, xp: int, level: int | None,
-                  is_level_up: bool, ts: str) -> None:
+                   is_level_up: bool, ts: str) -> None:
         with self._lock:
             self._conn.execute(
                 "INSERT INTO xp_events (session_id, xp_gained, level, is_level_up, timestamp) VALUES (?,?,?,?,?)",
-                (session_id, xp, level, int(is_level_up), ts),
+                (session_id, _i64(xp), _i64(level), int(is_level_up), ts),
             )
             self._conn.commit()
 
@@ -505,6 +526,11 @@ class Database:
                 (session_id, session_id),
             )
             my_sc = cur.fetchone()[0]
+            cur.execute("SELECT local_account_id FROM sessions WHERE id = ?",
+                        (session_id,))
+            acct_row = cur.fetchone()
+            local_acct = acct_row[0] if acct_row else None
+            sc_pick = self.sc_totals(session_id, local_acct)
             cur.execute("SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events WHERE session_id = ?", (session_id,))
             xp = cur.fetchone()[0] or 0
             cur.execute("SELECT COALESCE(MAX(level), 0) FROM xp_events WHERE session_id = ?", (session_id,))
@@ -554,6 +580,8 @@ class Database:
                 "my_kills": my_kills,
                 "soul_crystals": sc,
                 "my_soul_crystals": my_sc,
+                "sc_picked": sc_pick["picked"],
+                "sc_unpicked": sc_pick["unpicked"],
                 "xp": int(xp),
                 "level": int(level),
                 "drops": drops,
@@ -565,6 +593,32 @@ class Database:
                 "items_lost": items_lost,
                 "current_zone": zone_display,
             }
+
+    def sc_totals(self, session_id: int,
+                    local_account_id: int | None) -> dict:
+        """Soul-crystal (item_id=0) running totals by amount, local only.
+
+        picked:   SC amount picked up BY the local account.
+        unpicked: SC amount belonging to local but NOT picked up by
+                  local (still on the ground / taken by someone else).
+        Drops belonging to other players are excluded entirely."""
+        if local_account_id is None:
+            return {"picked": 0, "unpicked": 0}
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops "
+                "WHERE session_id = ? AND item_id = 0 AND picked_up_by = ?",
+                (session_id, local_account_id),
+            )
+            picked = cur.fetchone()[0] or 0
+            cur = self._conn.execute(
+                "SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops "
+                "WHERE session_id = ? AND item_id = 0 AND belongs_to = ? "
+                "AND (picked_up_by IS NULL OR picked_up_by != ?)",
+                (session_id, local_account_id, local_account_id),
+            )
+            unpicked = cur.fetchone()[0] or 0
+            return {"picked": int(picked), "unpicked": int(unpicked)}
 
     def zone_stats(self, session_id: int) -> list[dict]:
         """Per-zone aggregated stats for a session (kills/sc/drops/xp + time spent)."""
