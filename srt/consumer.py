@@ -38,6 +38,7 @@ _GAMEPLAY_TYPES = frozenset({
     "player_death",
     "exp_update",
     "level_up",
+    "mirage_exit",
     "zone_change",
 })
 
@@ -323,6 +324,11 @@ class EventConsumer(QObject):
             self._db.insert_xp(sid, raw_gain, level, False, ts)
         elif etype == "level_up":
             self._db.insert_xp(sid, 0, int(data.get("level", 0)), True, ts)
+        elif etype == "mirage_exit":
+            # A mirage run ended. This arrives just before the warp-out
+            # zone change closes the visit, so flag-then-close ordering
+            # holds: the open visit is still open here.
+            self._db.mark_current_visit_mirage(sid, ts)
         elif etype == "zone_change":
             self._db.insert_zone_visit(
                 sid,

@@ -1388,7 +1388,11 @@ class MainWindow(QMainWindow):
             time_str = _fmt_duration(secs)
             hrs = (secs / 3600.0) if secs else 0.0
             kpm = (z["kills"] / (secs / 60)) if secs else 0.0
-            self.tbl_zones.setItem(i, 0, _cell(z["display_name"]))
+            zone_item = _cell(z["display_name"]
+                              + ("  ·  Mirage" if z.get("is_mirage") else ""))
+            if z.get("is_mirage"):
+                zone_item.setToolTip("Mirage run")
+            self.tbl_zones.setItem(i, 0, zone_item)
             self.tbl_zones.setItem(i, 1, _cell(_fmt_clock(z["entered_at"])))
             self.tbl_zones.setItem(
                 i, 2, _cell(_fmt_clock(left) if z["left_at"] else "now"))
@@ -2196,7 +2200,11 @@ class _SessionDetailDialog(QDialog):
         for z in db.zone_stats(session_id):
             i = zones.rowCount()
             zones.insertRow(i)
-            zones.setItem(i, 0, _cell(z["display_name"]))
+            dz_item = _cell(z["display_name"]
+                            + ("  ·  Mirage" if z.get("is_mirage") else ""))
+            if z.get("is_mirage"):
+                dz_item.setToolTip("Mirage run")
+            zones.setItem(i, 0, dz_item)
             zones.setItem(i, 1, _cell(_fmt_clock(z["entered_at"])))
             zones.setItem(i, 2, _cell(_fmt_clock(z["left_at"])))
             zones.setItem(i, 3, _cell(

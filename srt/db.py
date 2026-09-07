@@ -97,6 +97,7 @@ SCHEMA = [
         display_name TEXT,
         entered_at TEXT NOT NULL,
         left_at TEXT,
+        is_mirage INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY(session_id) REFERENCES sessions(id)
     )""",
     """CREATE VIEW IF NOT EXISTS zone_stats AS
@@ -210,6 +211,7 @@ class Database:
             self._ensure_column("xp_events", "is_level_up", "INTEGER")
             self._ensure_column("xp_events", "bonus_party", "INTEGER")
             self._ensure_column("zone_visits", "display_name", "TEXT")
+            self._ensure_column("zone_visits", "is_mirage", "INTEGER NOT NULL DEFAULT 0")
             # Old builds created zone_visits with a NOT NULL `timestamp`
             # column; current code writes entered_at/left_at instead, so
             # every zone insert fails on the legacy constraint until the
@@ -253,13 +255,15 @@ class Database:
                     display_name TEXT,
                     entered_at TEXT NOT NULL,
                     left_at TEXT,
+                    is_mirage INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY(session_id) REFERENCES sessions(id)
                 )"""
             )
             self._conn.execute(
                 "INSERT INTO zone_visits_new "
-                "(id, session_id, map_name, display_name, entered_at, left_at) "
-                "SELECT id, session_id, map_name, display_name, entered_at, left_at "
+                "(id, session_id, map_name, display_name, entered_at, left_at, is_mirage) "
+                "SELECT id, session_id, map_name, display_name, entered_at, left_at, "
+                "COALESCE(is_mirage, 0) "
                 "FROM zone_visits"
             )
             self._conn.execute("DROP TABLE zone_visits")
@@ -496,6 +500,19 @@ class Database:
             )
             self._conn.commit()
 
+    def mark_current_visit_mirage(self, session_id: int, ts: str) -> None:
+        """Flag the currently open zone visit as a mirage run. Targets
+        the latest still-open visit; a no-op when none is open."""
+        with self._lock:
+            self._conn.execute(
+                """UPDATE zone_visits SET is_mirage = 1
+                   WHERE id = (SELECT id FROM zone_visits
+                               WHERE session_id = ? AND left_at IS NULL
+                               ORDER BY id DESC LIMIT 1)""",
+                (session_id,),
+            )
+            self._conn.commit()
+
     def close_open_zones(self, session_id: int, ts: str) -> None:
         """Stamp left_at on any still-open zone visits (called on session end)."""
         with self._lock:
@@ -628,6 +645,7 @@ class Database:
                           COALESCE(MAX(zv.display_name), zv.map_name) AS display_name,
                           zv.entered_at,
                           zv.left_at,
+                          zv.is_mirage,
                           zs.kills,
                           zs.soul_crystals,
                           zs.drops,
@@ -647,13 +665,14 @@ class Database:
                 "display_name": r[1],
                 "entered_at": r[2],
                 "left_at": r[3],
-                "kills": r[4] or 0,
-                "soul_crystals": r[5] or 0,
-                "drops": r[6] or 0,
-                "xp": r[7] or 0,
-                "my_kills": r[8] or 0,
-                "my_drops": r[9] or 0,
-                "my_soul_crystals": r[10] or 0,
+                "is_mirage": bool(r[4]),
+                "kills": r[5] or 0,
+                "soul_crystals": r[6] or 0,
+                "drops": r[7] or 0,
+                "xp": r[8] or 0,
+                "my_kills": r[9] or 0,
+                "my_drops": r[10] or 0,
+                "my_soul_crystals": r[11] or 0,
             } for r in cur.fetchall()]
 
     def past_sessions(self, limit: int = 50) -> list[dict]:
@@ -689,7 +708,7 @@ class Database:
         with self._lock:
             cur = self._conn.execute(
                 """SELECT id, map_name, COALESCE(display_name, map_name),
-                          entered_at, left_at
+                          entered_at, left_at, is_mirage
                    FROM zone_visits WHERE session_id = ?
                    ORDER BY entered_at""",
                 (session_id,),
@@ -697,6 +716,7 @@ class Database:
             return [{
                 "id": r[0], "map_name": r[1], "display_name": r[2],
                 "entered_at": r[3], "left_at": r[4],
+                "is_mirage": bool(r[5]),
             } for r in cur.fetchall()]
 
     def cumulative_events(self, session_id: int, kind: str) -> list[tuple[str, float]]:
