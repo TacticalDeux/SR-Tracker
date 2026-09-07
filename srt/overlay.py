@@ -1,31 +1,36 @@
 """The always-on-top HUD overlay.
 
-Visual identity (see `srt.theme`): a parchment strip pinned to the side
-of the screen. Parchment background, ash-gray tracked labels in Georgia,
-monospace numerals in Consolas. The soul-crystal count sits next to a
-hand-traced pixel-art crystal — the design's signature element.
+Visual identity (see `srt.theme`): a dark card pinned to the side of the
+screen. Ash-gray tracked labels in Segoe UI, monospace numerals in
+Consolas — numbers shrink to fit instead of clipping, zone names elide
+instead of stretching the window.
 
 Behavior:
   - Frameless, always-on-top, no taskbar (Tool flag).
-  - A child QFrame ("OverlayCard") holds the visible card.
+  - A child QFrame ("OverlayCard") holds the visible card; the drawer
+    is transparent so there is never a box inside a box.
   - The whole card is draggable when unlocked.
   - A settings drawer unfurls from the bottom of the card.
-  - When locked, the card dims, the crystal goes ash-gray, the lock
-    pill hides, and the whole window becomes click-through.
-  - The only way to unlock from outside is via the main window's
-    Lock/Unlock button.
+  - Background sliders change the card's background only — text
+    always renders at full opacity; Opacity sliders fade the whole
+    window, background and text together. A text-color picker paints
+    the stats text. When locked, the text dims to ash-gray and the
+    lock pill hides.
+  - When locked the whole window becomes click-through; the only way
+    to unlock from outside is via the main window's Lock/Unlock button.
+  - Size is layout-driven: the window shrink-wraps its content and
+    re-fits whenever values, visibility, or orientation change.
 """
 from __future__ import annotations
 from typing import Callable
-from PySide6.QtCore import QPoint, QRect, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter
+from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QSlider, QVBoxLayout, QWidget,
+    QCheckBox, QColorDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
+    QSizePolicy, QSlider, QVBoxLayout, QWidget,
 )
 
 from . import theme
-from .crystal import crystal_pixmap
 from .db import Database
 from .settings import Settings, SettingsStore
 
@@ -35,96 +40,163 @@ POLL_MS = 500
 
 # Field config: (key, display label, monospace number size)
 _FIELDS = (
-    ("kills", "KILLS",         22),
-    ("sc",    "SOUL CRYSTALS", 22),
-    ("xp",    "EXPERIENCE",    16),
-    ("level", "LEVEL",         22),
-    ("zone",  "ZONE",          14),
+    ("kills",   "KILLS",         22),
+    ("sc",      "SOUL CRYSTALS", 22),
+    ("xp",      "EXPERIENCE",    16),
+    ("level",   "LEVEL",         22),
+    ("zone",    "ZONE",          14),
+    ("deaths",  "DEATHS",        22),
+    ("xp_lost", "XP LOST",       16),
 )
 
 #: Toggleable fields for settings UIs (the main window's Overlay tab
-#: builds its checkboxes from this, so the two never drift apart).
+#: builds its field list from this, so the two never drift apart).
 OVERLAY_FIELDS = (
     ("kills", "Kills"),
     ("sc", "Soul crystals"),
     ("xp", "Experience"),
     ("level", "Level"),
     ("zone", "Zone"),
+    ("deaths", "Deaths"),
+    ("xp_lost", "XP lost"),
 )
+
+_FIELD_MAP = {key: (label, size) for key, label, size in _FIELDS}
+_OVERLAY_LABELS = dict(OVERLAY_FIELDS)
+
+
+def ordered_fields(settings) -> list[tuple[str, str, int]]:
+    """Field defs in the user's display order.
+
+    Unknown keys are dropped and known keys missing from the saved
+    order append at the end, so older settings files and future
+    fields both degrade gracefully."""
+    seen: set[str] = set()
+    out: list[tuple[str, str, int]] = []
+    for key in getattr(settings, "overlay_field_order", None) or ():
+        if key in _FIELD_MAP and key not in seen:
+            seen.add(key)
+            label, size = _FIELD_MAP[key]
+            out.append((key, label, size))
+    for key, label, size in _FIELDS:
+        if key not in seen:
+            out.append((key, label, size))
+    return out
+
+
+def _valid_color(value: str, fallback: str) -> str:
+    """The picked color, or the fallback when the stored value is junk."""
+    return value if QColor(value).isValid() else fallback
 
 _ORIENTATIONS = ("vertical", "horizontal")
 
 
+def _contrast_text(hex_color: str) -> str:
+    """Dark or light foreground that reads on the given background."""
+    c = QColor(hex_color)
+    lum = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+    return "#1a1424" if lum > 128 else "#e8dfc8"
+
+
 # ---------------------------------------------------------------------------
-# The signature element: a single field row. A pixel-art soul crystal
-# sits on the left, a monospace number sits to its right. The two are
-# painted into one canvas so the row reads as a single instrument — the
-# count and the crystal belong to each other, the way "KILLS 12" and
-# its counter-graphic should.
+# Field labels: tracked uppercase names that elide instead of forcing
+# the window wider. At small content scales the rows get narrow and a
+# fixed label ("SOUL CRYSTALS") would clip; eliding keeps the row
+# inside the shrunken window.
 # ---------------------------------------------------------------------------
-class _CrystalNumber(QWidget):
-    def __init__(self, number_size: int, parent=None):
+class _FitLabel(QLabel):
+    def __init__(self, text: str, align=Qt.AlignVCenter | Qt.AlignLeft,
+                 parent=None):
         super().__init__(parent)
-        self._number = "0"
-        self._dim = False
-        self._number_size = number_size
-        # Pre-render the crystal pixmaps at the size we use them. The
-        # crystal is 18x22 in the source, scaled with NearestNeighbor
-        # so the pixels stay crisp at every display size.
-        self._crystal = crystal_pixmap(32, dim=False)
-        self._crystal_dim = crystal_pixmap(32, dim=True)
+        self._full = text
+        self._align = align
+        self.setAlignment(align)
+        self.setObjectName("OverlayLabel")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setMinimumHeight(40)
+        self.setMinimumWidth(40)
+        self._elide()
+
+    def setText(self, text: str) -> None:
+        self._full = text
+        self._elide()
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._elide()
+
+    def _elide(self) -> None:
+        avail = max(self.width(), 20)
+        super().setText(QFontMetrics(self.font()).elidedText(
+            self._full, Qt.ElideRight, avail))
+
+
+# ---------------------------------------------------------------------------
+# Value labels: right-aligned monospace numerals that shrink to fit
+# instead of clipping. Long counts (10k+ souls in a good session)
+# step down from their configured size to a 6pt floor so the number
+# reads smaller rather than being cut off at the row edge — the floor
+# matters most when the whole overlay is scaled down.
+# ---------------------------------------------------------------------------
+class _FitNumber(QLabel):
+    def __init__(self, number_size: int, align=Qt.AlignRight | Qt.AlignVCenter,
+                 parent=None):
+        super().__init__(parent)
+        self._base_size = number_size
+        self._dim = False
+        self._normal = theme.PARCH_BG
+        self._locked_color = theme.ASH
+        self._align = align
+        self.setObjectName("OverlayNumber")
+        self.setAlignment(align)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def set_value(self, text: str) -> None:
-        self._number = text
-        self.update()
+        if text == self.text():
+            return
+        self.setText(text)
+        self._refit()
+
+    def set_colors(self, normal: str, locked: str) -> None:
+        """The picked stats color and the locked-state color. Stored so
+        a later lock flip re-applies them instead of falling back to a
+        hardcoded pair (which used to clobber the picked color)."""
+        if (normal, locked) == (self._normal, self._locked_color):
+            return
+        self._normal = normal
+        self._locked_color = locked
+        self._repaint()
 
     def set_dim(self, dim: bool) -> None:
+        if dim == self._dim:
+            return
         self._dim = dim
-        self.update()
+        self._repaint()
 
-    def paintEvent(self, _e) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing, False)
-        p.setRenderHint(QPainter.SmoothPixmapTransform, False)
+    def _repaint(self) -> None:
+        # Inline color only; font, padding and the rest still come from
+        # the OverlayNumber QSS rule.
+        ink = self._locked_color if self._dim else self._normal
+        self.setStyleSheet(f"color: {ink};")
 
-        crystal_size = self._crystal.width()
-        y = (self.height() - crystal_size) // 2
-        pm = self._crystal_dim if self._dim else self._crystal
-        p.drawPixmap(0, y, pm)
+    def base_size(self) -> int:
+        return self._base_size
 
-        # The crystal wants nearest-neighbor crispness, but the numerals
-        # shouldn't inherit that — restore antialiasing so the monospace
-        # digits render smoothly instead of jagged.
-        p.setRenderHint(QPainter.Antialiasing, True)
-        p.setRenderHint(QPainter.TextAntialiasing, True)
-        # Numbers and crystal sit on the dark card. Unlocked = full
-        # brightness parchment-white, locked = ash so the row reads
-        # "muted" the same way the crystal does.
-        ink = QColor(theme.ASH) if self._dim else QColor(theme.PARCH_BG)
-        p.setPen(ink)
-        rect = QRect(
-            crystal_size + 12, 0,
-            self.width() - crystal_size - 12, self.height(),
-        )
-        # Fit-text: soul-crystal and kill totals grow past 10k in a long
-        # session, and a fixed 22pt font gets clipped by the row width.
-        # Shrink the point size until the text fits (floor of 8pt) so a
-        # big count reads smaller instead of being cut off.
-        size = self._number_size
-        f = QFont("Consolas", size)
-        f.setBold(True)
-        f.setStyleHint(QFont.Monospace)
-        while size > 8:
-            f.setPointSize(size)
-            if QFontMetrics(f).horizontalAdvance(self._number) <= rect.width():
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._refit()
+
+    def _refit(self) -> None:
+        avail = max(self.width() - 2, 20)
+        size = self._base_size
+        while size > 6:
+            f = QFont("Consolas", size)
+            f.setBold(True)
+            f.setStyleHint(QFont.Monospace)
+            if QFontMetrics(f).horizontalAdvance(self.text()) <= avail:
                 break
             size -= 1
-        f.setPointSize(size)
-        p.setFont(f)
-        p.drawText(rect, Qt.AlignVCenter | Qt.AlignRight, self._number)
-        p.end()
+        self.setFont(f)
+        self.setMinimumHeight(QFontMetrics(f).height() + 8)
 
 # ---------------------------------------------------------------------------
 # The overlay window.
@@ -145,8 +217,14 @@ class OverlayWindow(QWidget):
         self._on_settings_changed = on_settings_changed
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        # Translucent (not just NoSystemBackground) so the rgba card
+        # fill composites against the game behind the window. Without
+        # this the backing store stays opaque: lowering the slider
+        # only darkened the card toward black instead of fading it
+        # out, and the text could never float backgroundless.
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
-        self.setStyleSheet(theme.OVERLAY_QSS)
+        self._apply_text_color()
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -157,16 +235,19 @@ class OverlayWindow(QWidget):
         outer.addWidget(self._card)
 
         layout = QVBoxLayout(self._card)
-        layout.setContentsMargins(18, 14, 18, 14)
+        self._card_layout = layout
+        margin_h, margin_v = self._scaled_margins(self._overlay_scale())
+        layout.setContentsMargins(margin_h, margin_v, margin_h, margin_v)
         layout.setSpacing(0)
 
         # --- header: handle (left) + lock pill (right) ---
         header = QHBoxLayout()
         header.setSpacing(8)
-        self._handle = QLabel("SOULS  REMAINING")
+        self._handle = _FitLabel("SOUL'S REMNANT",
+                                 Qt.AlignVCenter | Qt.AlignLeft)
         self._handle.setObjectName("OverlayHandle")
         self._handle.setCursor(Qt.SizeAllCursor)
-        header.addWidget(self._handle)
+        header.addWidget(self._handle, 1)
         header.addStretch(1)
         self._lock_btn = QPushButton("LOCK")
         self._lock_btn.setObjectName("OverlayPill")
@@ -182,7 +263,7 @@ class OverlayWindow(QWidget):
         # --- metric rows (rebuildable: an orientation switch throws the
         # whole box away and re-creates it, which is simpler and safer
         # than swapping layouts on live widgets) ---
-        self._rows: dict[str, tuple[QLabel, _CrystalNumber]] = {}
+        self._rows: dict[str, tuple[QLabel, _FitNumber]] = {}
         # Each entry: (rule widget, key of the row above it, key of the
         # row below it) — lets us keep a divider hidden when both the
         # rows it separates are hidden, instead of leaving it floating.
@@ -196,9 +277,11 @@ class OverlayWindow(QWidget):
         self._last_values: dict[str, str] = {}
         self._build_fields_box()
 
-        # --- settings drawer (collapsed by default) ---
+        # --- settings drawer (collapsed by default). Transparent on
+        # purpose: the drawer lives inside the card, so giving it its
+        # own bordered background produced a visible box inside a box.
         self._drawer = QFrame()
-        self._drawer.setObjectName("OverlayCard")
+        self._drawer.setObjectName("OverlayDrawer")
         self._drawer.setMaximumHeight(0)
         self._drawer.setVisible(False)
         d_layout = QVBoxLayout(self._drawer)
@@ -206,11 +289,13 @@ class OverlayWindow(QWidget):
         d_layout.setSpacing(10)
 
         op_row = QHBoxLayout()
-        op_lbl = QLabel("OPACITY")
+        op_lbl = QLabel("BACKGROUND")
         op_lbl.setObjectName("OverlayLabel")
         op_row.addWidget(op_lbl)
         self._opacity_slider = QSlider(Qt.Horizontal)
-        self._opacity_slider.setRange(20, 100)
+        # 0 == backgroundless: the card and its border both vanish,
+        # leaving the text floating over the game.
+        self._opacity_slider.setRange(0, 100)
         self._opacity_slider.setSingleStep(5)
         self._opacity_slider.setPageStep(10)
         self._opacity_slider.setValue(int(self._settings.overlay_opacity * 100))
@@ -222,11 +307,11 @@ class OverlayWindow(QWidget):
         # slider never touched — so locking looked "hardcoded". A second
         # slider owns the locked value; set both while unlocked.
         locked_row = QHBoxLayout()
-        locked_lbl = QLabel("LOCKED OPACITY")
+        locked_lbl = QLabel("LOCKED BACKGROUND")
         locked_lbl.setObjectName("OverlayLabel")
         locked_row.addWidget(locked_lbl)
         self._locked_opacity_slider = QSlider(Qt.Horizontal)
-        self._locked_opacity_slider.setRange(20, 100)
+        self._locked_opacity_slider.setRange(0, 100)
         self._locked_opacity_slider.setSingleStep(5)
         self._locked_opacity_slider.setPageStep(10)
         self._locked_opacity_slider.setValue(
@@ -236,9 +321,90 @@ class OverlayWindow(QWidget):
         locked_row.addWidget(self._locked_opacity_slider, 1)
         d_layout.addLayout(locked_row)
 
+        # Whole-window opacity (background AND text together) for both
+        # lock states — the counterpart to the background-only sliders
+        # above. 0 fades the overlay out entirely.
+        win_row = QHBoxLayout()
+        win_lbl = QLabel("OPACITY")
+        win_lbl.setObjectName("OverlayLabel")
+        win_lbl.setToolTip("Fades background and text together")
+        win_row.addWidget(win_lbl)
+        self._win_opacity_slider = QSlider(Qt.Horizontal)
+        self._win_opacity_slider.setRange(0, 100)
+        self._win_opacity_slider.setSingleStep(5)
+        self._win_opacity_slider.setPageStep(10)
+        self._win_opacity_slider.setValue(
+            int(self._settings.overlay_window_opacity * 100))
+        self._win_opacity_slider.valueChanged.connect(
+            self._on_window_opacity_changed)
+        win_row.addWidget(self._win_opacity_slider, 1)
+        d_layout.addLayout(win_row)
+
+        locked_win_row = QHBoxLayout()
+        locked_win_lbl = QLabel("LOCKED OPACITY")
+        locked_win_lbl.setObjectName("OverlayLabel")
+        locked_win_lbl.setToolTip("Fades background and text together")
+        locked_win_row.addWidget(locked_win_lbl)
+        self._locked_win_opacity_slider = QSlider(Qt.Horizontal)
+        self._locked_win_opacity_slider.setRange(0, 100)
+        self._locked_win_opacity_slider.setSingleStep(5)
+        self._locked_win_opacity_slider.setPageStep(10)
+        self._locked_win_opacity_slider.setValue(
+            int(self._settings.overlay_locked_window_opacity * 100))
+        self._locked_win_opacity_slider.valueChanged.connect(
+            self._on_locked_window_opacity_changed)
+        locked_win_row.addWidget(self._locked_win_opacity_slider, 1)
+        d_layout.addLayout(locked_win_row)
+
+        # Content scale: numbers, labels and the header handle grow or
+        # shrink together (70% .. 150% of the designed size).
+        scale_row = QHBoxLayout()
+        scale_lbl = QLabel("SCALE")
+        scale_lbl.setObjectName("OverlayLabel")
+        scale_lbl.setToolTip("Scales the overlay text")
+        scale_row.addWidget(scale_lbl)
+        self._scale_slider = QSlider(Qt.Horizontal)
+        self._scale_slider.setRange(70, 150)
+        self._scale_slider.setSingleStep(5)
+        self._scale_slider.setPageStep(10)
+        self._scale_slider.setValue(
+            int(round(self._overlay_scale() * 100)))
+        self._scale_slider.valueChanged.connect(self._on_scale_changed)
+        scale_row.addWidget(self._scale_slider, 1)
+        d_layout.addLayout(scale_row)
+
+        # Stats text color: a swatch button showing the current hex.
+        color_row = QHBoxLayout()
+        color_lbl = QLabel("TEXT COLOR")
+        color_lbl.setObjectName("OverlayLabel")
+        color_row.addWidget(color_lbl)
+        self._color_btn = QPushButton()
+        self._color_btn.setCursor(Qt.PointingHandCursor)
+        self._color_btn.setToolTip("Pick the stats text color")
+        self._color_btn.clicked.connect(self._on_pick_text_color)
+        color_row.addWidget(self._color_btn, 1)
+        d_layout.addLayout(color_row)
+        self._sync_color_button()
+
+        # Locked-state numbers get their own color: a swatch button
+        # showing the current hex.
+        locked_color_row = QHBoxLayout()
+        locked_color_lbl = QLabel("LOCKED TEXT")
+        locked_color_lbl.setObjectName("OverlayLabel")
+        locked_color_lbl.setToolTip("Numbers while the overlay is locked")
+        locked_color_row.addWidget(locked_color_lbl)
+        self._locked_color_btn = QPushButton()
+        self._locked_color_btn.setCursor(Qt.PointingHandCursor)
+        self._locked_color_btn.setToolTip("Pick the locked stats text color")
+        self._locked_color_btn.clicked.connect(
+            self._on_pick_locked_text_color)
+        locked_color_row.addWidget(self._locked_color_btn, 1)
+        d_layout.addLayout(locked_color_row)
+        self._sync_locked_color_button()
+
         self._field_checks: dict[str, QCheckBox] = {}
-        for key, label_text, _ in _FIELDS:
-            cb = QCheckBox(label_text.title())
+        for key, _label_text, _ in ordered_fields(self._settings):
+            cb = QCheckBox(_OVERLAY_LABELS.get(key, key.title()))
             cb.setObjectName("OverlayField")
             cb.setChecked(getattr(self._settings, f"overlay_show_{key}"))
             cb.toggled.connect(lambda checked, k=key: self._on_field_toggle(k, checked))
@@ -270,13 +436,16 @@ class OverlayWindow(QWidget):
         self._drag_pos: QPoint | None = None
         self._drag_active = False
 
-        # Initial geometry
-        if self._is_horizontal():
-            self.resize(880, 200)
-        else:
-            self.resize(280, 360)
+        # Geometry is layout-driven: the window shrink-wraps its content
+        # (see _build_fields_box / _refit_window) instead of assuming a
+        # fixed size that real values then overflow. The floor scales
+        # with the content scale so a scaled-down overlay can actually
+        # get smaller instead of clipping inside a full-size minimum.
+        self.setMinimumSize(*self._scaled_minimum(self._overlay_scale()))
+        self._last_hint = None
         self.move(self._settings.overlay_pos_x, self._settings.overlay_pos_y)
-        self._apply_opacity()
+        self._apply_bg()
+        self._apply_window_opacity()
         self._apply_field_visibility()
         self._clamp_to_screen()
         if self._settings.overlay_locked:
@@ -312,35 +481,43 @@ class OverlayWindow(QWidget):
             box_lay.setSpacing(0)
         box_lay.setContentsMargins(0, 0, 0, 0)
 
-        for i, (key, label_text, num_size) in enumerate(_FIELDS):
+        scale = self._overlay_scale()
+        ordered = ordered_fields(self._settings)
+        for i, (key, label_text, num_size) in enumerate(ordered):
             row = QWidget()
-            lbl = QLabel(label_text)
-            lbl.setObjectName("OverlayLabel")
-            num = _CrystalNumber(num_size)
             if horizontal:
+                lbl = _FitLabel(label_text, Qt.AlignCenter)
+                num = _FitNumber(max(6, int(round(num_size * scale))),
+                                 Qt.AlignCenter)
                 rl = QVBoxLayout(row)
                 rl.setContentsMargins(0, 0, 0, 0)
                 rl.setSpacing(2)
-                lbl.setAlignment(Qt.AlignCenter)
                 rl.addWidget(lbl)
-                num.setMinimumWidth(140)
+                # Narrow floors so a scaled-down strip shrink-wraps
+                # instead of holding the window wide while the text
+                # inside already shrank (_FitNumber steps to 6pt,
+                # labels elide).
+                num.setMinimumWidth(max(50, int(round(90 * scale))))
                 rl.addWidget(num)
             else:
+                lbl = _FitLabel(label_text,
+                                Qt.AlignVCenter | Qt.AlignLeft)
+                num = _FitNumber(max(6, int(round(num_size * scale))))
                 rl = QHBoxLayout(row)
                 rl.setContentsMargins(0, 0, 0, 0)
                 rl.setSpacing(10)
-                lbl.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
                 rl.addWidget(lbl, 1)
-                num.setMinimumWidth(190)
+                num.setMinimumWidth(max(60, int(round(120 * scale))))
                 rl.addWidget(num, 0)
             box_lay.addWidget(row)
             self._rows[key] = (lbl, num)
-            if not horizontal and i < len(_FIELDS) - 1:
+            num.set_colors(self._text_color, self._locked_text_color)
+            if not horizontal and i < len(ordered) - 1:
                 box_lay.addSpacing(8)
                 rule = _hairline()
                 box_lay.addWidget(rule)
                 box_lay.addSpacing(8)
-                self._hairlines.append((rule, key, _FIELDS[i + 1][0]))
+                self._hairlines.append((rule, key, ordered[i + 1][0]))
 
         self._fields_host.addWidget(box)
         for key, value in self._last_values.items():
@@ -349,9 +526,7 @@ class OverlayWindow(QWidget):
         for _, num in self._rows.values():
             num.set_dim(self._settings.overlay_locked)
         self._apply_field_visibility()
-        self._card.adjustSize()
-        self.adjustSize()
-        self._clamp_to_screen()
+        self._refit_window_soon()
 
     # ------------------------------------------------------------------
     # Public API
@@ -369,13 +544,34 @@ class OverlayWindow(QWidget):
         orientation_changed = (
             fresh.overlay_orientation != self._settings.overlay_orientation
         )
+        old_order = list(
+            getattr(self._settings, "overlay_field_order", None) or ())
+        old_scale = self._overlay_scale()
         self._settings = fresh
-        if orientation_changed:
+        # Colors first: a rebuild below paints new rows from the cache.
+        self._apply_text_color()
+        if abs(self._overlay_scale() - old_scale) > 1e-9:
+            # Scale moves padding + labels + numbers; the rebuild inside
+            # covers orientation/order changes too.
+            self._apply_scale()
+        elif orientation_changed or (
+                list(fresh.overlay_field_order or ()) != old_order):
             self._build_fields_box()
         self._sync_controls()
         self._apply_lock_state(self._settings.overlay_locked)
-        self._apply_opacity()
+        self._apply_bg()
+        self._apply_window_opacity()
         self._apply_field_visibility()
+
+    def _on_pick_locked_text_color(self) -> None:
+        picked = QColorDialog.getColor(QColor(self._locked_text_color),
+                                       self, "Overlay locked text color")
+        if not picked.isValid():
+            return
+        self._settings.overlay_locked_text_color = picked.name()
+        self._apply_text_color()
+        self._sync_locked_color_button()
+        self._save_settings()
 
     def _sync_controls(self) -> None:
         """Push the current settings into the drawer widgets (sliders,
@@ -387,6 +583,20 @@ class OverlayWindow(QWidget):
         self._locked_opacity_slider.setValue(
             int(self._settings.overlay_locked_opacity * 100))
         self._locked_opacity_slider.blockSignals(False)
+        self._win_opacity_slider.blockSignals(True)
+        self._win_opacity_slider.setValue(
+            int(self._settings.overlay_window_opacity * 100))
+        self._win_opacity_slider.blockSignals(False)
+        self._locked_win_opacity_slider.blockSignals(True)
+        self._locked_win_opacity_slider.setValue(
+            int(self._settings.overlay_locked_window_opacity * 100))
+        self._locked_win_opacity_slider.blockSignals(False)
+        self._scale_slider.blockSignals(True)
+        self._scale_slider.setValue(
+            int(round(self._overlay_scale() * 100)))
+        self._scale_slider.blockSignals(False)
+        self._sync_color_button()
+        self._sync_locked_color_button()
         for key, cb in self._field_checks.items():
             cb.blockSignals(True)
             cb.setChecked(getattr(self._settings, f"overlay_show_{key}"))
@@ -407,7 +617,53 @@ class OverlayWindow(QWidget):
 
     def showEvent(self, e) -> None:
         super().showEvent(e)
-        self._clamp_to_screen()
+        self._refit_window_soon()
+
+    def _refit_window_soon(self) -> None:
+        """Defer a forced refit to the next event-loop turn.
+
+        Structural changes (orientation rebuild, field toggles) post
+        layout requests that only settle once control returns to the
+        loop — measuring synchronously reads partially-updated hints
+        (a horizontal strip measured as header+footer size and stuck
+        there). The zero-delay timer fires after the pending layout
+        pass, so the measurement sees the settled content. The
+        receiver-arg form auto-cancels if the window is destroyed."""
+        QTimer.singleShot(0, self, lambda: self._refit_window(force=True))
+
+    def _refit_window(self, force: bool = False) -> None:
+        """Shrink-wrap the window around its current content.
+
+        Called after rebuilds, visibility changes, and lock flips. New
+        values arriving on the poll timer don't need it: text that fits
+        keeps the same size hint, and text that grows (counts, zones)
+        is handled by _FitNumber shrinking or eliding instead of asking
+        for more window."""
+        # Layouts recalculate lazily, and QWidget.sizeHint caches: right
+        # after a rebuild (orientation flip, field toggle) the cached
+        # hint still describes the OLD content. Measuring that stale
+        # hint once shrank a horizontal strip to header+footer size and
+        # locked it in. So invalidate + activate the top layout and read
+        # the layout's totals (recomputed fresh) instead of the cached
+        # widget hints.
+        top = self.layout()
+        if top is not None:
+            top.invalidate()
+            top.activate()
+            hint = top.totalSizeHint()
+            # A horizontal strip's columns carry minimum widths the
+            # plain size hint ignores — take the larger per dimension so
+            # the window always covers its content minimums.
+            want = hint.expandedTo(top.totalMinimumSize())
+        else:
+            hint = self._card.sizeHint()
+            want = hint
+        if force or hint != self._last_hint:
+            self._last_hint = hint
+            self._card.adjustSize()
+            if want != self.size():
+                self.resize(want)
+            self._clamp_to_screen()
 
     def _clamp_to_screen(self) -> None:
         """Pull a saved position back on-screen if a monitor was
@@ -442,9 +698,11 @@ class OverlayWindow(QWidget):
             self._drawer_toggle.show()
             self._handle.setCursor(Qt.SizeAllCursor)
             self._set_pass_through(False)
-        self._apply_opacity()
+        self._apply_bg()
+        self._apply_window_opacity()
         for _, num in self._rows.values():
             num.set_dim(locked)
+        self._refit_window_soon()
 
     def _set_pass_through(self, pass_through: bool) -> None:
         # WA_TransparentForMouseEvents alone doesn't give real
@@ -452,12 +710,19 @@ class OverlayWindow(QWidget):
         # takes the click. WindowTransparentForInput is the flag that
         # makes the OS skip the window for hit-testing, so the game
         # underneath gets the click. Toggling a window flag on a
-        # visible window requires a re-show to take effect.
+        # visible window hides it first; re-showing is what makes the
+        # new flag take effect. The old code called show() straight
+        # after the flag change, which Qt treated as a no-op on the
+        # just-hidden window — so locking from the tab hid the overlay
+        # and it never came back.
+        was_visible = self.isVisible()
+        if was_visible:
+            self.hide()
         self.setAttribute(Qt.WA_TransparentForMouseEvents, pass_through)
         for w in self.findChildren(QWidget):
             w.setAttribute(Qt.WA_TransparentForMouseEvents, pass_through)
         self.setWindowFlag(Qt.WindowTransparentForInput, pass_through)
-        if self.isVisible():
+        if was_visible:
             self.show()
 
     # ------------------------------------------------------------------
@@ -465,12 +730,32 @@ class OverlayWindow(QWidget):
     # ------------------------------------------------------------------
     def _on_opacity_changed(self, value: int) -> None:
         self._settings.overlay_opacity = value / 100.0
-        self._apply_opacity()
+        self._apply_bg()
         self._save_settings()
 
     def _on_locked_opacity_changed(self, value: int) -> None:
         self._settings.overlay_locked_opacity = value / 100.0
-        self._apply_opacity()
+        self._apply_bg()
+        self._save_settings()
+
+    def _on_window_opacity_changed(self, value: int) -> None:
+        self._settings.overlay_window_opacity = value / 100.0
+        self._apply_window_opacity()
+        self._save_settings()
+
+    def _on_locked_window_opacity_changed(self, value: int) -> None:
+        self._settings.overlay_locked_window_opacity = value / 100.0
+        self._apply_window_opacity()
+        self._save_settings()
+
+    def _on_pick_text_color(self) -> None:
+        picked = QColorDialog.getColor(QColor(self._text_color), self,
+                                       "Overlay stats text color")
+        if not picked.isValid():
+            return
+        self._settings.overlay_text_color = picked.name()
+        self._apply_text_color()
+        self._sync_color_button()
         self._save_settings()
 
     def _on_field_toggle(self, key: str, checked: bool) -> None:
@@ -478,13 +763,142 @@ class OverlayWindow(QWidget):
         self._apply_field_visibility()
         self._save_settings()
 
-    def _apply_opacity(self) -> None:
-        opacity = (
+    def _apply_bg(self) -> None:
+        """Paint the card background at the configured translucency.
+
+        Opacity touches the background fill only — the text is painted
+        separately at full opacity, so this slider is exactly the
+        "background but not text" control: at 0 the fill and the
+        border both vanish and the overlay is backgroundless. (The
+        old setWindowOpacity faded the whole window, text included,
+        which is why locked text looked washed out.)"""
+        alpha = (
             self._settings.overlay_locked_opacity
             if self._settings.overlay_locked
             else self._settings.overlay_opacity
         )
-        self.setWindowOpacity(opacity)
+        alpha = min(1.0, max(0.0, alpha))
+        self._bg_alpha = alpha
+        base = QColor(theme.INK_1)
+        edge = QColor(theme.INK_BORDER_2)
+        self._card.setStyleSheet(
+            "#OverlayCard {"
+            f" background: rgba({base.red()},{base.green()},{base.blue()},{alpha:.3f});"
+            " border: 1px solid"
+            f" rgba({edge.red()},{edge.green()},{edge.blue()},{alpha:.3f});"
+            "}"
+        )
+
+    def _card_bg_alpha(self) -> float:
+        """Background alpha currently applied to the card (0..1)."""
+        return getattr(self, "_bg_alpha", 1.0)
+
+    def _apply_window_opacity(self) -> None:
+        """Fade the whole window — background AND text together.
+
+        This is the "Opacity" slider to the "Background" slider's
+        scalpel: setWindowOpacity multiplies everything the window
+        paints, so the text dims with the card. It composes with (not
+        replaces) the card alpha from _apply_bg."""
+        alpha = (
+            self._settings.overlay_locked_window_opacity
+            if self._settings.overlay_locked
+            else self._settings.overlay_window_opacity
+        )
+        self.setWindowOpacity(min(1.0, max(0.0, alpha)))
+
+    def _apply_text_color(self) -> None:
+        """Paint the stats text in the picked colors.
+
+        Labels always use the stats color; numbers use it unlocked and
+        the locked color while locked. The label rule is appended after
+        the base sheet in the same setStyleSheet call so the
+        equal-specificity ID rule wins by order; numbers carry their
+        colors inline (see _FitNumber) so lock flips can't clobber them.
+        Cached on self so field-box rebuilds can paint new rows."""
+        normal = _valid_color(self._settings.overlay_text_color,
+                              theme.PARCH_BG)
+        locked = _valid_color(self._settings.overlay_locked_text_color,
+                              theme.ASH)
+        self._text_color = normal
+        self._locked_text_color = locked
+        self.setStyleSheet(
+            theme.OVERLAY_QSS
+            + f"\n#OverlayLabel {{ color: {normal}; }}\n"
+            + self._scale_rules()
+        )
+        # getattr: the constructor applies colors before the first
+        # field-box build creates any rows.
+        for _, num in getattr(self, "_rows", {}).values():
+            num.set_colors(normal, locked)
+
+    def _overlay_scale(self) -> float:
+        """Content scale, clamped to the slider's range."""
+        try:
+            return min(1.5, max(0.7, float(self._settings.overlay_scale)))
+        except (TypeError, ValueError):
+            return 1.0
+
+    def _scale_rules(self) -> str:
+        """Inline ID rules carrying the content scale.
+
+        Labels and the header handle size themselves in QSS, so scaling
+        needs rules that win by order at equal specificity. Numbers skip
+        this — _FitNumber takes its size as a constructor arg at rebuild."""
+        label_px = max(6, int(round(9 * self._overlay_scale())))
+        return (f"\n#OverlayLabel {{ font-size: {label_px}px; }}\n"
+                f"#OverlayHandle {{ font-size: {label_px}px; }}\n")
+
+    @staticmethod
+    def _scaled_margins(scale: float) -> tuple[int, int]:
+        """Card padding (horizontal, vertical) at the given scale."""
+        return int(round(18 * scale)), int(round(14 * scale))
+
+    @staticmethod
+    def _scaled_minimum(scale: float) -> tuple[int, int]:
+        """Window minimum size at the given scale."""
+        return (max(120, int(round(180 * scale))),
+                max(60, int(round(80 * scale))))
+
+    def _apply_scale(self) -> None:
+        """Apply the content scale: card padding now, text via rebuild.
+
+        Slider drags fire continuously and a 7-row rebuild is cheap, so
+        the overlay rescales live instead of waiting for release."""
+        margin_h, margin_v = self._scaled_margins(self._overlay_scale())
+        self._card_layout.setContentsMargins(margin_h, margin_v,
+                                             margin_h, margin_v)
+        self.setMinimumSize(*self._scaled_minimum(self._overlay_scale()))
+        self._apply_text_color()  # re-emits the sheet incl. label sizes
+        self._build_fields_box()
+
+    def _on_scale_changed(self, value: int) -> None:
+        self._settings.overlay_scale = value / 100.0
+        self._apply_scale()
+        self._save_settings()
+
+    @staticmethod
+    def _paint_swatch(btn, hex_color: str) -> None:
+        """Show a color as hex on a swatch button."""
+        if not QColor(hex_color).isValid():
+            hex_color = theme.PARCH_BG
+        name = QColor(hex_color).name()
+        btn.setText(name)
+        # A leaf button, not a container: a bare background here
+        # affects only this button.
+        btn.setStyleSheet(
+            f"background: {name}; color: {_contrast_text(name)};")
+
+    def _sync_color_button(self) -> None:
+        """Show the current stats-text color as hex on a swatch."""
+        self._paint_swatch(self._color_btn, getattr(
+            self, "_text_color", self._settings.overlay_text_color))
+
+    def _sync_locked_color_button(self) -> None:
+        """Show the current locked-text color as hex on a swatch."""
+        self._paint_swatch(self._locked_color_btn, getattr(
+            self, "_locked_text_color",
+            self._settings.overlay_locked_text_color))
 
     def _apply_field_visibility(self) -> None:
         for key, (lbl, num) in self._rows.items():
@@ -497,8 +911,7 @@ class OverlayWindow(QWidget):
             before_visible = getattr(self._settings, f"overlay_show_{before_key}")
             after_visible = getattr(self._settings, f"overlay_show_{after_key}")
             rule.setVisible(before_visible or after_visible)
-        self._card.adjustSize()
-        self.adjustSize()
+        self._refit_window_soon()
 
     def _toggle_drawer(self) -> None:
         self._set_drawer_visible(not self._drawer_visible)
@@ -511,8 +924,7 @@ class OverlayWindow(QWidget):
         else:
             self._drawer.setMaximumHeight(0)
             self._drawer.setVisible(False)
-        self._card.adjustSize()
-        self.adjustSize()
+        self._refit_window_soon()
 
     # ------------------------------------------------------------------
     # Polling
@@ -533,15 +945,24 @@ class OverlayWindow(QWidget):
             "xp": s["xp"],
             "level": s["level"],
             "zone": s.get("current_zone") or "—",
+            "deaths": s["deaths"],
+            "xp_lost": s["xp_lost"],
         }
         for key, (_lbl, num) in self._rows.items():
             text = self._format(key, vmap[key])
+            if key == "zone":
+                # Zone names come from game data and can be long; elide
+                # to the row width instead of stretching the window.
+                font = QFont("Consolas", num.base_size())
+                font.setBold(True)
+                text = QFontMetrics(font).elidedText(
+                    text, Qt.ElideRight, num.width() or 190)
             self._last_values[key] = text
             num.set_value(text)
 
     @staticmethod
     def _format(key: str, value) -> str:
-        if key == "xp" and isinstance(value, int):
+        if key in ("xp", "xp_lost") and isinstance(value, int):
             return f"{value:,}"
         return str(value)
 
