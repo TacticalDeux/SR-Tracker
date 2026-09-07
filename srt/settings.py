@@ -43,6 +43,9 @@ class Settings:
     overlay_show_zone: bool = True
     overlay_show_deaths: bool = True
     overlay_show_xp_lost: bool = True
+    # Per-zone mode: overlay/summary show the current visit instead of
+    # session totals. Off by default; missing keys upgrade to False.
+    overlay_per_zone: bool = False
     # Display order of the overlay fields, top to bottom. Unknown keys
     # are ignored and missing known keys append at the end, so older
     # files and future fields both degrade gracefully.

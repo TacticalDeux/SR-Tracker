@@ -390,18 +390,21 @@ class MainWindow(QMainWindow):
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         layout.addWidget(rule)
 
-        self.tbl_sessions = QTableWidget(0, 5)
+        self.tbl_sessions = QTableWidget(0, 7)
         self.tbl_sessions.setHorizontalHeaderLabels(
-            ["I", "BEGUN", "ENDED", "KILLS", "DROPS"]
+            ["I", "BEGUN", "ENDED", "KILLS", "DROPS", "DAMAGE", "DPS"]
         )
-        # KILLS / DROPS read "yours/session-total" (e.g. 8/12).
+        # KILLS / DROPS / DAMAGE read "yours/session-total" (e.g. 8/12).
         # Double-click a row to open that session's detail view.
         self.tbl_sessions.horizontalHeaderItem(3).setToolTip("Yours / session total kills")
         self.tbl_sessions.horizontalHeaderItem(4).setToolTip("Yours / session total drops")
+        self.tbl_sessions.horizontalHeaderItem(5).setToolTip("Yours / session total damage")
+        self.tbl_sessions.horizontalHeaderItem(6).setToolTip("Damage per second over the session")
         self.tbl_sessions.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         _align_headers(self.tbl_sessions,
                        [Qt.AlignCenter, Qt.AlignLeft, Qt.AlignLeft,
-                        Qt.AlignRight, Qt.AlignRight])
+                        Qt.AlignRight, Qt.AlignRight, Qt.AlignRight,
+                        Qt.AlignRight])
         self.tbl_sessions.verticalHeader().setVisible(False)
         self.tbl_sessions.setShowGrid(False)
         self.tbl_sessions.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -561,6 +564,8 @@ class MainWindow(QMainWindow):
         ("drops",   "Drops",           "{:.0f}"),
         ("sc",      "Soul crystals",   "{:.0f}"),
         ("xp",      "Experience",      "{:.0f}"),
+        ("damage",  "Damage",          "{:.0f}"),
+        ("dps",     "DPS",             "{:.1f}"),
         ("kpm",     "Kills / min",     "{:.1f}"),
         ("drops_m", "Drops / min",     "{:.1f}"),
         ("sc_m",    "Soul cryst. / min", "{:.1f}"),
@@ -1271,6 +1276,17 @@ class MainWindow(QMainWindow):
             drops_item.setToolTip(
                 f"{r['my_drops']} yours / {r['drops']} session total")
             self.tbl_sessions.setItem(i, 4, drops_item)
+            dmg_item = _cell(_mine_total(r["damage_mine"], r["damage_total"]),
+                             align=Qt.AlignRight)
+            dmg_item.setToolTip(
+                f"{r['damage_mine']:,} yours / {r['damage_total']:,} session total")
+            self.tbl_sessions.setItem(i, 5, dmg_item)
+            secs = _session_hours(r["started"], r["ended"]) * 3600.0
+            dps = (r["damage_total"] / secs) if secs > 0 else 0.0
+            dps_item = _cell(f"{dps:.1f}", align=Qt.AlignRight)
+            dps_item.setToolTip(
+                f"{r['damage_total']:,} damage over {_fmt_duration(secs)}")
+            self.tbl_sessions.setItem(i, 6, dps_item)
         self._show_empty(self.tbl_sessions, self._sessions_empty, len(rows) == 0)
 
     def _refresh_kills(self) -> None:
@@ -1472,6 +1488,7 @@ class MainWindow(QMainWindow):
             left = z["left_at"] or now_iso
             secs = _zone_seconds(z["entered_at"], left)
             minutes = (secs / 60.0) if secs else 0.0
+            vs = self._db.visit_stats(sid, z["id"])
             out.append({
                 "display": z["display_name"],
                 "map_name": z["map_name"],
@@ -1481,6 +1498,8 @@ class MainWindow(QMainWindow):
                 "drops": z["drops"],
                 "sc": z["soul_crystals"],
                 "xp": z["xp"],
+                "damage": vs["damage_total"] if vs else 0,
+                "dps": vs["dps"] if vs else 0.0,
                 "minutes": minutes,
                 "kpm": (z["kills"] / minutes) if minutes > 0 else 0.0,
                 "drops_m": (z["drops"] / minutes) if minutes > 0 else 0.0,
@@ -1521,6 +1540,7 @@ class MainWindow(QMainWindow):
         "drops": "drops", "drops_m": "drops",
         "sc": "sc", "sc_m": "sc",
         "xp": "xp", "xp_m": "xp",
+        "damage": "damage", "dps": "damage",
         "minutes": "minutes",
     }
 
@@ -1529,6 +1549,9 @@ class MainWindow(QMainWindow):
     # width); everything else is gained-in-the-bin, with rate metrics
     # dividing by the bin width.
     _TIME_RATE = {"kpm", "drops_m", "sc_m", "xp_m"}
+    # Per-second rates (DPS). Kept apart from the per-minute set so the
+    # existing division reads unchanged.
+    _PER_SECOND = {"dps"}
 
     def _time_series(self, sid: int, key: str,
                      window: tuple[datetime, datetime] | None) -> list[Point]:
@@ -1599,10 +1622,16 @@ class MainWindow(QMainWindow):
             i = min(int((t - start).total_seconds() / span_s * n), n - 1)
             bins[i] += delta
         width_min = span_s / n / 60.0
+        width_s = span_s / n
         out = []
         for b in range(n):
             bs = start + (end - start) * b / n
-            v = bins[b] / width_min if key in self._TIME_RATE else bins[b]
+            if key in self._TIME_RATE:
+                v = bins[b] / width_min
+            elif key in self._PER_SECOND:
+                v = bins[b] / width_s
+            else:
+                v = bins[b]
             out.append(Point(label=_tick_label(bs, span_s), value=v))
         return out
 

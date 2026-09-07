@@ -86,6 +86,9 @@ class EventConsumer(QObject):
         self._portal_sights: deque = deque(maxlen=16)
         # Map name of the current visit, for same-zone arrival checks.
         self._current_zone: str | None = None
+        # Id of the current open zone visit (None when all closed).
+        # Refreshed whenever visits open or close.
+        self._current_visit_id: int | None = None
         # Monotonic timestamp of the last event handed to _handle.
         # The status bar shows "Ns since last event" from this so an
         # idle game (no packets) is distinguishable from a dead bridge.
@@ -119,6 +122,11 @@ class EventConsumer(QObject):
         return self._session_id
 
     @property
+    def current_visit_id(self) -> int | None:
+        """Id of the current open zone visit, if any."""
+        return self._current_visit_id
+
+    @property
     def last_session_id(self) -> int | None:
         """Most recent session id, surviving stop(). The UI falls back
         to this when no session is actively running."""
@@ -140,6 +148,7 @@ class EventConsumer(QObject):
         self._mob_of_enemy = {}
         self._portal_sights = deque(maxlen=16)
         self._current_zone = None
+        self._current_visit_id = None
         self._last_event_at = time.monotonic()
         self._last_gameplay_at = time.monotonic()
         self._session_id = self._db.start_session()
@@ -381,6 +390,7 @@ class EventConsumer(QObject):
                         self._portal_sights.remove(sight)
                         break
             self._current_zone = new_map
+            self._current_visit_id = self._db.open_visit_id(sid)
         elif etype == "spawn_notification":
             self._db.insert_spawn_notification(
                 sid,

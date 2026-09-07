@@ -145,6 +145,22 @@ SCHEMA = [
 # Tables wiped by reset_session (everything per-session, but not the session row).
 _RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage", "deaths")
 
+
+def _span_seconds(started: str | None, ended: str | None) -> float:
+    """Seconds from started to ended-or-now; 0.0 when unusable."""
+    try:
+        t0 = datetime.fromisoformat(started) if started else None
+    except Exception:
+        t0 = None
+    if t0 is None:
+        return 0.0
+    try:
+        t1 = datetime.fromisoformat(ended) if ended else None
+    except Exception:
+        t1 = None
+    secs = ((t1 or datetime.now()) - t0).total_seconds()
+    return secs if secs > 0 else 0.0
+
 # SQLite INTEGER is a signed 64-bit int. Python ints are unbounded, so
 # any wire value that doesn't fit (e.g. a u64-wrapped death toll
 # reaching an INSERT directly) raises OverflowError and kills the
@@ -523,6 +539,136 @@ class Database:
             )
             self._conn.commit()
 
+    def open_visit_id(self, session_id: int) -> int | None:
+        """Id of the latest still-open visit, or None when all closed."""
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT id FROM zone_visits WHERE session_id = ? "
+                "AND left_at IS NULL ORDER BY id DESC LIMIT 1",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+    def visit_stats(self, session_id: int, visit_id: int) -> dict | None:
+        """Aggregates scoped to one zone visit's time window.
+
+        Returns kills, my_kills, drops, my_drops, sc_picked, sc_unpicked,
+        xp, deaths, xp_lost, damage_mine, damage_total plus elapsed_s
+        (entered_at to left_at, or to now while open), dps, dps_mine
+        and xp_hr. Attribution matches the session queries (mine =
+        the session's local account). None for an unknown visit."""
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT map_name, COALESCE(display_name, map_name), "
+                "entered_at, left_at, is_mirage FROM zone_visits "
+                "WHERE id = ? AND session_id = ?",
+                (visit_id, session_id),
+            )
+            vrow = cur.fetchone()
+            if vrow is None:
+                return None
+            entered_at, left_at = vrow[2], vrow[3]
+            acct = self.session_account(session_id)
+            mine_acct = acct if acct is not None else -1
+
+            def one(sql: str, params: tuple) -> int:
+                c = self._conn.execute(sql, params)
+                return int(c.fetchone()[0] or 0)
+
+            w = "timestamp >= ? AND (? IS NULL OR timestamp < ?)"
+            win = (entered_at, left_at, left_at)
+            kills = one(f"SELECT COUNT(*) FROM kills WHERE session_id = ? AND {w}",
+                        (session_id,) + win)
+            my_kills = one(
+                "SELECT COUNT(*) FROM kills WHERE session_id = ? "
+                f"AND is_mine = 1 AND {w}", (session_id,) + win)
+            drops = one(f"SELECT COUNT(*) FROM drops WHERE session_id = ? AND {w}",
+                        (session_id,) + win)
+            my_drops = one(
+                "SELECT COUNT(*) FROM drops WHERE session_id = ? "
+                f"AND belongs_to = ? AND {w}", (session_id, mine_acct) + win)
+            sc_picked = one(
+                "SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops "
+                f"WHERE session_id = ? AND item_id = 0 AND picked_up_by = ? AND {w}",
+                (session_id, mine_acct) + win)
+            sc_unpicked = one(
+                "SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops "
+                f"WHERE session_id = ? AND item_id = 0 AND belongs_to = ? "
+                f"AND (picked_up_by IS NULL OR picked_up_by != ?) AND {w}",
+                (session_id, mine_acct, mine_acct) + win)
+            xp = one(
+                "SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events "
+                f"WHERE session_id = ? AND {w}", (session_id,) + win)
+            deaths = one(f"SELECT COUNT(*) FROM deaths WHERE session_id = ? AND {w}",
+                         (session_id,) + win)
+            xp_lost = one(
+                "SELECT COALESCE(SUM(exp_lost), 0) FROM deaths "
+                f"WHERE session_id = ? AND {w}", (session_id,) + win)
+            damage_total = one(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage "
+                f"WHERE session_id = ? AND {w}", (session_id,) + win)
+            damage_mine = one(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage "
+                f"WHERE session_id = ? AND attacker = ? AND {w}",
+                (session_id, mine_acct) + win)
+            elapsed_s = _span_seconds(entered_at, left_at)
+            hrs = elapsed_s / 3600.0
+            return {
+                "visit_id": visit_id,
+                "map_name": vrow[0], "display_name": vrow[1],
+                "entered_at": entered_at, "left_at": left_at,
+                "is_mirage": bool(vrow[4]),
+                "kills": kills, "my_kills": my_kills,
+                "drops": drops, "my_drops": my_drops,
+                "sc_picked": sc_picked, "sc_unpicked": sc_unpicked,
+                "xp": xp, "deaths": deaths, "xp_lost": xp_lost,
+                "damage_mine": damage_mine, "damage_total": damage_total,
+                "elapsed_s": elapsed_s,
+                "dps": (damage_total / elapsed_s) if elapsed_s > 0 else 0.0,
+                "dps_mine": (damage_mine / elapsed_s) if elapsed_s > 0 else 0.0,
+                "xp_hr": (xp / hrs) if hrs > 0 else 0.0,
+            }
+
+    def session_rates(self, session_id: int) -> dict:
+        """Session-wide damage/xp rates over the session span
+        (started to ended, or to now while ongoing)."""
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT started, ended, local_account_id FROM sessions WHERE id = ?",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            started = row[0] if row else None
+            ended = row[1] if row and len(row) > 1 else None
+            acct = row[2] if row and len(row) > 2 else None
+            mine_acct = acct if acct is not None else -1
+            cur = self._conn.execute(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage WHERE session_id = ?",
+                (session_id,),
+            )
+            damage_total = int(cur.fetchone()[0] or 0)
+            cur = self._conn.execute(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage "
+                "WHERE session_id = ? AND attacker = ?",
+                (session_id, mine_acct),
+            )
+            damage_mine = int(cur.fetchone()[0] or 0)
+            cur = self._conn.execute(
+                "SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events WHERE session_id = ?",
+                (session_id,),
+            )
+            xp = int(cur.fetchone()[0] or 0)
+            elapsed_s = _span_seconds(started, ended)
+            hrs = elapsed_s / 3600.0
+            return {
+                "damage_mine": damage_mine, "damage_total": damage_total,
+                "dps": (damage_total / elapsed_s) if elapsed_s > 0 else 0.0,
+                "dps_mine": (damage_mine / elapsed_s) if elapsed_s > 0 else 0.0,
+                "xp": xp, "xp_hr": (xp / hrs) if hrs > 0 else 0.0,
+                "elapsed_s": elapsed_s,
+            }
+
     # --- read paths ---
     def summary(self, session_id: int) -> dict:
         with self._lock:
@@ -591,6 +737,19 @@ class Database:
             # Prefer the human-readable zone name; fall back to the raw
             # map id stored on the session, else "no zone seen yet".
             zone_display = (row[0] if row and row[0] else None) or current_zone
+            cur.execute(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage WHERE session_id = ?",
+                (session_id,),
+            )
+            damage_total = int(cur.fetchone()[0] or 0)
+            cur.execute(
+                "SELECT COALESCE(SUM(damage), 0) FROM damage "
+                "WHERE session_id = ? AND attacker = ?",
+                (session_id, local_acct if local_acct is not None else -1),
+            )
+            damage_mine = int(cur.fetchone()[0] or 0)
+            open_id = self.open_visit_id(session_id)
+            visit = self.visit_stats(session_id, open_id) if open_id else None
             return {
                 "session_id": session_id,
                 "kills": kills,
@@ -608,6 +767,9 @@ class Database:
                 "xp_lost": xp_lost,
                 "money_lost": money_lost,
                 "items_lost": items_lost,
+                "damage_mine": damage_mine,
+                "damage_total": damage_total,
+                "visit": visit,
                 "current_zone": zone_display,
             }
 
@@ -646,6 +808,7 @@ class Database:
                           zv.entered_at,
                           zv.left_at,
                           zv.is_mirage,
+                          zv.id,
                           zs.kills,
                           zs.soul_crystals,
                           zs.drops,
@@ -666,13 +829,14 @@ class Database:
                 "entered_at": r[2],
                 "left_at": r[3],
                 "is_mirage": bool(r[4]),
-                "kills": r[5] or 0,
-                "soul_crystals": r[6] or 0,
-                "drops": r[7] or 0,
-                "xp": r[8] or 0,
-                "my_kills": r[9] or 0,
-                "my_drops": r[10] or 0,
-                "my_soul_crystals": r[11] or 0,
+                "id": r[5],
+                "kills": r[6] or 0,
+                "soul_crystals": r[7] or 0,
+                "drops": r[8] or 0,
+                "xp": r[9] or 0,
+                "my_kills": r[10] or 0,
+                "my_drops": r[11] or 0,
+                "my_soul_crystals": r[12] or 0,
             } for r in cur.fetchall()]
 
     def past_sessions(self, limit: int = 50) -> list[dict]:
@@ -756,6 +920,13 @@ class Database:
                     (session_id,),
                 )
                 return [(r[0], float(r[1])) for r in cur.fetchall() if r[0]]
+            if kind == "damage":
+                cur = self._conn.execute(
+                    "SELECT timestamp, damage FROM damage "
+                    "WHERE session_id = ? ORDER BY timestamp",
+                    (session_id,),
+                )
+                return [(r[0], float(r[1] or 0)) for r in cur.fetchall() if r[0]]
             raise ValueError(f"unknown candle kind: {kind!r}")
 
     def recent_kills(self, session_id: int, limit: int = 200, names=None) -> list[dict]:
@@ -799,12 +970,18 @@ class Database:
                           (SELECT COUNT(*) FROM kills WHERE session_id = s.id AND is_mine = 1) AS my_kills,
                           (SELECT COUNT(*) FROM drops WHERE session_id = s.id) AS drops,
                           (SELECT COUNT(*) FROM drops WHERE session_id = s.id
-                           AND belongs_to = s.local_account_id) AS my_drops
+                           AND belongs_to = s.local_account_id) AS my_drops,
+                          (SELECT COALESCE(SUM(damage), 0) FROM damage
+                           WHERE session_id = s.id AND attacker = s.local_account_id) AS dmg_mine,
+                          (SELECT COALESCE(SUM(damage), 0) FROM damage
+                           WHERE session_id = s.id) AS dmg_total
                    FROM sessions s ORDER BY s.id DESC LIMIT 50"""
             )
             return [
                 {"id": r[0], "started": r[1], "ended": r[2],
                  "kills": r[3], "my_kills": r[4] or 0,
-                 "drops": r[5], "my_drops": r[6] or 0}
+                 "drops": r[5], "my_drops": r[6] or 0,
+                 "damage_mine": int(r[7] or 0),
+                 "damage_total": int(r[8] or 0)}
                 for r in cur.fetchall()
             ]
