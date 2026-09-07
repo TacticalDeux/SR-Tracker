@@ -101,6 +101,42 @@ class _SummaryPanel(QWidget):
         right = QVBoxLayout()
         right.setSpacing(20)
 
+        # Current-visit block (per-zone mode only): zone name + mirage
+        # marker on top, visit stats below. Session totals stay beneath
+        # under their own caption; with per-zone off all of this hides
+        # and the layout below is exactly today's.
+        self._visit_header = QLabel("")
+        self._visit_header.setFont(QFont("Georgia", 11))
+        self._visit_header.setStyleSheet(
+            f"color: {theme.CRYSTAL_LIGHT}; letter-spacing: 3px;"
+            " font-weight: bold;"
+        )
+        self._visit_header.hide()
+        right.addWidget(self._visit_header)
+
+        self._v_kills   = self._make_metric("VISIT KILLS")
+        self._v_sc      = self._make_metric("VISIT SOUL CRYSTALS")
+        self._v_xp      = self._make_metric("VISIT EXPERIENCE")
+        self._v_deaths  = self._make_metric("VISIT DEATHS")
+        self._v_xp_lost = self._make_metric("VISIT XP LOST")
+        self._v_xp_hr   = self._make_metric("VISIT XP/HR")
+        self._v_dps     = self._make_metric("VISIT DPS")
+        self._visit_rows = (self._v_kills, self._v_sc, self._v_xp,
+                            self._v_deaths, self._v_xp_lost,
+                            self._v_xp_hr, self._v_dps)
+        for w in self._visit_rows:
+            w.hide()
+            right.addWidget(w)
+
+        self._session_caption = QLabel("SESSION TOTALS")
+        self._session_caption.setFont(QFont("Georgia", 9))
+        self._session_caption.setStyleSheet(
+            f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px;"
+            " font-weight: bold;"
+        )
+        self._session_caption.hide()
+        right.addWidget(self._session_caption)
+
         self._kills   = self._make_metric("KILLS")
         self._sc      = self._make_metric("SOUL CRYSTALS")
         self._xp      = self._make_metric("EXPERIENCE")
@@ -156,7 +192,7 @@ class _SummaryPanel(QWidget):
         w._lbl = lbl
         return w
 
-    def set_summary(self, s: dict | None) -> None:
+    def set_summary(self, s: dict | None, per_zone: bool = False) -> None:
         if s is None:
             self._crystal.set_dim(True)
             self._right_widget.hide()
@@ -165,6 +201,63 @@ class _SummaryPanel(QWidget):
         self._crystal.set_dim(False)
         self._empty_holder.hide()
         self._right_widget.show()
+        visit = s.get("visit") if per_zone else None
+        if visit is not None:
+            from .overlay import _compact_rate
+            display = (visit.get("display_name") or visit.get("map_name")
+                       or "Current visit")
+            header = f"CURRENT VISIT — {display}"
+            if visit.get("is_mirage"):
+                header += "  ◈ MIRAGE"
+            self._visit_header.setText(header)
+            self._visit_header.setToolTip(
+                f"{display} (visit #{visit.get('visit_id')})"
+                + (" — mirage run" if visit.get("is_mirage") else ""))
+            self._visit_header.show()
+            sc_total = visit["sc_picked"] + visit["sc_unpicked"]
+            self._v_kills._num.setText(
+                _mine_total(visit["my_kills"], visit["kills"]))
+            self._v_kills._num.setToolTip(
+                f"{visit['my_kills']} yours / {visit['kills']} in this visit")
+            self._v_sc._num.setText(
+                _mine_total(visit["sc_picked"], sc_total))
+            self._v_sc._num.setToolTip(
+                f"{visit['sc_picked']:,} picked up / {sc_total:,} in this visit")
+            self._v_xp._num.setText(f"{visit['xp']:,}")
+            self._v_xp._num.setToolTip(
+                f"{visit['xp']:,} XP in this visit")
+            self._v_deaths._num.setText(str(visit.get("deaths", 0)))
+            self._v_deaths._num.setToolTip(
+                f"{visit.get('deaths', 0)} deaths in this visit")
+            self._v_xp_lost._num.setText(f"{visit.get('xp_lost', 0):,}")
+            self._v_xp_lost._num.setToolTip(
+                f"{visit.get('xp_lost', 0):,} XP lost to deaths in this visit")
+            self._v_xp_hr._num.setText(
+                f"{_compact_rate(visit['xp_hr'])}/hr")
+            self._v_xp_hr._num.setToolTip(
+                f"{visit['xp_hr']:,.1f} XP/hr in this visit")
+            self._v_dps._num.setText(
+                f"{_compact_rate(visit['dps_mine'])} DPS")
+            self._v_dps._num.setToolTip(
+                f"{visit['dps_mine']:,.1f} yours / "
+                f"{visit['dps']:,.1f} total DPS in this visit")
+            for w in self._visit_rows:
+                w.show()
+            self._session_caption.show()
+        elif per_zone:
+            # Per-zone on but no visit open yet — say so, keep session
+            # totals beneath exactly as today.
+            self._visit_header.setText("CURRENT VISIT — none open yet")
+            self._visit_header.setToolTip("Enter a zone to open a visit")
+            self._visit_header.show()
+            for w in self._visit_rows:
+                w.hide()
+            self._session_caption.hide()
+        else:
+            self._visit_header.hide()
+            for w in self._visit_rows:
+                w.hide()
+            self._session_caption.hide()
         sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._kills._num.setText(_mine_total(s["my_kills"], s["kills"]))
         self._kills._num.setToolTip(
@@ -723,6 +816,13 @@ class MainWindow(QMainWindow):
             lambda _i: self._push_overlay_settings())
         form.addRow("Layout:", self._ov_orient)
 
+        self._ov_per_zone = QCheckBox("Per-zone stats")
+        self._ov_per_zone.setToolTip(
+            "Show the current visit's stats instead of session totals")
+        self._ov_per_zone.toggled.connect(
+            lambda _c: self._push_overlay_settings())
+        form.addRow("Mode:", self._ov_per_zone)
+
         op_row = QHBoxLayout()
         self._ov_opacity = QSlider(Qt.Horizontal)
         self._ov_opacity.setRange(0, 100)
@@ -1050,6 +1150,10 @@ class MainWindow(QMainWindow):
         oi = self._ov_orient.findData(s.overlay_orientation)
         self._ov_orient.setCurrentIndex(oi if oi >= 0 else 0)
         self._ov_orient.blockSignals(False)
+        self._ov_per_zone.blockSignals(True)
+        self._ov_per_zone.setChecked(bool(getattr(s, "overlay_per_zone",
+                                                  False)))
+        self._ov_per_zone.blockSignals(False)
         self._ov_opacity.blockSignals(True)
         self._ov_opacity.setValue(int(s.overlay_opacity * 100))
         self._ov_opacity.blockSignals(False)
@@ -1085,6 +1189,7 @@ class MainWindow(QMainWindow):
         s = self._settings_store.load()
         s.overlay_orientation = (
             self._ov_orient.currentData() or "vertical")
+        s.overlay_per_zone = self._ov_per_zone.isChecked()
         s.overlay_opacity = self._ov_opacity.value() / 100.0
         s.overlay_locked_opacity = self._ov_locked_opacity.value() / 100.0
         s.overlay_window_opacity = self._ov_window_opacity.value() / 100.0
@@ -1112,6 +1217,8 @@ class MainWindow(QMainWindow):
         if self._overlay is not None and self._overlay.isVisible():
             self._overlay.reload_settings()
         self._refresh_lock_button()
+        # Mode (per-zone) also drives the Summary tab — repaint it now.
+        self._refresh_summary()
 
     @staticmethod
     def _paint_ov_swatch(btn: QPushButton, hex_color: str) -> None:
@@ -1170,6 +1277,12 @@ class MainWindow(QMainWindow):
         labels = dict(OVERLAY_FIELDS)
         order = list(getattr(s, "overlay_field_order", None)
                      or [k for k, _ in OVERLAY_FIELDS])
+        # Older settings files predate newer fields (xp/hr, DPS) — or
+        # any future field: append missing known keys at the end so
+        # their toggles always exist, matching ordered_fields().
+        for key, _ in OVERLAY_FIELDS:
+            if key not in order:
+                order.append(key)
         current = [self._ov_fields.item(i).data(Qt.UserRole)
                    for i in range(self._ov_fields.count())]
         if current != order:
@@ -1247,7 +1360,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._set_status(f"(error: {e})")
             return
-        self._summary.set_summary(s)
+        self._summary.set_summary(
+            s, per_zone=bool(getattr(self._settings, "overlay_per_zone",
+                                     False)))
         sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._set_status(
             f"Session #{sid}  ·  {s['my_kills']} yours / {s['kills']} session total kills"

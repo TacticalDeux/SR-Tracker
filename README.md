@@ -1,6 +1,6 @@
 # SR Tracker
 
-Desktop tracker for Soul's Remnant (REMOVED game session). Injects a hook DLL into
+Desktop tracker for Soul's Remnant. Injects a hook DLL into
 the running game, decodes gameplay events from REMOVED, and shows kills / drops /
 soul crystals / XP / level / zone / deaths in a native Qt UI plus an always-on-top overlay.
 
@@ -28,15 +28,9 @@ srt/                  Application package
 tools/
   build.py            Build a standalone exe with PyInstaller (--clean / --console / --no-uac-admin)
   REMOVED       REMOVED
-  REMOVED.py    Name-extraction helper
-  REMOVED.py        Hang diagnostics
-  REMOVED.py    DLL export checker
   private/            Private submodule
 
 dll/                  Private hook DLL (submodule pointer; binary bundled into releases)
-  sr_tracker.dll      Hook DLL binary (bundled into the exe)
-  REMOVED      Hook DLL source
-  REMOVED.txt     Decoder helper data
 
 assets/
   soul_crystal.png    Crystal icon bundled into the exe
@@ -110,16 +104,21 @@ migration logic for legacy DBs.
 
 - **Main window**: 7 tabs + Debug.
   - **Summary**: soul-crystal orb + at-a-glance metrics. Every count states
-    what it means: kills/drops read "yours / session total", soul crystals
-    read "picked up / total" (your crystals only), XP is the session total.
+    what it means: kills/drops/damage read "yours / session total", soul
+    crystals read "picked up / total" (your crystals only), XP is the session
+    total. With per-zone mode on, Summary leads with the current visit
+    (zone name, mirage marker, visit stats) over session totals.
   - **Sessions**: session list (double-click a row to open details) with the
-    same yours/total labeling; detail dialog adds a per-zone breakdown.
+    same yours/total labeling, plus damage and DPS columns; detail dialog
+    adds a per-zone breakdown with mirage markers.
   - **Kills**: time / enemy / mob / mine.
   - **Drops**: time / drop / item / qty / owner / status (On Ground, picked
     up by you/other player, destroyed).
-  - **Zones**: per-zone breakdown.
+  - **Zones**: per-zone breakdown with mirage markers.
   - **Graphs**: metric/chart/zone selectors + session selector + Details / Refresh.
-  - **Overlay**: all overlay settings (fields, order, opacity, scale, colors, orientation).
+    Damage and DPS are chartable alongside the other metrics.
+  - **Overlay**: all overlay settings (fields, order, opacity, scale, colors,
+    orientation, per-zone mode toggle).
    - **Debug**: dev event stream (`debug_console.py`).
   - Header band: **Start/Stop Tracking** (primary), **Show overlay**,
     **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
@@ -127,8 +126,10 @@ migration logic for legacy DBs.
     (Quit routes through `closeEvent`: stops consumer, uninstalls hooks, releases DB).
 - **Overlay**: frameless, always-on-top HUD. Rows size to their full text —
   long zone names and big counts widen the window instead of clipping.
-  - 7 toggleable fields: kills, sc (soul crystals, picked up / total),
-    xp, level, zone, deaths, xp_lost — drag-to-reorder (top to bottom).
+  - 9 toggleable fields: kills, sc (soul crystals, picked up / total),
+    xp, level, zone, deaths, xp_lost, xp/hr, dps — drag-to-reorder
+    (top to bottom). Per-zone mode swaps every row to the current visit
+    (zone/mirage/dungeon) so you can read each area without resetting.
   - Large counts render compact (1.5K, 3.4M, 5.6B); exact values on hover
     and in the main window.
   - Two opacity paths: card-background alpha + whole-window opacity, each with a
@@ -156,7 +157,10 @@ migration logic for legacy DBs.
   "overlay_show_zone": true,
   "overlay_show_deaths": true,
   "overlay_show_xp_lost": true,
-  "overlay_field_order": ["kills", "sc", "xp", "level", "zone", "deaths", "xp_lost"],
+  "overlay_show_xp_hr": true,
+  "overlay_show_dps": true,
+  "overlay_per_zone": false,
+  "overlay_field_order": ["kills", "sc", "xp", "level", "zone", "deaths", "xp_lost", "xp_hr", "dps"],
   "overlay_pos_x": 60,
   "overlay_pos_y": 60,
   "overlay_locked": false,

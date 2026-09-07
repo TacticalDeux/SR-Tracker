@@ -43,6 +43,8 @@ class Settings:
     overlay_show_zone: bool = True
     overlay_show_deaths: bool = True
     overlay_show_xp_lost: bool = True
+    overlay_show_xp_hr: bool = True
+    overlay_show_dps: bool = True
     # Per-zone mode: overlay/summary show the current visit instead of
     # session totals. Off by default; missing keys upgrade to False.
     overlay_per_zone: bool = False
@@ -51,7 +53,7 @@ class Settings:
     # files and future fields both degrade gracefully.
     overlay_field_order: list[str] = field(
         default_factory=lambda: ["kills", "sc", "xp", "level", "zone",
-                                 "deaths", "xp_lost"])
+                                  "deaths", "xp_lost", "xp_hr", "dps"])
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False

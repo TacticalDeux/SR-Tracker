@@ -48,6 +48,8 @@ _FIELDS = (
     ("zone",    "ZONE",          14),
     ("deaths",  "DEATHS",        22),
     ("xp_lost", "XP LOST",       16),
+    ("xp_hr",   "XP/HR",         16),
+    ("dps",     "DPS",           16),
 )
 
 #: Toggleable fields for settings UIs (the main window's Overlay tab
@@ -60,6 +62,8 @@ OVERLAY_FIELDS = (
     ("zone", "Zone"),
     ("deaths", "Deaths"),
     ("xp_lost", "XP lost"),
+    ("xp_hr", "XP/hr"),
+    ("dps", "DPS"),
 )
 
 _FIELD_MAP = {key: (label, size) for key, label, size in _FIELDS}
@@ -121,6 +125,22 @@ def _compact_number(value: int) -> str:
 def _exact_number(value: int) -> str:
     """Full exact count with commas for tooltips (1,234,567)."""
     return f"{value:,}"
+
+
+def _compact_rate(value: float) -> str:
+    """Compact a per-hour/DPS rate, keeping one decimal (21.6K, 15.0).
+
+    Counts drop a trailing .0 (1K); rates keep it (15.0 DPS) so a
+    rate never reads as an exact count. T is the largest suffix."""
+    sign = "-" if value < 0 else ""
+    n = abs(float(value))
+    if n < 1000:
+        return f"{sign}{n:.1f}"
+    for threshold, suffix in ((10 ** 12, "T"), (10 ** 9, "B"),
+                              (10 ** 6, "M"), (10 ** 3, "K")):
+        if n >= threshold:
+            return f"{sign}{n / threshold:.1f}{suffix}"
+    return f"{sign}{n:.1f}"  # unreachable, kept for safety
 
 
 # ---------------------------------------------------------------------------
@@ -470,7 +490,8 @@ class OverlayWindow(QWidget):
         for key, _label_text, _ in ordered_fields(self._settings):
             cb = QCheckBox(_OVERLAY_LABELS.get(key, key.title()))
             cb.setObjectName("OverlayField")
-            cb.setChecked(getattr(self._settings, f"overlay_show_{key}"))
+            cb.setChecked(bool(getattr(self._settings, f"overlay_show_{key}",
+                                       True)))
             cb.toggled.connect(lambda checked, k=key: self._on_field_toggle(k, checked))
             d_layout.addWidget(cb)
             self._field_checks[key] = cb
@@ -614,6 +635,8 @@ class OverlayWindow(QWidget):
         old_order = list(
             getattr(self._settings, "overlay_field_order", None) or ())
         old_scale = self._overlay_scale()
+        old_per_zone = bool(getattr(self._settings, "overlay_per_zone",
+                                    False))
         self._settings = fresh
         # Colors first: a rebuild below paints new rows from the cache.
         self._apply_text_color()
@@ -629,6 +652,11 @@ class OverlayWindow(QWidget):
         self._apply_bg()
         self._apply_window_opacity()
         self._apply_field_visibility()
+        if bool(getattr(self._settings, "overlay_per_zone", False)) \
+                != old_per_zone:
+            # Same rows, different source (visit vs session) — repaint
+            # now instead of waiting for the next poll.
+            self._refresh()
 
     def _on_pick_locked_text_color(self) -> None:
         picked = QColorDialog.getColor(QColor(self._locked_text_color),
@@ -666,7 +694,8 @@ class OverlayWindow(QWidget):
         self._sync_locked_color_button()
         for key, cb in self._field_checks.items():
             cb.blockSignals(True)
-            cb.setChecked(getattr(self._settings, f"overlay_show_{key}"))
+            cb.setChecked(bool(getattr(self._settings, f"overlay_show_{key}",
+                                       True)))
             cb.blockSignals(False)
 
     def set_locked(self, locked: bool) -> None:
@@ -702,10 +731,9 @@ class OverlayWindow(QWidget):
         """Shrink-wrap the window around its current content.
 
         Called after rebuilds, visibility changes, and lock flips. New
-        values arriving on the poll timer don't need it: text that fits
-        keeps the same size hint, and text that grows (counts, zones)
-        is handled by _FitNumber shrinking or eliding instead of asking
-        for more window."""
+        values arriving on the poll timer call it too: rows size to
+        their content, so text that grows (counts, zones, visits)
+        asks for more window instead of clipping."""
         # Layouts recalculate lazily, and QWidget.sizeHint caches: right
         # after a rebuild (orientation flip, field toggle) the cached
         # hint still describes the OLD content. Measuring that stale
@@ -930,7 +958,7 @@ class OverlayWindow(QWidget):
     def _apply_scale(self) -> None:
         """Apply the content scale: card padding now, text via rebuild.
 
-        Slider drags fire continuously and a 7-row rebuild is cheap, so
+        Slider drags fire continuously and a field rebuild is cheap, so
         the overlay rescales live instead of waiting for release."""
         margin_h, margin_v = self._scaled_margins(self._overlay_scale())
         self._card_layout.setContentsMargins(margin_h, margin_v,
@@ -969,14 +997,17 @@ class OverlayWindow(QWidget):
 
     def _apply_field_visibility(self) -> None:
         for key, (lbl, num) in self._rows.items():
-            visible = getattr(self._settings, f"overlay_show_{key}")
+            visible = bool(getattr(self._settings, f"overlay_show_{key}",
+                                   True))
             lbl.setVisible(visible)
             num.setVisible(visible)
         # A divider only earns its keep if at least one of the rows it
         # separates is still showing.
         for rule, before_key, after_key in self._hairlines:
-            before_visible = getattr(self._settings, f"overlay_show_{before_key}")
-            after_visible = getattr(self._settings, f"overlay_show_{after_key}")
+            before_visible = bool(getattr(
+                self._settings, f"overlay_show_{before_key}", True))
+            after_visible = bool(getattr(
+                self._settings, f"overlay_show_{after_key}", True))
             rule.setVisible(before_visible or after_visible)
         self._refit_window_soon()
 
@@ -1007,33 +1038,92 @@ class OverlayWindow(QWidget):
             s = self._db.summary(sid)
         except Exception:
             return
-        zone_text = s.get("current_zone") or "—"
-        vmap = {
-            "kills": _mine_total(s["my_kills"], s["kills"]),
-            "sc": _mine_total(s["sc_picked"],
-                               s["sc_picked"] + s["sc_unpicked"]),
-            "xp": s["xp"],
-            "level": s["level"],
-            "zone": zone_text,
-            "deaths": s["deaths"],
-            "xp_lost": s["xp_lost"],
-        }
-        # Exact full values behind the compact display text — the main
-        # window already shows full counts, and the overlay tooltip
-        # carries them here so nothing is lost to K/M/B/T.
-        exact = {
-            "kills": _exact_mine_total(s["my_kills"], s["kills"]),
-            "sc": _exact_mine_total(s["sc_picked"],
-                                      s["sc_picked"] + s["sc_unpicked"]),
-            "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
-            else str(s["xp"]),
-            "level": str(s["level"]),
-            "zone": zone_text,
-            "deaths": _exact_number(s["deaths"])
-            if isinstance(s["deaths"], int) else str(s["deaths"]),
-            "xp_lost": _exact_number(s["xp_lost"])
-            if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
-        }
+        per_zone = bool(getattr(self._settings, "overlay_per_zone", False))
+        visit = s.get("visit") if per_zone else None
+        if visit is not None:
+            # Per-zone mode: every row reads the current visit's stats.
+            # Level is account-scoped (no visit meaning), so it stays
+            # session-wide; the zone row names the visit itself.
+            sc_total = visit["sc_picked"] + visit["sc_unpicked"]
+            zone_text = (visit.get("display_name")
+                         or visit.get("map_name")
+                         or s.get("current_zone") or "—")
+            vmap = {
+                "kills": _mine_total(visit["my_kills"], visit["kills"]),
+                "sc": _mine_total(visit["sc_picked"], sc_total),
+                "xp": visit["xp"],
+                "level": s["level"],
+                "zone": zone_text,
+                "deaths": visit["deaths"],
+                "xp_lost": visit["xp_lost"],
+                "xp_hr": visit["xp_hr"],
+                "dps": visit["dps_mine"],
+            }
+            exact = {
+                "kills": _exact_mine_total(visit["my_kills"],
+                                           visit["kills"]),
+                "sc": _exact_mine_total(visit["sc_picked"], sc_total),
+                "xp": _exact_number(visit["xp"])
+                if isinstance(visit["xp"], int) else str(visit["xp"]),
+                "level": str(s["level"]),
+                "zone": zone_text + (" — mirage run" if visit.get(
+                    "is_mirage") else ""),
+                "deaths": _exact_number(visit["deaths"])
+                if isinstance(visit["deaths"], int)
+                else str(visit["deaths"]),
+                "xp_lost": _exact_number(visit["xp_lost"])
+                if isinstance(visit["xp_lost"], int)
+                else str(visit["xp_lost"]),
+                "xp_hr": f"{visit['xp_hr']:,.1f} XP/hr (this visit)",
+                "dps": (f"{visit['dps_mine']:,.1f} yours / "
+                        f"{visit['dps']:,.1f} total DPS (this visit)"),
+            }
+        else:
+            # Session totals — today's behavior. The two rate rows read
+            # session-wide rates; the extra query runs only when one of
+            # them is actually visible.
+            rates = None
+            if ("xp_hr" in self._rows and bool(
+                    getattr(self._settings, "overlay_show_xp_hr", True))) \
+                    or ("dps" in self._rows and bool(
+                        getattr(self._settings, "overlay_show_dps", True))):
+                try:
+                    rates = self._db.session_rates(sid)
+                except Exception:
+                    rates = None
+            rates = rates or {"xp_hr": 0.0, "dps": 0.0, "dps_mine": 0.0}
+            zone_text = s.get("current_zone") or "—"
+            vmap = {
+                "kills": _mine_total(s["my_kills"], s["kills"]),
+                "sc": _mine_total(s["sc_picked"],
+                                   s["sc_picked"] + s["sc_unpicked"]),
+                "xp": s["xp"],
+                "level": s["level"],
+                "zone": zone_text,
+                "deaths": s["deaths"],
+                "xp_lost": s["xp_lost"],
+                "xp_hr": rates["xp_hr"],
+                "dps": rates["dps_mine"],
+            }
+            # Exact full values behind the compact display text — the main
+            # window already shows full counts, and the overlay tooltip
+            # carries them here so nothing is lost to K/M/B/T.
+            exact = {
+                "kills": _exact_mine_total(s["my_kills"], s["kills"]),
+                "sc": _exact_mine_total(s["sc_picked"],
+                                        s["sc_picked"] + s["sc_unpicked"]),
+                "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
+                else str(s["xp"]),
+                "level": str(s["level"]),
+                "zone": zone_text,
+                "deaths": _exact_number(s["deaths"])
+                if isinstance(s["deaths"], int) else str(s["deaths"]),
+                "xp_lost": _exact_number(s["xp_lost"])
+                if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
+                "xp_hr": f"{rates['xp_hr']:,.1f} XP/hr (session)",
+                "dps": (f"{rates['dps_mine']:,.1f} yours / "
+                        f"{rates['dps']:,.1f} total DPS (session)"),
+            }
         for key, (_lbl, num) in self._rows.items():
             # Full text always: each _FitNumber sizes its minimum width
             # to the content (measured at the scaled size), so the
@@ -1052,12 +1142,17 @@ class OverlayWindow(QWidget):
     @staticmethod
     def _format(key: str, value) -> str:
         # Large counts compact to K/M/B/T (endgame XP hits billions/
-        # trillions); level and zone always render exactly. kills/sc
-        # arrive pre-compacted from _mine_total, so plain strings pass
-        # through untouched.
+        # trillions); rates compact the same way with their units
+        # (21.6K/hr, 15.0 DPS). Level and zone always render exactly.
+        # kills/sc arrive pre-compacted from _mine_total, so plain
+        # strings pass through untouched.
         if key in ("xp", "xp_lost", "kills", "sc", "deaths") \
                 and isinstance(value, int):
             return _compact_number(value)
+        if key == "xp_hr" and isinstance(value, (int, float)):
+            return f"{_compact_rate(value)}/hr"
+        if key == "dps" and isinstance(value, (int, float)):
+            return f"{_compact_rate(value)} DPS"
         return str(value)
 
     # ------------------------------------------------------------------
