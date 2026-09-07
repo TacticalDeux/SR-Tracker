@@ -19,7 +19,9 @@ import math
 from dataclasses import dataclass
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtGui import (
+    QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen,
+)
 from PySide6.QtWidgets import QWidget
 
 from . import theme
@@ -66,6 +68,7 @@ class BarChart(QWidget):
             p.setPen(QColor(theme.ASH))
             p.setFont(QFont("Segoe UI", 10))
             p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.end()
             return
 
         max_value = max((b.value for b in self._bars), default=1.0)
@@ -219,10 +222,12 @@ class SeriesChart(QWidget):
         self._value_format = value_format
         self._zoom = _ZoomState()
         self._pan_start = None
-        # In-graph hover state: None or ("bar"|"point"|"slice", index).
-        # Painted directly on the graph (instant, themed, clamped) —
-        # there is no Qt popout tooltip anymore.
-        self._hover: tuple[str, int] | None = None
+        # In-graph hover state: None, ("point", fpos) with a fractional
+        # line position (the readout interpolates between bins), or
+        # ("slice", index) for share. Bars have no hover — the values
+        # already read straight off the rows. Painted directly on the
+        # graph (instant, themed, clamped) — no Qt popout tooltip.
+        self._hover: tuple[str, float] | None = None
         self._hover_pos: QPointF | None = None
         self.setMinimumHeight(120)
         self.setMouseTracking(True)
@@ -230,12 +235,15 @@ class SeriesChart(QWidget):
     def set_points(self, points: list[Point]) -> None:
         points = list(points)
         if len(points) != len(self._points):
-            # New shape (session/metric switch) — drop the zoom; plain
-            # value refreshes keep it so live updates don't yank the view.
+            # New shape (session/metric switch) — drop the zoom and the
+            # hover. Plain value refreshes keep both, so the live tick
+            # neither yanks the view nor flashes a stale readout while
+            # the cursor sits still (the old code cleared the hover on
+            # every tick, which read as the wrong/previous slice).
             self._zoom.reset()
+            self._hover = None
+            self._hover_pos = None
         self._points = points
-        self._hover = None
-        self._hover_pos = None
         self.update()
 
     def reset_zoom(self) -> None:
@@ -319,15 +327,15 @@ class SeriesChart(QWidget):
     # palette, clamped inside the widget. _update_hover tracks the
     # hovered datum; the paint pass draws the highlight + the box.
     def _update_hover(self, pos) -> None:
-        if self._mode == "bars":
-            new: tuple[str, int] | None = self._bars_index(pos)
-            new = ("bar", new) if new is not None else None
-        elif self._mode == "share":
+        new: tuple[str, float] | None
+        if self._mode == "share":
             idx = self._share_index(pos)
             new = ("slice", idx) if idx is not None else None
-        else:
-            idx = self._series_index(pos)
-            new = ("point", idx) if idx is not None else None
+        elif self._mode == "line":
+            fpos = self._series_position(pos)
+            new = ("point", fpos) if fpos is not None else None
+        else:  # bars: values read straight off the rows — no hover.
+            new = None
         anchor = QPointF(pos.x(), pos.y())
         if new != self._hover or (
                 new is not None and anchor != self._hover_pos):
@@ -345,33 +353,38 @@ class SeriesChart(QWidget):
         """Text lines for the current hover, or [] when nothing hovers."""
         if self._hover is None:
             return []
-        _kind, i = self._hover
-        if self._mode == "share":
+        kind, i = self._hover
+        if self._mode == "share" and kind == "slice":
             _cx, _cy, _o, _in, total, slices = self._share_geometry()
             if not 0 <= i < len(slices) or total <= 0:
                 return []
-            pt, _c, _s, _sp = slices[i]
+            pt, _c, _s, _sp = slices[int(i)]
             frac = max(pt.value, 0.0) / total
             return [pt.label,
                     f"{(pt.fmt or self._value_format).format(pt.value)}"
                     f" ({frac * 100.0:.1f}%)"]
-        if not 0 <= i < len(self._points):
-            return []
-        # Line mode hovers the zoomed slice; bar mode the full list.
-        if self._mode == "line":
+        if self._mode == "line" and kind == "point":
+            at = self._series_hover_at(i)
+            if at is None:
+                return []
+            _pixel, value, base, frac = at
             i0, _i1 = self._zoom.indices(len(self._points))
-            return self._point_lines(self._points[i0 + i])
-        return self._point_lines(self._points[i])
+            a = self._points[i0 + base]
+            if frac < 1e-9:
+                return self._point_lines(a)
+            b = self._points[min(i0 + base + 1, len(self._points) - 1)]
+            return [f"{a.label} – {b.label}",
+                    f"≈ {(a.fmt or self._value_format).format(value)}"]
+        return []
 
-    def _bars_index(self, pos) -> int | None:
-        i = int((pos.y() - self._BAR_MARGIN) // self._BAR_H)
-        if 0 <= i < len(self._points):
-            return i
-        return None
+    def _series_position(self, pos) -> float | None:
+        """Fractional cursor position into the zoomed line slice.
 
-    def _series_index(self, pos) -> int | None:
+        0.0 is the first visible bin, N-1 the last. Values between
+        bins are what let the readout interpolate instead of only
+        ever snapping to the plotted points."""
         n = len(self._points)
-        if not n:
+        if not n or self._mode != "line":
             return None
         i0, i1 = self._zoom.indices(n)
         plot = self._plot_rect()
@@ -380,7 +393,39 @@ class SeriesChart(QWidget):
         frac = (pos.x() - plot.left()) / plot.width()
         if not 0.0 <= frac <= 1.0:
             return None
-        return min(max(int(round(frac * (i1 - i0))), 0), i1 - i0)
+        return frac * (i1 - i0)
+
+    def _series_hover_at(self, fpos: float):
+        """Pixel + interpolated value at a fractional slice position.
+
+        Returns (pixel, value, base, frac): base/frac split fpos into
+        the segment [base, base+1]; exactly-on-a-point yields frac 0.
+        The pixel lerps between the painted coords, so the marker
+        always sits on the curve and the box always reads what the
+        marker sits on."""
+        pts, coords, _plot = self._series_coords()
+        m = len(pts)
+        if not m or not coords:
+            return None
+        fpos = min(max(fpos, 0.0), float(m - 1))
+        base = min(int(fpos), m - 1)
+        nxt = min(base + 1, m - 1)
+        frac = fpos - base
+        vmax = max((pt.value for pt in pts), default=1.0)
+        if vmax <= 0:
+            vmax = 1.0
+        value = pts[base].value + frac * (pts[nxt].value - pts[base].value)
+        pixel = coords[base] * (1.0 - frac) + coords[nxt] * frac
+        return pixel, value, base, frac
+
+    def _series_index(self, pos) -> int | None:
+        """Nearest-bin snap for the back-compat _series_tip shim."""
+        fpos = self._series_position(pos)
+        if fpos is None:
+            return None
+        n = len(self._points)
+        i0, i1 = self._zoom.indices(n)
+        return min(max(int(round(fpos)), 0), i1 - i0)
 
     def _share_index(self, pos) -> int | None:
         cx, cy, outer, inner, total, slices = self._share_geometry()
@@ -406,10 +451,6 @@ class SeriesChart(QWidget):
     # hit-tests above.
     def _point_tip(self, pt: Point) -> str:
         return "\n".join(self._point_lines(pt))
-
-    def _bars_tip(self, pos) -> str:
-        i = self._bars_index(pos)
-        return self._point_tip(self._points[i]) if i is not None else ""
 
     def _series_tip(self, pos) -> str:
         i = self._series_index(pos)
@@ -455,21 +496,25 @@ class SeriesChart(QWidget):
 
     # -- painting --
     def paintEvent(self, _e) -> None:
+        # try/finally: an exception mid-paint must still end the
+        # painter, or Qt logs "QBackingStore::endPaint() called with
+        # active painter" and the widget goes blank.
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing, True)
-        p.fillRect(self.rect(), QColor(theme.INK_0))
-        if not self._points:
-            self._paint_empty(p)
+        try:
+            p.setRenderHint(QPainter.Antialiasing, True)
+            p.fillRect(self.rect(), QColor(theme.INK_0))
+            if not self._points:
+                self._paint_empty(p)
+                return
+            if self._mode == "bars":
+                self._paint_bars(p)
+            elif self._mode == "share":
+                self._paint_share(p)
+            else:
+                self._paint_series(p)
+            self._paint_hover(p)
+        finally:
             p.end()
-            return
-        if self._mode == "bars":
-            self._paint_bars(p)
-        elif self._mode == "share":
-            self._paint_share(p)
-        else:
-            self._paint_series(p)
-        self._paint_hover(p)
-        p.end()
 
     def _series_coords(self) -> tuple[list[Point], list[QPointF], QRectF]:
         """Zoomed line-mode slice plus its pixel coords and plot rect.
@@ -500,11 +545,14 @@ class SeriesChart(QWidget):
         kind, i = self._hover
         anchor: QPointF
         if kind == "point":
-            _pts, coords, plot = self._series_coords()
-            if not 0 <= i < len(coords):
+            at = self._series_hover_at(i)
+            if at is None:
                 return
-            c = coords[i]
-            # Guide line + a filled marker so the read point is obvious.
+            c, _v, _b, _f = at
+            _pts, _coords, plot = self._series_coords()
+            # Guide line + a filled marker so the read point is
+            # obvious. The marker rides the interpolated position, so
+            # between bins it sits on the curve, not on thin air.
             p.setPen(QPen(QColor(theme.RUNE), 1, Qt.DashLine))
             p.drawLine(QPointF(c.x(), plot.top()),
                        QPointF(c.x(), plot.bottom()))
@@ -513,25 +561,18 @@ class SeriesChart(QWidget):
             p.drawEllipse(c, 6.0, 6.0)
             p.setBrush(Qt.NoBrush)
             anchor = c
-        elif kind == "bar":
-            y = self._BAR_MARGIN + i * self._BAR_H
-            row = QRectF(4, y - 2, self.width() - 8, self._BAR_H)
-            wash = QColor(theme.INK_2)
-            p.fillRect(row, wash)
-            p.setPen(QPen(QColor(theme.RUNE), 1))
-            p.setBrush(Qt.NoBrush)
-            p.drawRect(row)
-            anchor = self._hover_pos
         else:  # "slice"
             _cx, _cy, outer, _inner, _total, slices = self._share_geometry()
             if not 0 <= i < len(slices):
                 return
-            _pt, color, start, span = slices[i]
+            _pt, _color, start, span = slices[int(i)]
             rect = QRectF(_cx - outer, _cy - outer, outer * 2, outer * 2)
-            p.setPen(QPen(QColor(theme.PARCH_BG), 2))
-            p.setBrush(color)
-            p.drawPie(rect, int(round(start * 16)), int(round(span * 16)))
+            # Outline only: repainting the wedge would cover the hole
+            # and its session total. A parchment edge marks the slice
+            # without touching any other paint.
+            p.setPen(QPen(QColor(theme.PARCH_BG), 3))
             p.setBrush(Qt.NoBrush)
+            p.drawPie(rect, int(round(start * 16)), int(round(span * 16)))
             anchor = self._hover_pos
         self._paint_tip(p, anchor, lines)
 
@@ -789,6 +830,7 @@ class RateBarChart(BarChart):
             p.setPen(QColor(theme.ASH))
             p.setFont(QFont("Segoe UI", 10))
             p.drawText(self.rect(), Qt.AlignCenter, "No data")
+            p.end()
             return
 
         max_value = max((b.value for b in self._bars), default=1.0)
