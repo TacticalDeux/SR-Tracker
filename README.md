@@ -41,34 +41,6 @@ SR Tracker.spec       Legacy PyInstaller spec (superseded by tools/build.py)
 
 No `requirements*.txt` — you need Python 3 + PySide6 + PyInstaller.
 
-## Running from source
-
-```sh
-python sr_tracker.py
-# equivalent: python -m srt.app
-```
-
-The first run creates `data/srtracker.db` next to the source. Settings
-live in `data/settings.json` while developing.
-
-To inject the DLL into the game (default target `REMOVED`):
-
-```sh
-python -m REMOVED               # auto-find the game
-python -m REMOVED 12345         # inject into a specific PID
-python -m REMOVED --launch      # launch the game then inject
-python -m REMOVED --name proc.exe  # match a different process name
-```
-
-In the UI, **Start Tracking** does this automatically: finds the game PID →
-checks if the DLL is loaded → injects via `REMOVED` → waits for
-install → starts the `EventConsumer`, which drains the `Global\REMOVED`
-REMOVED into SQLite. **Stop** ends the session; **Reset session** clears
-kills/drops/XP/etc. for the current session id (keeps the id).
-
-Deaths are recorded from the game's death screen with the exact toll
-(XP / money / items lost); pickups resolve per drop (yours vs others).
-
 ## Building a standalone exe
 
 ```sh
@@ -94,7 +66,6 @@ When frozen, the database and settings file live under
 | --- | --- | --- |
 | Database | `data/srtracker.db` | `%LOCALAPPDATA%\SRTracker\srtracker.db` |
 | Settings | `data/settings.json` | `%LOCALAPPDATA%\SRTracker\settings.json` |
-| DLL events log | `%TEMP%\REMOVED` (DLL-owned) | same |
 
 SQLite tables: `sessions`, `kills`, `drops`, `deaths`, `xp_events`, `damage`,
 `spawn_notifications`, `events`, `zone_visits` (+ `zone_stats` view), with

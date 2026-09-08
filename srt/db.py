@@ -6,12 +6,14 @@ are not safe to share across threads without serialization.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import buffs as buffs_mod
+from . import modifiers as modifiers_mod
 
 
 SCHEMA = [
@@ -241,6 +243,7 @@ class Database:
             self._ensure_column("xp_events", "bonus_party", "INTEGER")
             self._ensure_column("zone_visits", "display_name", "TEXT")
             self._ensure_column("zone_visits", "is_mirage", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column("REMOVED", "modifiers", "TEXT")
             # Old builds created zone_visits with a NOT NULL `timestamp`
             # column; current code writes entered_at/left_at instead, so
             # every zone insert fails on the legacy constraint until the
@@ -511,34 +514,62 @@ class Database:
             self._conn.commit()
 
     def REMOVED(self, session_id: int, buff_id: int, mode: str,
-                    duration: int, ts: str) -> None:
+                    duration: int, ts: str,
+                    modifiers: list[dict] | None = None) -> None:
         """Record one buff sighting (add, update or remove). Durations
-        ride in milliseconds; 0 means no expiry."""
+        ride in milliseconds; 0 means no expiry. Modifiers ride as a
+        JSON list of {id, text} pairs."""
+        mods_json = json.dumps(modifiers or [], ensure_ascii=True)
         with self._lock:
             self._conn.execute(
-                "INSERT INTO REMOVED (session_id, buff_id, mode, duration, timestamp)"
-                " VALUES (?,?,?,?,?)",
-                (session_id, _i64(buff_id), mode, _i64(duration), ts),
+                "INSERT INTO REMOVED "
+                "(session_id, buff_id, mode, duration, modifiers, timestamp)"
+                " VALUES (?,?,?,?,?,?)",
+                (session_id, _i64(buff_id), mode, _i64(duration), mods_json, ts),
             )
             self._conn.commit()
+
+    @staticmethod
+    def _decode_modifiers(raw: str | None) -> list[dict]:
+        """Parse the stored modifiers JSON into {id, text, display}
+        rows. Display is the raw text when present, else the catalog
+        template, else the id itself."""
+        try:
+            items = json.loads(raw) if raw else []
+        except (TypeError, ValueError):
+            return []
+        out = []
+        for m in items if isinstance(items, list) else []:
+            if not isinstance(m, dict):
+                continue
+            mid = str(m.get("id", ""))
+            text = str(m.get("text", ""))
+            out.append({
+                "id": mid,
+                "text": text,
+                "display": (text or modifiers_mod.REMOVED(mid, fallback=text)
+                            or mid),
+            })
+        return out
 
     def REMOVED(self, session_id: int) -> list[dict]:
         """Buffs currently in effect: the latest sighting per buff id is
         an add/update that has not expired (duration 0 never expires).
-        Each row carries buff_id, name, mode, duration_ms, granted_at
-        and expires_at (None when open-ended). Oldest grant first."""
+        Each row carries buff_id, name, mode, duration_ms, granted_at,
+        expires_at (None when open-ended) and modifiers. Oldest grant
+        first."""
         now = datetime.now()
         with self._lock:
             cur = self._conn.execute(
-                """SELECT buff_id, mode, duration, timestamp FROM REMOVED
-                   WHERE session_id = ? ORDER BY id""",
+                """SELECT buff_id, mode, duration, modifiers, timestamp
+                   FROM REMOVED WHERE session_id = ? ORDER BY id""",
                 (session_id,),
             )
             latest: dict[int, tuple] = {}
-            for buff_id, mode, duration, ts in cur.fetchall():
-                latest[int(buff_id)] = (mode, int(duration or 0), ts)
+            for buff_id, mode, duration, mods, ts in cur.fetchall():
+                latest[int(buff_id)] = (mode, int(duration or 0), mods, ts)
             out = []
-            for buff_id, (mode, duration, ts) in latest.items():
+            for buff_id, (mode, duration, mods, ts) in latest.items():
                 if mode == "remove":
                     continue
                 expires_at = None
@@ -559,6 +590,7 @@ class Database:
                     "granted_at": ts,
                     "expires_at": (expires_at.isoformat(timespec="milliseconds")
                                    if expires_at else None),
+                    "modifiers": self._decode_modifiers(mods),
                 })
             out.sort(key=lambda r: r["granted_at"] or "")
             return out
