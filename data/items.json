@@ -1,0 +1,6282 @@
+[
+  {
+    "id": 1,
+    "name": "Bowtie",
+    "source": "Resources/Items/Database/Bowtie.tres"
+  },
+  {
+    "id": 2,
+    "name": "Small Health Potion",
+    "source": "Resources/Items/Database/SmallHealthPotion.tres"
+  },
+  {
+    "id": 3,
+    "name": "Red Crystal",
+    "source": "Resources/Items/Database/RedCrystal.tres"
+  },
+  {
+    "id": 4,
+    "name": "Blue Crystal",
+    "source": "Resources/Items/Database/BlueCrystal.tres"
+  },
+  {
+    "id": 5,
+    "name": "Yellow Crystal",
+    "source": "Resources/Items/Database/YellowCrystal.tres"
+  },
+  {
+    "id": 7,
+    "name": "Banana Pudding",
+    "source": "Resources/Items/Database/BananaPudding.tres"
+  },
+  {
+    "id": 8,
+    "name": "Dango",
+    "source": "Resources/Items/Database/Dango.tres"
+  },
+  {
+    "id": 9,
+    "name": "Health Potion",
+    "source": "Resources/Items/Database/HealthPotion.tres"
+  },
+  {
+    "id": 10,
+    "name": "Red Shard",
+    "source": "Resources/Items/Database/RedShard.tres"
+  },
+  {
+    "id": 11,
+    "name": "Blue Shard",
+    "source": "Resources/Items/Database/BlueShard.tres"
+  },
+  {
+    "id": 12,
+    "name": "Yellow Shard",
+    "source": "Resources/Items/Database/YellowShard.tres"
+  },
+  {
+    "id": 13,
+    "name": "Skill Book",
+    "source": "Resources/Items/Database/SkillBook.tres"
+  },
+  {
+    "id": 14,
+    "name": "Kunai",
+    "source": "Resources/Items/Database/Kunai.tres"
+  },
+  {
+    "id": 16,
+    "name": "Small Mana Potion",
+    "source": "Resources/Items/Database/SmallManaPotion.tres"
+  },
+  {
+    "id": 17,
+    "name": "Mana Potion",
+    "source": "Resources/Items/Database/ManaPotion.tres"
+  },
+  {
+    "id": 21,
+    "name": "Fragmented Gear of Time",
+    "source": "Resources/Items/Database/FragmentedGearOfTime.tres"
+  },
+  {
+    "id": 24,
+    "name": "Fish Scouter",
+    "source": "Resources/Items/Database/FishScouter.tres"
+  },
+  {
+    "id": 25,
+    "name": "Leaf of Return",
+    "source": "Resources/Items/Database/LeafOfReturn.tres"
+  },
+  {
+    "id": 29,
+    "name": "Red Herb",
+    "source": "Resources/Items/Database/RedHerb.tres"
+  },
+  {
+    "id": 30,
+    "name": "Iron Ore",
+    "source": "Resources/Items/Database/IronOre.tres"
+  },
+  {
+    "id": 31,
+    "name": "Green Herb",
+    "source": "Resources/Items/Database/GreenHerb.tres"
+  },
+  {
+    "id": 32,
+    "name": "Dye",
+    "source": "Resources/Items/Database/Dye.tres"
+  },
+  {
+    "id": 33,
+    "name": "Blue Herb",
+    "source": "Resources/Items/Database/BlueHerb.tres"
+  },
+  {
+    "id": 34,
+    "name": "Robe",
+    "source": "Resources/Items/Database/Robe.tres"
+  },
+  {
+    "id": 35,
+    "name": "Ring of Power",
+    "source": "Resources/Items/Database/RingOfPower.tres"
+  },
+  {
+    "id": 36,
+    "name": "Cat on Head",
+    "source": "Resources/Items/Database/CatOnHead.tres"
+  },
+  {
+    "id": 37,
+    "name": "Santa Hat",
+    "source": "Resources/Items/Database/SantaHat.tres"
+  },
+  {
+    "id": 38,
+    "name": "Tiara",
+    "source": "Resources/Items/Database/Tiara.tres"
+  },
+  {
+    "id": 40,
+    "name": "Iron Ingot",
+    "source": "Resources/Items/Database/IronIngotOld.tres"
+  },
+  {
+    "id": 43,
+    "name": "Ring of Magic",
+    "source": "Resources/Items/Database/RingOfMagic.tres"
+  },
+  {
+    "id": 44,
+    "name": "Ring of Swiftness",
+    "source": "Resources/Items/Database/RingOfSwiftness.tres"
+  },
+  {
+    "id": 45,
+    "name": "Lemon",
+    "source": "Resources/Items/Database/Lemon.tres"
+  },
+  {
+    "id": 46,
+    "name": "Lemon Pie",
+    "source": "Resources/Items/Database/LemonPie.tres"
+  },
+  {
+    "id": 47,
+    "name": "Flour",
+    "source": "Resources/Items/Database/Flour.tres"
+  },
+  {
+    "id": 48,
+    "name": "Wheat",
+    "source": "Resources/Items/Database/Wheat.tres"
+  },
+  {
+    "id": 49,
+    "name": "Ring of Chaos",
+    "source": "Resources/Items/Database/RingOfChaos.tres"
+  },
+  {
+    "id": 50,
+    "name": "Leaf of Raising",
+    "source": "Resources/Items/Database/LeafOfRaising.tres"
+  },
+  {
+    "id": 51,
+    "name": "Dying Sands",
+    "source": "Resources/Items/Database/DyingSands.tres"
+  },
+  {
+    "id": 52,
+    "name": "Banana",
+    "source": "Resources/Items/Database/Banana.tres"
+  },
+  {
+    "id": 53,
+    "name": "Mystery Ticket",
+    "source": "Resources/Items/Database/MysteryTicket.tres"
+  },
+  {
+    "id": 54,
+    "name": "Dark Essence",
+    "source": "Resources/Items/Database/DarkEssence.tres"
+  },
+  {
+    "id": 55,
+    "name": "Light Essence",
+    "source": "Resources/Items/Database/LightEssence.tres"
+  },
+  {
+    "id": 56,
+    "name": "Normal Dungeon Pass",
+    "source": "Resources/Items/Database/DungeonPassNormal.tres"
+  },
+  {
+    "id": 58,
+    "name": "Boss Key",
+    "source": "Resources/Items/Database/BossKey.tres"
+  },
+  {
+    "id": 59,
+    "name": "Nurturing Gem",
+    "source": "Resources/Items/Database/NurturingGem.tres"
+  },
+  {
+    "id": 60,
+    "name": "Mystic Gem",
+    "source": "Resources/Items/Database/MysticGem.tres"
+  },
+  {
+    "id": 61,
+    "name": "Calamity Gem",
+    "source": "Resources/Items/Database/CalamityGem.tres"
+  },
+  {
+    "id": 75,
+    "name": "Dark Puzzle Piece A",
+    "source": "Resources/Items/Database/DarkPuzzlePieceA.tres"
+  },
+  {
+    "id": 76,
+    "name": "Dark Puzzle Piece B",
+    "source": "Resources/Items/Database/DarkPuzzlePieceB.tres"
+  },
+  {
+    "id": 77,
+    "name": "Dark Puzzle Piece C",
+    "source": "Resources/Items/Database/DarkPuzzlePieceC.tres"
+  },
+  {
+    "id": 78,
+    "name": "Dark Puzzle Piece D",
+    "source": "Resources/Items/Database/DarkPuzzlePieceD.tres"
+  },
+  {
+    "id": 79,
+    "name": "Dark Anchor",
+    "source": "Resources/Items/Database/DarkAnchor.tres"
+  },
+  {
+    "id": 80,
+    "name": "Great Health Potion",
+    "source": "Resources/Items/Database/GreatHealthPotion.tres"
+  },
+  {
+    "id": 81,
+    "name": "Great Mana Potion",
+    "source": "Resources/Items/Database/GreatManaPotion.tres"
+  },
+  {
+    "id": 82,
+    "name": "Bank Upgrade Coupon",
+    "source": "Resources/Items/Database/BankUpgradeCoupon.tres"
+  },
+  {
+    "id": 83,
+    "name": "Spiky Shell",
+    "source": "Resources/Items/Database/SpikyShell.tres"
+  },
+  {
+    "id": 84,
+    "name": "Dark Bullet-knife",
+    "source": "Resources/Items/Database/DarkBulletKnife.tres"
+  },
+  {
+    "id": 85,
+    "name": "Shell Piece",
+    "source": "Resources/Items/Database/ShellPiece.tres"
+  },
+  {
+    "id": 86,
+    "name": "Cat Ears",
+    "source": "Resources/Items/Database/CatEars.tres"
+  },
+  {
+    "id": 87,
+    "name": "Rubble",
+    "source": "Resources/Items/Database/Rubble.tres"
+  },
+  {
+    "id": 88,
+    "name": "Rock Pendant",
+    "source": "Resources/Items/Database/RockPendant.tres"
+  },
+  {
+    "id": 89,
+    "name": "White Herb",
+    "source": "Resources/Items/Database/WhiteHerb.tres"
+  },
+  {
+    "id": 101,
+    "name": "Reaper Ring",
+    "source": "Resources/Items/Database/ReaperRing.tres"
+  },
+  {
+    "id": 102,
+    "name": "Plains Summoning Crystal Lv 1",
+    "source": "Resources/Items/Database/PlainsSummoningCrystalLv1.tres"
+  },
+  {
+    "id": 103,
+    "name": "Plains Summoning Crystal Lv 2",
+    "source": "Resources/Items/Database/PlainsSummoningCrystalLv2.tres"
+  },
+  {
+    "id": 104,
+    "name": "Ocean Summoning Crystal Lv 1",
+    "source": "Resources/Items/Database/OceanSummoningCrystalLv1.tres"
+  },
+  {
+    "id": 105,
+    "name": "Campfire",
+    "source": "Resources/Items/Database/Campfire.tres"
+  },
+  {
+    "id": 106,
+    "name": "Firefly",
+    "source": "Resources/Items/Database/Firefly.tres"
+  },
+  {
+    "id": 107,
+    "name": "Shrimp",
+    "source": "Resources/Items/Database/Shrimp.tres"
+  },
+  {
+    "id": 108,
+    "name": "Return Crystal",
+    "source": "Resources/Items/Database/ReturnCrystal.tres"
+  },
+  {
+    "id": 109,
+    "name": "Grappling Hook",
+    "source": "Resources/Items/Database/GrapplingHook.tres"
+  },
+  {
+    "id": 110,
+    "name": "Seashine Hook",
+    "source": "Resources/Items/Database/SeashineHook.tres"
+  },
+  {
+    "id": 111,
+    "name": "Avenger's Hook",
+    "source": "Resources/Items/Database/AvengerHook.tres"
+  },
+  {
+    "id": 112,
+    "name": "World-Shift Crystal",
+    "source": "Resources/Items/Database/WorldShiftCrystal.tres"
+  },
+  {
+    "id": 113,
+    "name": "Ring of Light",
+    "source": "Resources/Items/Database/RingOfLight.tres"
+  },
+  {
+    "id": 114,
+    "name": "Aura Fuel",
+    "source": "Resources/Items/Database/AuraFuel.tres"
+  },
+  {
+    "id": 115,
+    "name": "Aura Fuel (W-Type)",
+    "source": "Resources/Items/Database/AuraFuelWType.tres"
+  },
+  {
+    "id": 116,
+    "name": "Aura Fuel (F-Type)",
+    "source": "Resources/Items/Database/AuraFuelFType.tres"
+  },
+  {
+    "id": 117,
+    "name": "Refined Fiber",
+    "source": "Resources/Items/Database/RefinedFiber.tres"
+  },
+  {
+    "id": 118,
+    "name": "Eternal Light",
+    "source": "Resources/Items/Database/EternalLight.tres"
+  },
+  {
+    "id": 119,
+    "name": "Marshmallow",
+    "source": "Resources/Items/Database/Marshmallow.tres"
+  },
+  {
+    "id": 120,
+    "name": "Smores",
+    "source": "Resources/Items/Database/Smores.tres"
+  },
+  {
+    "id": 121,
+    "name": "Chocolate",
+    "source": "Resources/Items/Database/Chocolate.tres"
+  },
+  {
+    "id": 122,
+    "name": "Sugar",
+    "source": "Resources/Items/Database/Sugar.tres"
+  },
+  {
+    "id": 123,
+    "name": "Lantern",
+    "source": "Resources/Items/Database/Lantern.tres"
+  },
+  {
+    "id": 124,
+    "name": "Chomper",
+    "source": "Resources/Items/Database/Chomper.tres"
+  },
+  {
+    "id": 125,
+    "name": "Sulfur Squid",
+    "source": "Resources/Items/Database/SulphurSquid.tres"
+  },
+  {
+    "id": 126,
+    "name": "Ice Salmon",
+    "source": "Resources/Items/Database/IceSalmon.tres"
+  },
+  {
+    "id": 127,
+    "name": "Trout",
+    "source": "Resources/Items/Database/Trout.tres"
+  },
+  {
+    "id": 128,
+    "name": "Exotic Tuna",
+    "source": "Resources/Items/Database/ExoticTuna.tres"
+  },
+  {
+    "id": 129,
+    "name": "Black Calamari",
+    "source": "Resources/Items/Database/BlackCalamari.tres"
+  },
+  {
+    "id": 130,
+    "name": "Cooked Trout",
+    "source": "Resources/Items/Database/CookedTrout.tres"
+  },
+  {
+    "id": 131,
+    "name": "Strong Sushi",
+    "source": "Resources/Items/Database/StrongSushi.tres"
+  },
+  {
+    "id": 132,
+    "name": "Frozen Kebab",
+    "source": "Resources/Items/Database/FrozenKebab.tres"
+  },
+  {
+    "id": 133,
+    "name": "Stylish Sushi",
+    "source": "Resources/Items/Database/StylishSushi.tres"
+  },
+  {
+    "id": 134,
+    "name": "Seafood Supreme",
+    "source": "Resources/Items/Database/SeafoodSupreme.tres"
+  },
+  {
+    "id": 135,
+    "name": "Speedy Seafood Salad",
+    "source": "Resources/Items/Database/SpeedySeafoodSalad.tres"
+  },
+  {
+    "id": 136,
+    "name": "Seaweed",
+    "source": "Resources/Items/Database/Seaweed.tres"
+  },
+  {
+    "id": 137,
+    "name": "Grass Block",
+    "source": "Resources/Items/Database/GrassBlock.tres"
+  },
+  {
+    "id": 138,
+    "name": "Dirt Block",
+    "source": "Resources/Items/Database/DirtBlock.tres"
+  },
+  {
+    "id": 139,
+    "name": "Sand Block",
+    "source": "Resources/Items/Database/SandBlock.tres"
+  },
+  {
+    "id": 140,
+    "name": "Snow Block",
+    "source": "Resources/Items/Database/SnowBlock.tres"
+  },
+  {
+    "id": 141,
+    "name": "Graysand Block",
+    "source": "Resources/Items/Database/GraysandBlock.tres"
+  },
+  {
+    "id": 142,
+    "name": "Ancient Stone Block",
+    "source": "Resources/Items/Database/AncientStoneBlock.tres"
+  },
+  {
+    "id": 143,
+    "name": "Deep Forest Grass Block",
+    "source": "Resources/Items/Database/DeepForestGrassBlock.tres"
+  },
+  {
+    "id": 144,
+    "name": "Cooked Shrimp",
+    "source": "Resources/Items/Database/CookedShrimp.tres"
+  },
+  {
+    "id": 145,
+    "name": "Repel Beacon",
+    "source": "Resources/Items/Database/RepelBeacon.tres"
+  },
+  {
+    "id": 146,
+    "name": "Dungeon Scouter",
+    "source": "Resources/Items/Database/DungeonScouter.tres"
+  },
+  {
+    "id": 153,
+    "name": "Red Seeds",
+    "source": "Resources/Items/Database/RedSeeds.tres"
+  },
+  {
+    "id": 154,
+    "name": "Green Seeds",
+    "source": "Resources/Items/Database/GreenSeeds.tres"
+  },
+  {
+    "id": 155,
+    "name": "Blue Seeds",
+    "source": "Resources/Items/Database/BlueSeeds.tres"
+  },
+  {
+    "id": 156,
+    "name": "Mixed Seeds",
+    "source": "Resources/Items/Database/MixedSeeds.tres"
+  },
+  {
+    "id": 157,
+    "name": "White Seeds",
+    "source": "Resources/Items/Database/WhiteSeeds.tres"
+  },
+  {
+    "id": 158,
+    "name": "Wheat Seeds",
+    "source": "Resources/Items/Database/WheatSeeds.tres"
+  },
+  {
+    "id": 159,
+    "name": "Fertilizer",
+    "source": "Resources/Items/Database/Fertilizer.tres"
+  },
+  {
+    "id": 161,
+    "name": "Monster Candy",
+    "source": "Resources/Items/Database/MonsterCandy.tres"
+  },
+  {
+    "id": 162,
+    "name": "Pumpkin",
+    "source": "Resources/Items/Database/Pumpkin.tres"
+  },
+  {
+    "id": 163,
+    "name": "Pumpkin Pie",
+    "source": "Resources/Items/Database/PumpkinPie.tres"
+  },
+  {
+    "id": 164,
+    "name": "Candy Corn",
+    "source": "Resources/Items/Database/CandyCorn.tres"
+  },
+  {
+    "id": 165,
+    "name": "Spooky Cat",
+    "source": "Resources/Items/Database/SpookyCat.tres"
+  },
+  {
+    "id": 166,
+    "name": "Ragged Diary Page 6",
+    "source": "Resources/Items/Database/RaggedDiaryPage6.tres"
+  },
+  {
+    "id": 167,
+    "name": "Ragged Diary Page 1",
+    "source": "Resources/Items/Database/RaggedDiaryPage1.tres"
+  },
+  {
+    "id": 168,
+    "name": "Dull Dungeon Crystal",
+    "source": "Resources/Items/Database/DullDungeonCrystal.tres"
+  },
+  {
+    "id": 169,
+    "name": "Radiant Dungeon Crystal",
+    "source": "Resources/Items/Database/RadiantDungeonCrystal.tres"
+  },
+  {
+    "id": 170,
+    "name": "Chaotic Warp Crystal",
+    "source": "Resources/Items/Database/ChaoticWarpCrystal.tres"
+  },
+  {
+    "id": 171,
+    "name": "Wood Storage Chest",
+    "source": "Resources/Items/Database/WoodStorageChest.tres"
+  },
+  {
+    "id": 172,
+    "name": "Oak Sapling",
+    "source": "Resources/Items/Database/OakSapling.tres"
+  },
+  {
+    "id": 173,
+    "name": "Wood",
+    "source": "Resources/Items/Database/Wood.tres"
+  },
+  {
+    "id": 174,
+    "name": "Wood Block",
+    "source": "Resources/Items/Database/WoodBlock.tres"
+  },
+  {
+    "id": 175,
+    "name": "Stone Block",
+    "source": "Resources/Items/Database/StoneBlock.tres"
+  },
+  {
+    "id": 176,
+    "name": "Street Lamp",
+    "source": "Resources/Items/Database/StreetLamp.tres"
+  },
+  {
+    "id": 177,
+    "name": "Magic Storage Chest",
+    "source": "Resources/Items/Database/MagicStorageChest.tres"
+  },
+  {
+    "id": 178,
+    "name": "Stone",
+    "source": "Resources/Items/Database/gathering_material/Stone.tres"
+  },
+  {
+    "id": 179,
+    "name": "Pine Sapling",
+    "source": "Resources/Items/Database/PineSapling.tres"
+  },
+  {
+    "id": 180,
+    "name": "Palm Sapling",
+    "source": "Resources/Items/Database/PalmSapling.tres"
+  },
+  {
+    "id": 181,
+    "name": "Book of Unlearning",
+    "source": "Resources/Items/Database/BookOfUnlearning.tres"
+  },
+  {
+    "id": 182,
+    "name": "Piano",
+    "source": "Resources/Items/Database/Piano.tres"
+  },
+  {
+    "id": 183,
+    "name": "Flute",
+    "source": "Resources/Items/Database/Flute.tres"
+  },
+  {
+    "id": 184,
+    "name": "Bass Guitar",
+    "source": "Resources/Items/Database/BassGuitar.tres"
+  },
+  {
+    "id": 185,
+    "name": "Monster Essence",
+    "source": "Resources/Items/Database/MonsterEssence.tres"
+  },
+  {
+    "id": 186,
+    "name": "Candy Cane",
+    "source": "Resources/Items/Database/CandyCane.tres"
+  },
+  {
+    "id": 187,
+    "name": "Festive Lights (Red)",
+    "source": "Resources/Items/Database/FestiveLightsRed.tres"
+  },
+  {
+    "id": 188,
+    "name": "Festive Lights (Blue)",
+    "source": "Resources/Items/Database/FestiveLightsBlue.tres"
+  },
+  {
+    "id": 189,
+    "name": "Festive Lights (Yellow)",
+    "source": "Resources/Items/Database/FestiveLightsYellow.tres"
+  },
+  {
+    "id": 190,
+    "name": "Gingerbread Figure",
+    "source": "Resources/Items/Database/GingerBreadFigure.tres"
+  },
+  {
+    "id": 191,
+    "name": "Crafting Recipe",
+    "source": "Resources/Items/Database/CraftingRecipe.tres"
+  },
+  {
+    "id": 192,
+    "name": "Home Crystal",
+    "source": "Resources/Items/Database/HomeCrystal.tres"
+  },
+  {
+    "id": 193,
+    "name": "Sealing Crystal",
+    "source": "Resources/Items/Database/SealingCrystal.tres"
+  },
+  {
+    "id": 194,
+    "name": "Lime",
+    "source": "Resources/Items/Database/Lime.tres"
+  },
+  {
+    "id": 195,
+    "name": "Eternal Flame",
+    "source": "Resources/Items/Database/EternalFlame.tres"
+  },
+  {
+    "id": 196,
+    "name": "Cursed Rock",
+    "source": "Resources/Items/Database/CursedRock.tres"
+  },
+  {
+    "id": 197,
+    "name": "Cursed Flame",
+    "source": "Resources/Items/Database/CursedFlame.tres"
+  },
+  {
+    "id": 198,
+    "name": "Sturdy Rock",
+    "source": "Resources/Items/Database/SturdyRock.tres"
+  },
+  {
+    "id": 199,
+    "name": "Elemental Shard",
+    "source": "Resources/Items/Database/ElementalShard.tres"
+  },
+  {
+    "id": 200,
+    "name": "Fallen Soul Shard",
+    "source": "Resources/Items/Database/FallenSoulShard.tres"
+  },
+  {
+    "id": 201,
+    "name": "Lime Smoothie",
+    "source": "Resources/Items/Database/LimeSmoothie.tres"
+  },
+  {
+    "id": 202,
+    "name": "Lemon Lime Soda",
+    "source": "Resources/Items/Database/LemonLimeSoda.tres"
+  },
+  {
+    "id": 203,
+    "name": "Strong Soda",
+    "source": "Resources/Items/Database/StrongSoda.tres"
+  },
+  {
+    "id": 204,
+    "name": "Angel Fish",
+    "source": "Resources/Items/Database/AngelFish.tres"
+  },
+  {
+    "id": 205,
+    "name": "Desert Eel",
+    "source": "Resources/Items/Database/DesertEel.tres"
+  },
+  {
+    "id": 206,
+    "name": "Spicy Unagi Special",
+    "source": "Resources/Items/Database/SpicyUnagiSpecial.tres"
+  },
+  {
+    "id": 207,
+    "name": "Tropical Fish Plate",
+    "source": "Resources/Items/Database/TropicalFishPlate.tres"
+  },
+  {
+    "id": 208,
+    "name": "Desert Rose",
+    "source": "Resources/Items/Database/DesertRose.tres"
+  },
+  {
+    "id": 209,
+    "name": "Darkshard",
+    "source": "Resources/Items/Database/Darkshard.tres"
+  },
+  {
+    "id": 210,
+    "name": "Holy Rock",
+    "source": "Resources/Items/Database/HolyRock.tres"
+  },
+  {
+    "id": 211,
+    "name": "Fireworks (Red)",
+    "source": "Resources/Items/Database/FireworksRed.tres"
+  },
+  {
+    "id": 212,
+    "name": "Fireworks (Blue)",
+    "source": "Resources/Items/Database/FireworksBlue.tres"
+  },
+  {
+    "id": 213,
+    "name": "Fireworks (Yellow)",
+    "source": "Resources/Items/Database/FireworksYellow.tres"
+  },
+  {
+    "id": 214,
+    "name": "Music Box",
+    "source": "Resources/Items/Database/MusicBox.tres"
+  },
+  {
+    "id": 215,
+    "name": "Name Color Coupon",
+    "source": "Resources/Items/Database/NameColorCoupon.tres"
+  },
+  {
+    "id": 216,
+    "name": "Smirk Emote Coupon",
+    "source": "Resources/Items/Database/SmirkEmoteCoupon.tres"
+  },
+  {
+    "id": 217,
+    "name": "Red Color Block",
+    "source": "Resources/Items/Database/RedColorBlock.tres"
+  },
+  {
+    "id": 218,
+    "name": "Blue Color Block",
+    "source": "Resources/Items/Database/BlueColorBlock.tres"
+  },
+  {
+    "id": 219,
+    "name": "Yellow Color Block",
+    "source": "Resources/Items/Database/YellowColorBlock.tres"
+  },
+  {
+    "id": 220,
+    "name": "Pink Color Block",
+    "source": "Resources/Items/Database/PinkColorBlock.tres"
+  },
+  {
+    "id": 221,
+    "name": "Purple Color Block",
+    "source": "Resources/Items/Database/PurpleColorBlock.tres"
+  },
+  {
+    "id": 222,
+    "name": "Green Color Block",
+    "source": "Resources/Items/Database/GreenColorBlock.tres"
+  },
+  {
+    "id": 223,
+    "name": "Megaphone",
+    "source": "Resources/Items/Database/Megaphone.tres"
+  },
+  {
+    "id": 224,
+    "name": "Hard Dungeon Pass",
+    "source": "Resources/Items/Database/DungeonPassHard.tres"
+  },
+  {
+    "id": 225,
+    "name": "Extreme Dungeon Pass",
+    "source": "Resources/Items/Database/DungeonPassExtreme.tres"
+  },
+  {
+    "id": 226,
+    "name": "Flower of a Lost Soul",
+    "source": "Resources/Items/Database/FlowerOfALostSoul.tres"
+  },
+  {
+    "id": 227,
+    "name": "Tear of the Abyss",
+    "source": "Resources/Items/Database/TearOfTheAbyss.tres"
+  },
+  {
+    "id": 228,
+    "name": "Bandana",
+    "source": "Resources/Items/Database/Bandana.tres"
+  },
+  {
+    "id": 229,
+    "name": "Pinwheel",
+    "source": "Resources/Items/Database/PinWheel.tres"
+  },
+  {
+    "id": 230,
+    "name": "Feather Hat",
+    "source": "Resources/Items/Database/FeatherHat.tres"
+  },
+  {
+    "id": 231,
+    "name": "Bamboo Hat",
+    "source": "Resources/Items/Database/BambooHat.tres"
+  },
+  {
+    "id": 232,
+    "name": "Nerd Glasses",
+    "source": "Resources/Items/Database/NerdGlasses.tres"
+  },
+  {
+    "id": 233,
+    "name": "Book on Head",
+    "source": "Resources/Items/Database/BookOnHead.tres"
+  },
+  {
+    "id": 234,
+    "name": "Slime on Head",
+    "source": "Resources/Items/Database/SlimeOnHead.tres"
+  },
+  {
+    "id": 235,
+    "name": "Rain Cloud",
+    "source": "Resources/Items/Database/RainCloud.tres"
+  },
+  {
+    "id": 236,
+    "name": "Top Hat",
+    "source": "Resources/Items/Database/TopHat.tres"
+  },
+  {
+    "id": 237,
+    "name": "Angry Face",
+    "source": "Resources/Items/Database/AngryFace.tres"
+  },
+  {
+    "id": 238,
+    "name": "Straw Hat",
+    "source": "Resources/Items/Database/StrawHat.tres"
+  },
+  {
+    "id": 239,
+    "name": "Thief Mask",
+    "source": "Resources/Items/Database/ThiefMask.tres"
+  },
+  {
+    "id": 240,
+    "name": "Robin Hat",
+    "source": "Resources/Items/Database/RobinHat.tres"
+  },
+  {
+    "id": 241,
+    "name": "Horns",
+    "source": "Resources/Items/Database/Horns.tres"
+  },
+  {
+    "id": 242,
+    "name": "Flames",
+    "source": "Resources/Items/Database/Flames.tres"
+  },
+  {
+    "id": 243,
+    "name": "Pretty Flower",
+    "source": "Resources/Items/Database/PrettyFlower.tres"
+  },
+  {
+    "id": 244,
+    "name": "Battle Helmet",
+    "source": "Resources/Items/Database/BattleHelmet.tres"
+  },
+  {
+    "id": 245,
+    "name": "Witch Hat",
+    "source": "Resources/Items/Database/WitchHat.tres"
+  },
+  {
+    "id": 246,
+    "name": "Cool Glasses",
+    "source": "Resources/Items/Database/CoolGlasses.tres"
+  },
+  {
+    "id": 247,
+    "name": "Halo",
+    "source": "Resources/Items/Database/Halo.tres"
+  },
+  {
+    "id": 248,
+    "name": "Eye Patch",
+    "source": "Resources/Items/Database/EyePatch.tres"
+  },
+  {
+    "id": 249,
+    "name": "Static",
+    "source": "Resources/Items/Database/Static.tres"
+  },
+  {
+    "id": 250,
+    "name": "Cross Necklace",
+    "source": "Resources/Items/Database/CrossNecklace.tres"
+  },
+  {
+    "id": 251,
+    "name": "Soul on Head",
+    "source": "Resources/Items/Database/SoulOnHead.tres"
+  },
+  {
+    "id": 252,
+    "name": "Goggles",
+    "source": "Resources/Items/Database/Goggles.tres"
+  },
+  {
+    "id": 253,
+    "name": "Cross Earrings",
+    "source": "Resources/Items/Database/CrossEarrings.tres"
+  },
+  {
+    "id": 254,
+    "name": "Flower Tiara",
+    "source": "Resources/Items/Database/FlowerTiara.tres"
+  },
+  {
+    "id": 255,
+    "name": "Wooden Mask",
+    "source": "Resources/Items/Database/WoodenMask.tres"
+  },
+  {
+    "id": 256,
+    "name": "Scarecrow",
+    "source": "Resources/Items/Database/Scarecrow.tres"
+  },
+  {
+    "id": 257,
+    "name": "Blue Flowers",
+    "source": "Resources/Items/Database/BlueFlowers.tres"
+  },
+  {
+    "id": 258,
+    "name": "Pathfinder",
+    "source": "Resources/Items/Database/Pathfinder.tres"
+  },
+  {
+    "id": 259,
+    "name": "Barrel",
+    "source": "Resources/Items/Database/Barrel.tres"
+  },
+  {
+    "id": 260,
+    "name": "Barrel 2",
+    "source": "Resources/Items/Database/Barrel2.tres"
+  },
+  {
+    "id": 261,
+    "name": "Boulder",
+    "source": "Resources/Items/Database/Boulder.tres"
+  },
+  {
+    "id": 262,
+    "name": "Bush",
+    "source": "Resources/Items/Database/Bush.tres"
+  },
+  {
+    "id": 263,
+    "name": "Wooden Chair",
+    "source": "Resources/Items/Database/WoodenChair.tres"
+  },
+  {
+    "id": 264,
+    "name": "Wooden Crate",
+    "source": "Resources/Items/Database/WoodenCrate.tres"
+  },
+  {
+    "id": 265,
+    "name": "Wooden Fence",
+    "source": "Resources/Items/Database/WoodenFence.tres"
+  },
+  {
+    "id": 266,
+    "name": "Green Flowers",
+    "source": "Resources/Items/Database/GreenFlowers.tres"
+  },
+  {
+    "id": 267,
+    "name": "Red Flowers",
+    "source": "Resources/Items/Database/RedFlowers.tres"
+  },
+  {
+    "id": 268,
+    "name": "Yellow Flowers",
+    "source": "Resources/Items/Database/YellowFlowers.tres"
+  },
+  {
+    "id": 269,
+    "name": "Haystack",
+    "source": "Resources/Items/Database/Haystack.tres"
+  },
+  {
+    "id": 270,
+    "name": "Dungeon Lamp",
+    "source": "Resources/Items/Database/DungeonLamp.tres"
+  },
+  {
+    "id": 271,
+    "name": "Wooden Table",
+    "source": "Resources/Items/Database/WoodenTable.tres"
+  },
+  {
+    "id": 272,
+    "name": "Vase",
+    "source": "Resources/Items/Database/Vase.tres"
+  },
+  {
+    "id": 273,
+    "name": "Wooden Bookshelf",
+    "source": "Resources/Items/Database/WoodenBookshelf.tres"
+  },
+  {
+    "id": 274,
+    "name": "Well",
+    "source": "Resources/Items/Database/Well.tres"
+  },
+  {
+    "id": 275,
+    "name": "Wispy Oracle",
+    "source": "Resources/Items/Database/WispyOracle.tres"
+  },
+  {
+    "id": 276,
+    "name": "Golden Cloud Piece",
+    "source": "Resources/Items/Database/GoldenCloudPiece.tres"
+  },
+  {
+    "id": 277,
+    "name": "Seashell",
+    "source": "Resources/Items/Database/Seashell.tres"
+  },
+  {
+    "id": 278,
+    "name": "Blue Slime Piece",
+    "source": "Resources/Items/Database/BlueSlimePiece.tres"
+  },
+  {
+    "id": 279,
+    "name": "Wolf Fish",
+    "source": "Resources/Items/Database/WolfFish.tres"
+  },
+  {
+    "id": 280,
+    "name": "Glowfish",
+    "source": "Resources/Items/Database/Glowfish.tres"
+  },
+  {
+    "id": 281,
+    "name": "Hearts Aura",
+    "source": "Resources/Items/Database/HeartsAura.tres"
+  },
+  {
+    "id": 282,
+    "name": "Red Aura",
+    "source": "Resources/Items/Database/RedAura.tres"
+  },
+  {
+    "id": 283,
+    "name": "Purple Aura",
+    "source": "Resources/Items/Database/PurpleAura.tres"
+  },
+  {
+    "id": 284,
+    "name": "Cold Aura",
+    "source": "Resources/Items/Database/ColdAura.tres"
+  },
+  {
+    "id": 285,
+    "name": "Yellow Aura",
+    "source": "Resources/Items/Database/YellowAura.tres"
+  },
+  {
+    "id": 286,
+    "name": "Gray Aura",
+    "source": "Resources/Items/Database/GrayAura.tres"
+  },
+  {
+    "id": 287,
+    "name": "White Aura",
+    "source": "Resources/Items/Database/WhiteAura.tres"
+  },
+  {
+    "id": 288,
+    "name": "Blue Aura",
+    "source": "Resources/Items/Database/BlueAura.tres"
+  },
+  {
+    "id": 289,
+    "name": "Small Bag",
+    "source": "Resources/Items/Database/SmallBag.tres"
+  },
+  {
+    "id": 290,
+    "name": "Backpack",
+    "source": "Resources/Items/Database/Backpack.tres"
+  },
+  {
+    "id": 291,
+    "name": "Void Bag",
+    "source": "Resources/Items/Database/VoidBag.tres"
+  },
+  {
+    "id": 292,
+    "name": "Christmas Presents",
+    "source": "Resources/Items/Database/ChristmasPresents.tres"
+  },
+  {
+    "id": 293,
+    "name": "Santa Bag",
+    "source": "Resources/Items/Database/SantaBag.tres"
+  },
+  {
+    "id": 294,
+    "name": "Snow Aura",
+    "source": "Resources/Items/Database/SnowAura.tres"
+  },
+  {
+    "id": 295,
+    "name": "Snowball",
+    "source": "Resources/Items/Database/Snowball.tres"
+  },
+  {
+    "id": 296,
+    "name": "Special Horn",
+    "source": "Resources/Items/Database/SpecialHorn.tres"
+  },
+  {
+    "id": 297,
+    "name": "Dungeon Essence",
+    "source": "Resources/Items/Database/DungeonEssence.tres"
+  },
+  {
+    "id": 298,
+    "name": "Savannah Grass Block",
+    "source": "Resources/Items/Database/SavannahGrassBlock.tres"
+  },
+  {
+    "id": 299,
+    "name": "Misty Grass Block",
+    "source": "Resources/Items/Database/MistyGrassBlock.tres"
+  },
+  {
+    "id": 300,
+    "name": "Innocence",
+    "source": "Resources/Items/Database/weapons/Innocence.tres"
+  },
+  {
+    "id": 301,
+    "name": "Judgement",
+    "source": "Resources/Items/Database/weapons/Judgement.tres"
+  },
+  {
+    "id": 302,
+    "name": "Perseverance",
+    "source": "Resources/Items/Database/weapons/Perseverance.tres"
+  },
+  {
+    "id": 303,
+    "name": "Sword of Heart",
+    "source": "Resources/Items/Database/weapons/SwordOfHeart.tres"
+  },
+  {
+    "id": 304,
+    "name": "Faith",
+    "source": "Resources/Items/Database/weapons/Faith.tres"
+  },
+  {
+    "id": 305,
+    "name": "Shooting Star",
+    "source": "Resources/Items/Database/weapons/ShootingStar.tres"
+  },
+  {
+    "id": 306,
+    "name": "Wish",
+    "source": "Resources/Items/Database/weapons/Wish.tres"
+  },
+  {
+    "id": 307,
+    "name": "Knull",
+    "source": "Resources/Items/Database/weapons/Knull.tres"
+  },
+  {
+    "id": 308,
+    "name": "Smite",
+    "source": "Resources/Items/Database/weapons/Smite.tres"
+  },
+  {
+    "id": 309,
+    "name": "Messenger",
+    "source": "Resources/Items/Database/weapons/Messenger.tres"
+  },
+  {
+    "id": 310,
+    "name": "Divinity",
+    "source": "Resources/Items/Database/weapons/Divinity.tres"
+  },
+  {
+    "id": 311,
+    "name": "Psyche",
+    "source": "Resources/Items/Database/weapons/Psyche.tres"
+  },
+  {
+    "id": 312,
+    "name": "Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/TearOfTheFallen.tres"
+  },
+  {
+    "id": 313,
+    "name": "Sacrifice",
+    "source": "Resources/Items/Database/weapons/Sacrifice.tres"
+  },
+  {
+    "id": 314,
+    "name": "Solitude",
+    "source": "Resources/Items/Database/weapons/Solitude.tres"
+  },
+  {
+    "id": 315,
+    "name": "Exchange",
+    "source": "Resources/Items/Database/weapons/Exchange.tres"
+  },
+  {
+    "id": 316,
+    "name": "Energetic Soul",
+    "source": "Resources/Items/Database/EnergeticSoul.tres"
+  },
+  {
+    "id": 317,
+    "name": "Ambitious Soul",
+    "source": "Resources/Items/Database/AmbitiousSoul.tres"
+  },
+  {
+    "id": 318,
+    "name": "Transcendent Soul",
+    "source": "Resources/Items/Database/TranscendentSoul.tres"
+  },
+  {
+    "id": 319,
+    "name": "Chaotic Soul",
+    "source": "Resources/Items/Database/ChaoticSoul.tres"
+  },
+  {
+    "id": 320,
+    "name": "Turbulent Soul",
+    "source": "Resources/Items/Database/TurbulentSoul.tres"
+  },
+  {
+    "id": 321,
+    "name": "Primordial Soul",
+    "source": "Resources/Items/Database/PrimordialSoul.tres"
+  },
+  {
+    "id": 322,
+    "name": "Eternal Soul",
+    "source": "Resources/Items/Database/EternalSoul.tres"
+  },
+  {
+    "id": 323,
+    "name": "Mischievous Soul",
+    "source": "Resources/Items/Database/MischievousSoul.tres"
+  },
+  {
+    "id": 324,
+    "name": "Faded Innocence",
+    "source": "Resources/Items/Database/weapons/FadedInnocence.tres"
+  },
+  {
+    "id": 325,
+    "name": "Radiant Metal Essence",
+    "source": "Resources/Items/Database/RadiantMetalEssence.tres"
+  },
+  {
+    "id": 326,
+    "name": "Radiant Eternal Essence",
+    "source": "Resources/Items/Database/RadiantEternalEssence.tres"
+  },
+  {
+    "id": 327,
+    "name": "Radiant Raging Essence",
+    "source": "Resources/Items/Database/RadiantRagingEssence.tres"
+  },
+  {
+    "id": 328,
+    "name": "Radiant Historic Essence",
+    "source": "Resources/Items/Database/RadiantHistoricEssence.tres"
+  },
+  {
+    "id": 329,
+    "name": "Radiant Nurturing Essence",
+    "source": "Resources/Items/Database/RadiantNurturingEssence.tres"
+  },
+  {
+    "id": 330,
+    "name": "Radiant Life Essence",
+    "source": "Resources/Items/Database/RadiantLifeEssence.tres"
+  },
+  {
+    "id": 331,
+    "name": "Radiant Ghostly Essence",
+    "source": "Resources/Items/Database/RadiantGhostlyEssence.tres"
+  },
+  {
+    "id": 332,
+    "name": "Metal Essence",
+    "source": "Resources/Items/Database/MetalEssence.tres"
+  },
+  {
+    "id": 333,
+    "name": "Eternal Essence",
+    "source": "Resources/Items/Database/EternalEssence.tres"
+  },
+  {
+    "id": 334,
+    "name": "Raging Essence",
+    "source": "Resources/Items/Database/RagingEssence.tres"
+  },
+  {
+    "id": 335,
+    "name": "Historic Essence",
+    "source": "Resources/Items/Database/HistoricEssence.tres"
+  },
+  {
+    "id": 336,
+    "name": "Nurturing Essence",
+    "source": "Resources/Items/Database/NurturingEssence.tres"
+  },
+  {
+    "id": 337,
+    "name": "Life Essence",
+    "source": "Resources/Items/Database/LifeEssence.tres"
+  },
+  {
+    "id": 338,
+    "name": "Ghostly Essence",
+    "source": "Resources/Items/Database/GhostlyEssence.tres"
+  },
+  {
+    "id": 339,
+    "name": "Dull Metal Essence",
+    "source": "Resources/Items/Database/DullMetalEssence.tres"
+  },
+  {
+    "id": 340,
+    "name": "Dull Eternal Essence",
+    "source": "Resources/Items/Database/DullEternalEssence.tres"
+  },
+  {
+    "id": 341,
+    "name": "Dull Raging Essence",
+    "source": "Resources/Items/Database/DullRagingEssence.tres"
+  },
+  {
+    "id": 342,
+    "name": "Dull Historic Essence",
+    "source": "Resources/Items/Database/DullHistoricEssence.tres"
+  },
+  {
+    "id": 343,
+    "name": "Dull Nurturing Essence",
+    "source": "Resources/Items/Database/DullNurturingEssence.tres"
+  },
+  {
+    "id": 344,
+    "name": "Dull Life Essence",
+    "source": "Resources/Items/Database/DullLifeEssence.tres"
+  },
+  {
+    "id": 345,
+    "name": "Dull Ghostly Essence",
+    "source": "Resources/Items/Database/DullGhostlyEssence.tres"
+  },
+  {
+    "id": 346,
+    "name": "Traveler's Coat",
+    "source": "Resources/Items/Database/TravelersCoat.tres"
+  },
+  {
+    "id": 347,
+    "name": "Transitive Soul",
+    "source": "Resources/Items/Database/TransitiveSoul.tres"
+  },
+  {
+    "id": 348,
+    "name": "Gravity Pocket",
+    "source": "Resources/Items/Database/GravityPocket.tres"
+  },
+  {
+    "id": 349,
+    "name": "Dye Gachapon",
+    "source": "Resources/Items/Database/DyeGachapon.tres"
+  },
+  {
+    "id": 350,
+    "name": "Dull Innocence",
+    "source": "Resources/Items/Database/weapons/DullInnocence.tres"
+  },
+  {
+    "id": 351,
+    "name": "Dull Judgement",
+    "source": "Resources/Items/Database/weapons/DullJudgement.tres"
+  },
+  {
+    "id": 352,
+    "name": "Dull Perseverance",
+    "source": "Resources/Items/Database/weapons/DullPerseverance.tres"
+  },
+  {
+    "id": 353,
+    "name": "Dull Sword of Heart",
+    "source": "Resources/Items/Database/weapons/DullSwordOfHeart.tres"
+  },
+  {
+    "id": 354,
+    "name": "Dull Faith",
+    "source": "Resources/Items/Database/weapons/DullFaith.tres"
+  },
+  {
+    "id": 355,
+    "name": "Dull Shooting Star",
+    "source": "Resources/Items/Database/weapons/DullShootingStar.tres"
+  },
+  {
+    "id": 356,
+    "name": "Dull Wish",
+    "source": "Resources/Items/Database/weapons/DullWish.tres"
+  },
+  {
+    "id": 357,
+    "name": "Dull Knull",
+    "source": "Resources/Items/Database/weapons/DullKnull.tres"
+  },
+  {
+    "id": 358,
+    "name": "Dull Smite",
+    "source": "Resources/Items/Database/weapons/DullSmite.tres"
+  },
+  {
+    "id": 359,
+    "name": "Dull Messenger",
+    "source": "Resources/Items/Database/weapons/DullMessenger.tres"
+  },
+  {
+    "id": 360,
+    "name": "Dull Divinity",
+    "source": "Resources/Items/Database/weapons/DullDivinity.tres"
+  },
+  {
+    "id": 361,
+    "name": "Dull Psyche",
+    "source": "Resources/Items/Database/weapons/DullPsyche.tres"
+  },
+  {
+    "id": 362,
+    "name": "Dull Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/DullTearOfTheFallen.tres"
+  },
+  {
+    "id": 363,
+    "name": "Dull Sacrifice",
+    "source": "Resources/Items/Database/weapons/DullSacrifice.tres"
+  },
+  {
+    "id": 364,
+    "name": "Dull Solitude",
+    "source": "Resources/Items/Database/weapons/DullSolitude.tres"
+  },
+  {
+    "id": 365,
+    "name": "Dull Exchange",
+    "source": "Resources/Items/Database/weapons/DullExchange.tres"
+  },
+  {
+    "id": 366,
+    "name": "Radiant Innocence",
+    "source": "Resources/Items/Database/weapons/RadiantInnocence.tres"
+  },
+  {
+    "id": 367,
+    "name": "Radiant Judgement",
+    "source": "Resources/Items/Database/weapons/RadiantJudgement.tres"
+  },
+  {
+    "id": 368,
+    "name": "Radiant Perseverance",
+    "source": "Resources/Items/Database/weapons/RadiantPerseverance.tres"
+  },
+  {
+    "id": 369,
+    "name": "Radiant Sword of Heart",
+    "source": "Resources/Items/Database/weapons/RadiantSwordOfHeart.tres"
+  },
+  {
+    "id": 370,
+    "name": "Radiant Faith",
+    "source": "Resources/Items/Database/weapons/RadiantFaith.tres"
+  },
+  {
+    "id": 371,
+    "name": "Radiant Shooting Star",
+    "source": "Resources/Items/Database/weapons/RadiantShootingStar.tres"
+  },
+  {
+    "id": 372,
+    "name": "Radiant Wish",
+    "source": "Resources/Items/Database/weapons/RadiantWish.tres"
+  },
+  {
+    "id": 373,
+    "name": "Radiant Knull",
+    "source": "Resources/Items/Database/weapons/RadiantKnull.tres"
+  },
+  {
+    "id": 374,
+    "name": "Radiant Smite",
+    "source": "Resources/Items/Database/weapons/RadiantSmite.tres"
+  },
+  {
+    "id": 375,
+    "name": "Radiant Messenger",
+    "source": "Resources/Items/Database/weapons/RadiantMessenger.tres"
+  },
+  {
+    "id": 376,
+    "name": "Radiant Divinity",
+    "source": "Resources/Items/Database/weapons/RadiantDivinity.tres"
+  },
+  {
+    "id": 377,
+    "name": "Radiant Psyche",
+    "source": "Resources/Items/Database/weapons/RadiantPsyche.tres"
+  },
+  {
+    "id": 378,
+    "name": "Radiant Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/RadiantTearOfTheFallen.tres"
+  },
+  {
+    "id": 379,
+    "name": "Radiant Sacrifice",
+    "source": "Resources/Items/Database/weapons/RadiantSacrifice.tres"
+  },
+  {
+    "id": 380,
+    "name": "Radiant Solitude",
+    "source": "Resources/Items/Database/weapons/RadiantSolitude.tres"
+  },
+  {
+    "id": 381,
+    "name": "Radiant Exchange",
+    "source": "Resources/Items/Database/weapons/RadiantExchange.tres"
+  },
+  {
+    "id": 382,
+    "name": "Starfish",
+    "source": "Resources/Items/Database/Starfish.tres"
+  },
+  {
+    "id": 383,
+    "name": "Ancient Fish",
+    "source": "Resources/Items/Database/AncientFish.tres"
+  },
+  {
+    "id": 384,
+    "name": "Fire Fish",
+    "source": "Resources/Items/Database/FireFish.tres"
+  },
+  {
+    "id": 385,
+    "name": "Clownfish",
+    "source": "Resources/Items/Database/Clownfish.tres"
+  },
+  {
+    "id": 386,
+    "name": "Skelefish",
+    "source": "Resources/Items/Database/Skelefish.tres"
+  },
+  {
+    "id": 387,
+    "name": "Abyssal Leech",
+    "source": "Resources/Items/Database/AbyssalLeech.tres"
+  },
+  {
+    "id": 388,
+    "name": "Ice Jelly",
+    "source": "Resources/Items/Database/IceJelly.tres"
+  },
+  {
+    "id": 389,
+    "name": "Lava Octopus",
+    "source": "Resources/Items/Database/LavaOctopus.tres"
+  },
+  {
+    "id": 390,
+    "name": "Moss Snail",
+    "source": "Resources/Items/Database/MossSnail.tres"
+  },
+  {
+    "id": 391,
+    "name": "Clam",
+    "source": "Resources/Items/Database/Clam.tres"
+  },
+  {
+    "id": 392,
+    "name": "Abyssal Octopus",
+    "source": "Resources/Items/Database/AbyssalOctopus.tres"
+  },
+  {
+    "id": 393,
+    "name": "Abyssal Urchin",
+    "source": "Resources/Items/Database/AbyssalUrchin.tres"
+  },
+  {
+    "id": 394,
+    "name": "Electray",
+    "source": "Resources/Items/Database/Electray.tres"
+  },
+  {
+    "id": 395,
+    "name": "Spookee",
+    "source": "Resources/Items/Database/Spookee.tres"
+  },
+  {
+    "id": 396,
+    "name": "Salt",
+    "source": "Resources/Items/Database/gathering_material/Salt.tres"
+  },
+  {
+    "id": 397,
+    "name": "Copper Ore",
+    "source": "Resources/Items/Database/gathering_material/CopperOre.tres"
+  },
+  {
+    "id": 398,
+    "name": "Quartz",
+    "source": "Resources/Items/Database/gathering_material/Quartz.tres"
+  },
+  {
+    "id": 399,
+    "name": "Sulfuric Powder",
+    "source": "Resources/Items/Database/gathering_material/SulphuricPowder.tres"
+  },
+  {
+    "id": 400,
+    "name": "Petrified Wood",
+    "source": "Resources/Items/Database/gathering_material/PetrifiedWood.tres"
+  },
+  {
+    "id": 401,
+    "name": "Malachite Ore",
+    "source": "Resources/Items/Database/gathering_material/MalachiteOre.tres"
+  },
+  {
+    "id": 402,
+    "name": "Emerald",
+    "source": "Resources/Items/Database/gathering_material/Emerald.tres"
+  },
+  {
+    "id": 403,
+    "name": "Cobalt Ore",
+    "source": "Resources/Items/Database/gathering_material/CobaltOre.tres"
+  },
+  {
+    "id": 404,
+    "name": "Aquamarine",
+    "source": "Resources/Items/Database/gathering_material/Aquamarine.tres"
+  },
+  {
+    "id": 405,
+    "name": "Bismuth",
+    "source": "Resources/Items/Database/gathering_material/Bismuth.tres"
+  },
+  {
+    "id": 406,
+    "name": "Ruby",
+    "source": "Resources/Items/Database/gathering_material/Ruby.tres"
+  },
+  {
+    "id": 407,
+    "name": "Titanium Ore",
+    "source": "Resources/Items/Database/gathering_material/TitaniumOre.tres"
+  },
+  {
+    "id": 408,
+    "name": "Sapphire",
+    "source": "Resources/Items/Database/gathering_material/Sapphire.tres"
+  },
+  {
+    "id": 409,
+    "name": "Gold Ore",
+    "source": "Resources/Items/Database/gathering_material/GoldOre.tres"
+  },
+  {
+    "id": 410,
+    "name": "Amber",
+    "source": "Resources/Items/Database/gathering_material/Amber.tres"
+  },
+  {
+    "id": 411,
+    "name": "Mithril Ore",
+    "source": "Resources/Items/Database/gathering_material/MithrilOre.tres"
+  },
+  {
+    "id": 412,
+    "name": "Dreamstone",
+    "source": "Resources/Items/Database/gathering_material/DreamStone.tres"
+  },
+  {
+    "id": 413,
+    "name": "Arcane Crystal",
+    "source": "Resources/Items/Database/gathering_material/ArcaneCrystal.tres"
+  },
+  {
+    "id": 414,
+    "name": "Ocean Heart",
+    "source": "Resources/Items/Database/gathering_material/OceanHeart.tres"
+  },
+  {
+    "id": 415,
+    "name": "Obsidian Ore",
+    "source": "Resources/Items/Database/gathering_material/Obsidian.tres"
+  },
+  {
+    "id": 416,
+    "name": "Bloodstone",
+    "source": "Resources/Items/Database/gathering_material/Bloodstone.tres"
+  },
+  {
+    "id": 417,
+    "name": "Eternal Ice",
+    "source": "Resources/Items/Database/gathering_material/EternalIce.tres"
+  },
+  {
+    "id": 418,
+    "name": "Moonstone",
+    "source": "Resources/Items/Database/gathering_material/Moonstone.tres"
+  },
+  {
+    "id": 419,
+    "name": "Star Metal",
+    "source": "Resources/Items/Database/gathering_material/StarMetal.tres"
+  },
+  {
+    "id": 420,
+    "name": "Black Diamond",
+    "source": "Resources/Items/Database/gathering_material/BlackDiamond.tres"
+  },
+  {
+    "id": 421,
+    "name": "Dream Fragment",
+    "source": "Resources/Items/Database/gathering_material/DreamFragment.tres"
+  },
+  {
+    "id": 422,
+    "name": "Ocean Shard",
+    "source": "Resources/Items/Database/gathering_material/OceanShard.tres"
+  },
+  {
+    "id": 423,
+    "name": "Blood Pebble",
+    "source": "Resources/Items/Database/gathering_material/BloodPebble.tres"
+  },
+  {
+    "id": 424,
+    "name": "Moon Shard",
+    "source": "Resources/Items/Database/gathering_material/MoonShard.tres"
+  },
+  {
+    "id": 425,
+    "name": "Black Diamond Fragment",
+    "source": "Resources/Items/Database/gathering_material/BlackDiamondFragment.tres"
+  },
+  {
+    "id": 426,
+    "name": "2x EXP Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xEXPCoupon.tres"
+  },
+  {
+    "id": 427,
+    "name": "2x Combat Skill EXP Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xCombatSkillEXPCoupon.tres"
+  },
+  {
+    "id": 428,
+    "name": "2x Drops Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xDropCoupon.tres"
+  },
+  {
+    "id": 429,
+    "name": "2x Soul Crystals Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xSoulCrystalsCoupon.tres"
+  },
+  {
+    "id": 430,
+    "name": "Stone Focus",
+    "source": "Resources/Items/Database/weapons/_New/430_StoneFocus.tres"
+  },
+  {
+    "id": 431,
+    "name": "Copper Focus",
+    "source": "Resources/Items/Database/weapons/_New/431_CopperFocus.tres"
+  },
+  {
+    "id": 432,
+    "name": "Quartz Focus",
+    "source": "Resources/Items/Database/weapons/_New/432_QuartzFocus.tres"
+  },
+  {
+    "id": 433,
+    "name": "Iron Focus",
+    "source": "Resources/Items/Database/weapons/_New/433_IronFocus.tres"
+  },
+  {
+    "id": 434,
+    "name": "Eerie Focus",
+    "source": "Resources/Items/Database/weapons/_New/434_EerieFocus.tres"
+  },
+  {
+    "id": 435,
+    "name": "Deep Focus",
+    "source": "Resources/Items/Database/weapons/_New/435_DeepFocus.tres"
+  },
+  {
+    "id": 436,
+    "name": "Repressive Focus",
+    "source": "Resources/Items/Database/weapons/_New/436_RepressiveFocus.tres"
+  },
+  {
+    "id": 437,
+    "name": "Sharp Focus",
+    "source": "Resources/Items/Database/weapons/_New/437_SharpFocus.tres"
+  },
+  {
+    "id": 438,
+    "name": "Radiant Focus",
+    "source": "Resources/Items/Database/weapons/_New/438_RadiantFocus.tres"
+  },
+  {
+    "id": 439,
+    "name": "Divinity",
+    "source": "Resources/Items/Database/weapons/_New/439_Divinity.tres"
+  },
+  {
+    "id": 440,
+    "name": "Radiant Divinity",
+    "source": "Resources/Items/Database/weapons/_New/440_RadiantDivinity.tres"
+  },
+  {
+    "id": 441,
+    "name": "Inverse Divinity",
+    "source": "Resources/Items/Database/weapons/_New/441_InverseDivinity.tres"
+  },
+  {
+    "id": 442,
+    "name": "Psyche",
+    "source": "Resources/Items/Database/weapons/_New/442_Psyche.tres"
+  },
+  {
+    "id": 443,
+    "name": "Radiant Psyche",
+    "source": "Resources/Items/Database/weapons/_New/443_RadiantPsyche.tres"
+  },
+  {
+    "id": 444,
+    "name": "Inverse Psyche",
+    "source": "Resources/Items/Database/weapons/_New/444_InversePsyche.tres"
+  },
+  {
+    "id": 445,
+    "name": "Stone Bow",
+    "source": "Resources/Items/Database/weapons/_New/445_StoneBow.tres"
+  },
+  {
+    "id": 446,
+    "name": "Copper Bow",
+    "source": "Resources/Items/Database/weapons/_New/446_CopperBow.tres"
+  },
+  {
+    "id": 447,
+    "name": "Quartz Bow",
+    "source": "Resources/Items/Database/weapons/_New/447_QuartzBow.tres"
+  },
+  {
+    "id": 448,
+    "name": "Iron Bow",
+    "source": "Resources/Items/Database/weapons/_New/448_IronBow.tres"
+  },
+  {
+    "id": 449,
+    "name": "Eerie Bow",
+    "source": "Resources/Items/Database/weapons/_New/449_EerieBow.tres"
+  },
+  {
+    "id": 450,
+    "name": "Deep Bow",
+    "source": "Resources/Items/Database/weapons/_New/450_DeepBow.tres"
+  },
+  {
+    "id": 451,
+    "name": "Repressive Bow",
+    "source": "Resources/Items/Database/weapons/_New/451_RepressiveBow.tres"
+  },
+  {
+    "id": 452,
+    "name": "Sharp Bow",
+    "source": "Resources/Items/Database/weapons/_New/452_SharpBow.tres"
+  },
+  {
+    "id": 453,
+    "name": "Radiant Bow",
+    "source": "Resources/Items/Database/weapons/_New/453_RadiantBow.tres"
+  },
+  {
+    "id": 454,
+    "name": "Wish",
+    "source": "Resources/Items/Database/weapons/_New/454_Wish.tres"
+  },
+  {
+    "id": 455,
+    "name": "Radiant Wish",
+    "source": "Resources/Items/Database/weapons/_New/455_RadiantWish.tres"
+  },
+  {
+    "id": 456,
+    "name": "Inverse Wish",
+    "source": "Resources/Items/Database/weapons/_New/456_InverseWish.tres"
+  },
+  {
+    "id": 457,
+    "name": "Shooting Star",
+    "source": "Resources/Items/Database/weapons/_New/457_ShootingStar.tres"
+  },
+  {
+    "id": 458,
+    "name": "Radiant Shooting Star",
+    "source": "Resources/Items/Database/weapons/_New/458_RadiantShootingStar.tres"
+  },
+  {
+    "id": 459,
+    "name": "Inverse Shooting Star",
+    "source": "Resources/Items/Database/weapons/_New/459_InverseShootingStar.tres"
+  },
+  {
+    "id": 460,
+    "name": "Stone Shield",
+    "source": "Resources/Items/Database/weapons/_New/460_StoneShield.tres"
+  },
+  {
+    "id": 461,
+    "name": "Copper Shield",
+    "source": "Resources/Items/Database/weapons/_New/461_CopperShield.tres"
+  },
+  {
+    "id": 462,
+    "name": "Quartz Shield",
+    "source": "Resources/Items/Database/weapons/_New/462_QuartzShield.tres"
+  },
+  {
+    "id": 463,
+    "name": "Iron Shield",
+    "source": "Resources/Items/Database/weapons/_New/463_IronShield.tres"
+  },
+  {
+    "id": 464,
+    "name": "Eerie Shield",
+    "source": "Resources/Items/Database/weapons/_New/464_EerieShield.tres"
+  },
+  {
+    "id": 465,
+    "name": "Deep Shield",
+    "source": "Resources/Items/Database/weapons/_New/465_DeepShield.tres"
+  },
+  {
+    "id": 466,
+    "name": "Repressive Shield",
+    "source": "Resources/Items/Database/weapons/_New/466_RepressiveShield.tres"
+  },
+  {
+    "id": 467,
+    "name": "Sharp Shield",
+    "source": "Resources/Items/Database/weapons/_New/467_SharpShield.tres"
+  },
+  {
+    "id": 468,
+    "name": "Radiant Shield",
+    "source": "Resources/Items/Database/weapons/_New/468_RadiantShield.tres"
+  },
+  {
+    "id": 469,
+    "name": "Perseverance",
+    "source": "Resources/Items/Database/weapons/_New/469_Perseverance.tres"
+  },
+  {
+    "id": 470,
+    "name": "Radiant Perseverance",
+    "source": "Resources/Items/Database/weapons/_New/470_RadiantPerseverance.tres"
+  },
+  {
+    "id": 471,
+    "name": "Inverse Perseverance",
+    "source": "Resources/Items/Database/weapons/_New/471_InversePerseverance.tres"
+  },
+  {
+    "id": 472,
+    "name": "Judgement",
+    "source": "Resources/Items/Database/weapons/_New/472_Judgement.tres"
+  },
+  {
+    "id": 473,
+    "name": "Radiant Judgement",
+    "source": "Resources/Items/Database/weapons/_New/473_RadiantJudgement.tres"
+  },
+  {
+    "id": 474,
+    "name": "Inverse Judgement",
+    "source": "Resources/Items/Database/weapons/_New/474_InverseJudgement.tres"
+  },
+  {
+    "id": 475,
+    "name": "Stone Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/475_StoneSpellblade.tres"
+  },
+  {
+    "id": 476,
+    "name": "Copper Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/476_CopperSpellblade.tres"
+  },
+  {
+    "id": 477,
+    "name": "Quartz Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/477_QuartzSpellblade.tres"
+  },
+  {
+    "id": 478,
+    "name": "Iron Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/478_IronSpellblade.tres"
+  },
+  {
+    "id": 479,
+    "name": "Eerie Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/479_EerieSpellblade.tres"
+  },
+  {
+    "id": 480,
+    "name": "Deep Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/480_DeepSpellblade.tres"
+  },
+  {
+    "id": 481,
+    "name": "Repressive Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/481_RepressiveSpellblade.tres"
+  },
+  {
+    "id": 482,
+    "name": "Sharp Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/482_SharpSpellblade.tres"
+  },
+  {
+    "id": 483,
+    "name": "Radiant Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/483_RadiantSpellblade.tres"
+  },
+  {
+    "id": 484,
+    "name": "Sacrifice",
+    "source": "Resources/Items/Database/weapons/_New/484_Sacrifice.tres"
+  },
+  {
+    "id": 485,
+    "name": "Radiant Sacrifice",
+    "source": "Resources/Items/Database/weapons/_New/485_RadiantSacrifice.tres"
+  },
+  {
+    "id": 486,
+    "name": "Inverse Sacrifice",
+    "source": "Resources/Items/Database/weapons/_New/486_InverseSacrifice.tres"
+  },
+  {
+    "id": 487,
+    "name": "Solitude",
+    "source": "Resources/Items/Database/weapons/_New/487_Solitude.tres"
+  },
+  {
+    "id": 488,
+    "name": "Radiant Solitude",
+    "source": "Resources/Items/Database/weapons/_New/488_RadiantSolitude.tres"
+  },
+  {
+    "id": 489,
+    "name": "Inverse Solitude",
+    "source": "Resources/Items/Database/weapons/_New/489_InverseSolitude.tres"
+  },
+  {
+    "id": 490,
+    "name": "Stone Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/490_StoneHolyArrow.tres"
+  },
+  {
+    "id": 491,
+    "name": "Copper Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/491_CopperHolyArrow.tres"
+  },
+  {
+    "id": 492,
+    "name": "Quartz Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/492_QuartzHolyArrow.tres"
+  },
+  {
+    "id": 493,
+    "name": "Iron Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/493_IronHolyArrow.tres"
+  },
+  {
+    "id": 494,
+    "name": "Eerie Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/494_EerieHolyArrow.tres"
+  },
+  {
+    "id": 495,
+    "name": "Deep Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/495_DeepHolyArrow.tres"
+  },
+  {
+    "id": 496,
+    "name": "Repressive Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/496_RepressiveHolyArrow.tres"
+  },
+  {
+    "id": 497,
+    "name": "Sharp Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/497_SharpHolyArrow.tres"
+  },
+  {
+    "id": 498,
+    "name": "Radiant Holy Arrow",
+    "source": "Resources/Items/Database/weapons/_New/498_RadiantHolyArrow.tres"
+  },
+  {
+    "id": 499,
+    "name": "Messenger",
+    "source": "Resources/Items/Database/weapons/_New/499_Messenger.tres"
+  },
+  {
+    "id": 500,
+    "name": "Radiant Messenger",
+    "source": "Resources/Items/Database/weapons/_New/500_RadiantMessenger.tres"
+  },
+  {
+    "id": 501,
+    "name": "Inverse Messenger",
+    "source": "Resources/Items/Database/weapons/_New/501_InverseMessenger.tres"
+  },
+  {
+    "id": 502,
+    "name": "Smite",
+    "source": "Resources/Items/Database/weapons/_New/502_Smite.tres"
+  },
+  {
+    "id": 503,
+    "name": "Radiant Smite",
+    "source": "Resources/Items/Database/weapons/_New/503_RadiantSmite.tres"
+  },
+  {
+    "id": 504,
+    "name": "Inverse Smite",
+    "source": "Resources/Items/Database/weapons/_New/504_InverseSmite.tres"
+  },
+  {
+    "id": 505,
+    "name": "Stone Javelin",
+    "source": "Resources/Items/Database/weapons/_New/505_StoneJavelin.tres"
+  },
+  {
+    "id": 506,
+    "name": "Copper Javelin",
+    "source": "Resources/Items/Database/weapons/_New/506_CopperJavelin.tres"
+  },
+  {
+    "id": 507,
+    "name": "Quartz Javelin",
+    "source": "Resources/Items/Database/weapons/_New/507_QuartzJavelin.tres"
+  },
+  {
+    "id": 508,
+    "name": "Iron Javelin",
+    "source": "Resources/Items/Database/weapons/_New/508_IronJavelin.tres"
+  },
+  {
+    "id": 509,
+    "name": "Eerie Javelin",
+    "source": "Resources/Items/Database/weapons/_New/509_EerieJavelin.tres"
+  },
+  {
+    "id": 510,
+    "name": "Deep Javelin",
+    "source": "Resources/Items/Database/weapons/_New/510_DeepJavelin.tres"
+  },
+  {
+    "id": 511,
+    "name": "Repressive Javelin",
+    "source": "Resources/Items/Database/weapons/_New/511_RepressiveJavelin.tres"
+  },
+  {
+    "id": 512,
+    "name": "Sharp Javelin",
+    "source": "Resources/Items/Database/weapons/_New/512_SharpJavelin.tres"
+  },
+  {
+    "id": 513,
+    "name": "Radiant Javelin",
+    "source": "Resources/Items/Database/weapons/_New/513_RadiantJavelin.tres"
+  },
+  {
+    "id": 514,
+    "name": "Exchange",
+    "source": "Resources/Items/Database/weapons/_New/514_Exchange.tres"
+  },
+  {
+    "id": 515,
+    "name": "Radiant Exchange",
+    "source": "Resources/Items/Database/weapons/_New/515_RadiantExchange.tres"
+  },
+  {
+    "id": 516,
+    "name": "Inverse Exchange",
+    "source": "Resources/Items/Database/weapons/_New/516_InverseExchange.tres"
+  },
+  {
+    "id": 517,
+    "name": "Stone Sword",
+    "source": "Resources/Items/Database/weapons/_New/517_StoneSword.tres"
+  },
+  {
+    "id": 518,
+    "name": "Copper Sword",
+    "source": "Resources/Items/Database/weapons/_New/518_CopperSword.tres"
+  },
+  {
+    "id": 519,
+    "name": "Quartz Sword",
+    "source": "Resources/Items/Database/weapons/_New/519_QuartzSword.tres"
+  },
+  {
+    "id": 520,
+    "name": "Iron Sword",
+    "source": "Resources/Items/Database/weapons/_New/520_IronSword.tres"
+  },
+  {
+    "id": 521,
+    "name": "Eerie Sword",
+    "source": "Resources/Items/Database/weapons/_New/521_EerieSword.tres"
+  },
+  {
+    "id": 522,
+    "name": "Deep Sword",
+    "source": "Resources/Items/Database/weapons/_New/522_DeepSword.tres"
+  },
+  {
+    "id": 523,
+    "name": "Repressive Sword",
+    "source": "Resources/Items/Database/weapons/_New/523_RepressiveSword.tres"
+  },
+  {
+    "id": 524,
+    "name": "Sharp Sword",
+    "source": "Resources/Items/Database/weapons/_New/524_SharpSword.tres"
+  },
+  {
+    "id": 525,
+    "name": "Radiant Sword",
+    "source": "Resources/Items/Database/weapons/_New/525_RadiantSword.tres"
+  },
+  {
+    "id": 526,
+    "name": "Sword of Heart",
+    "source": "Resources/Items/Database/weapons/_New/526_SwordOfHeart.tres"
+  },
+  {
+    "id": 527,
+    "name": "Radiant Sword of Heart",
+    "source": "Resources/Items/Database/weapons/_New/527_RadiantSwordOfHeart.tres"
+  },
+  {
+    "id": 528,
+    "name": "Inverse Sword of Heart",
+    "source": "Resources/Items/Database/weapons/_New/528_InverseSwordOfHeart.tres"
+  },
+  {
+    "id": 529,
+    "name": "Stone Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/529_StoneMagicWand.tres"
+  },
+  {
+    "id": 530,
+    "name": "Copper Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/530_CopperMagicWand.tres"
+  },
+  {
+    "id": 531,
+    "name": "Quartz Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/531_QuartzMagicWand.tres"
+  },
+  {
+    "id": 532,
+    "name": "Iron Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/532_IronMagicWand.tres"
+  },
+  {
+    "id": 533,
+    "name": "Eerie Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/533_EerieMagicWand.tres"
+  },
+  {
+    "id": 534,
+    "name": "Deep Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/534_DeepMagicWand.tres"
+  },
+  {
+    "id": 535,
+    "name": "Repressive Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/535_RepressiveMagicWand.tres"
+  },
+  {
+    "id": 536,
+    "name": "Sharp Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/536_SharpMagicWand.tres"
+  },
+  {
+    "id": 537,
+    "name": "Radiant Magic Wand",
+    "source": "Resources/Items/Database/weapons/_New/537_RadiantMagicWand.tres"
+  },
+  {
+    "id": 538,
+    "name": "Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/_New/538_TearOfTheFallen.tres"
+  },
+  {
+    "id": 539,
+    "name": "Radiant Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/_New/539_RadiantTearOfTheFallen.tres"
+  },
+  {
+    "id": 540,
+    "name": "Inverse Tear of the Fallen",
+    "source": "Resources/Items/Database/weapons/_New/540_InverseTearOfTheFallen.tres"
+  },
+  {
+    "id": 541,
+    "name": "Stone Kunai",
+    "source": "Resources/Items/Database/weapons/_New/541_StoneKunai.tres"
+  },
+  {
+    "id": 542,
+    "name": "Copper Kunai",
+    "source": "Resources/Items/Database/weapons/_New/542_CopperKunai.tres"
+  },
+  {
+    "id": 543,
+    "name": "Quartz Kunai",
+    "source": "Resources/Items/Database/weapons/_New/543_QuartzKunai.tres"
+  },
+  {
+    "id": 544,
+    "name": "Iron Kunai",
+    "source": "Resources/Items/Database/weapons/_New/544_IronKunai.tres"
+  },
+  {
+    "id": 545,
+    "name": "Eerie Kunai",
+    "source": "Resources/Items/Database/weapons/_New/545_EerieKunai.tres"
+  },
+  {
+    "id": 546,
+    "name": "Deep Kunai",
+    "source": "Resources/Items/Database/weapons/_New/546_DeepKunai.tres"
+  },
+  {
+    "id": 547,
+    "name": "Repressive Kunai",
+    "source": "Resources/Items/Database/weapons/_New/547_RepressiveKunai.tres"
+  },
+  {
+    "id": 548,
+    "name": "Sharp Kunai",
+    "source": "Resources/Items/Database/weapons/_New/548_SharpKunai.tres"
+  },
+  {
+    "id": 549,
+    "name": "Radiant Kunai",
+    "source": "Resources/Items/Database/weapons/_New/549_RadiantKunai.tres"
+  },
+  {
+    "id": 550,
+    "name": "Knull",
+    "source": "Resources/Items/Database/weapons/_New/550_Knull.tres"
+  },
+  {
+    "id": 551,
+    "name": "Radiant Knull",
+    "source": "Resources/Items/Database/weapons/_New/551_RadiantKnull.tres"
+  },
+  {
+    "id": 552,
+    "name": "Inverse Knull",
+    "source": "Resources/Items/Database/weapons/_New/552_InverseKnull.tres"
+  },
+  {
+    "id": 553,
+    "name": "Stone Cross",
+    "source": "Resources/Items/Database/weapons/_New/553_StoneCross.tres"
+  },
+  {
+    "id": 554,
+    "name": "Copper Cross",
+    "source": "Resources/Items/Database/weapons/_New/554_CopperCross.tres"
+  },
+  {
+    "id": 555,
+    "name": "Quartz Cross",
+    "source": "Resources/Items/Database/weapons/_New/555_QuartzCross.tres"
+  },
+  {
+    "id": 556,
+    "name": "Iron Cross",
+    "source": "Resources/Items/Database/weapons/_New/556_IronCross.tres"
+  },
+  {
+    "id": 557,
+    "name": "Eerie Cross",
+    "source": "Resources/Items/Database/weapons/_New/557_EerieCross.tres"
+  },
+  {
+    "id": 558,
+    "name": "Deep Cross",
+    "source": "Resources/Items/Database/weapons/_New/558_DeepCross.tres"
+  },
+  {
+    "id": 559,
+    "name": "Repressive Cross",
+    "source": "Resources/Items/Database/weapons/_New/559_RepressiveCross.tres"
+  },
+  {
+    "id": 560,
+    "name": "Sharp Cross",
+    "source": "Resources/Items/Database/weapons/_New/560_SharpCross.tres"
+  },
+  {
+    "id": 561,
+    "name": "Radiant Cross",
+    "source": "Resources/Items/Database/weapons/_New/561_RadiantCross.tres"
+  },
+  {
+    "id": 562,
+    "name": "Faith",
+    "source": "Resources/Items/Database/weapons/_New/562_Faith.tres"
+  },
+  {
+    "id": 563,
+    "name": "Radiant Faith",
+    "source": "Resources/Items/Database/weapons/_New/563_RadiantFaith.tres"
+  },
+  {
+    "id": 564,
+    "name": "Inverse Faith",
+    "source": "Resources/Items/Database/weapons/_New/564_InverseFaith.tres"
+  },
+  {
+    "id": 565,
+    "name": "Stone Orb",
+    "source": "Resources/Items/Database/weapons/_New/565_StoneOrb.tres"
+  },
+  {
+    "id": 566,
+    "name": "Copper Orb",
+    "source": "Resources/Items/Database/weapons/_New/566_CopperOrb.tres"
+  },
+  {
+    "id": 567,
+    "name": "Quartz Orb",
+    "source": "Resources/Items/Database/weapons/_New/567_QuartzOrb.tres"
+  },
+  {
+    "id": 568,
+    "name": "Iron Orb",
+    "source": "Resources/Items/Database/weapons/_New/568_IronOrb.tres"
+  },
+  {
+    "id": 569,
+    "name": "Eerie Orb",
+    "source": "Resources/Items/Database/weapons/_New/569_EerieOrb.tres"
+  },
+  {
+    "id": 570,
+    "name": "Deep Orb",
+    "source": "Resources/Items/Database/weapons/_New/570_DeepOrb.tres"
+  },
+  {
+    "id": 571,
+    "name": "Repressive Orb",
+    "source": "Resources/Items/Database/weapons/_New/571_RepressiveOrb.tres"
+  },
+  {
+    "id": 572,
+    "name": "Sharp Orb",
+    "source": "Resources/Items/Database/weapons/_New/572_SharpOrb.tres"
+  },
+  {
+    "id": 573,
+    "name": "Radiant Orb",
+    "source": "Resources/Items/Database/weapons/_New/573_RadiantOrb.tres"
+  },
+  {
+    "id": 574,
+    "name": "Innocence",
+    "source": "Resources/Items/Database/weapons/_New/574_Innocence.tres"
+  },
+  {
+    "id": 575,
+    "name": "Radiant Innocence",
+    "source": "Resources/Items/Database/weapons/_New/575_RadiantInnocence.tres"
+  },
+  {
+    "id": 576,
+    "name": "Inverse Innocence",
+    "source": "Resources/Items/Database/weapons/_New/576_InverseInnocence.tres"
+  },
+  {
+    "id": 577,
+    "name": "Invisible Hat",
+    "source": "Resources/Items/Database/InvisibleHat.tres"
+  },
+  {
+    "id": 578,
+    "name": "Eye Color Contacts",
+    "source": "Resources/Items/Database/EyeColorContacts.tres"
+  },
+  {
+    "id": 579,
+    "name": "Hair Color Dye",
+    "source": "Resources/Items/Database/HairColorDye.tres"
+  },
+  {
+    "id": 580,
+    "name": "Face Color Paint",
+    "source": "Resources/Items/Database/FaceColorPaint.tres"
+  },
+  {
+    "id": 581,
+    "name": "Mouth Color Paint",
+    "source": "Resources/Items/Database/MouthColorPaint.tres"
+  },
+  {
+    "id": 582,
+    "name": "Body Color Paint",
+    "source": "Resources/Items/Database/BodyColorPaint.tres"
+  },
+  {
+    "id": 583,
+    "name": "Hair Style Coupon",
+    "source": "Resources/Items/Database/HairStyleCoupon.tres"
+  },
+  {
+    "id": 584,
+    "name": "Eye Style Coupon",
+    "source": "Resources/Items/Database/EyeStyleCoupon.tres"
+  },
+  {
+    "id": 585,
+    "name": "Face Style Coupon",
+    "source": "Resources/Items/Database/FaceStyleCoupon.tres"
+  },
+  {
+    "id": 586,
+    "name": "Mouth Style Coupon",
+    "source": "Resources/Items/Database/MouthStyleCoupon.tres"
+  },
+  {
+    "id": 587,
+    "name": "Character Slot Expansion Coupon",
+    "source": "Resources/Items/Database/CharacterSlotCoupon.tres"
+  },
+  {
+    "id": 588,
+    "name": "Equip Slot Expansion Coupon",
+    "source": "Resources/Items/Database/EquipSlotCoupon.tres"
+  },
+  {
+    "id": 589,
+    "name": "Use Slot Expansion Coupon",
+    "source": "Resources/Items/Database/UseSlotCoupon.tres"
+  },
+  {
+    "id": 590,
+    "name": "Mats Slot Expansion Coupon",
+    "source": "Resources/Items/Database/MatsSlotCoupon.tres"
+  },
+  {
+    "id": 591,
+    "name": "Misc Slot Expansion Coupon",
+    "source": "Resources/Items/Database/MiscSlotCoupon.tres"
+  },
+  {
+    "id": 592,
+    "name": "Grassy Dungeon Essence",
+    "source": "Resources/Items/Database/GrassyDungeonEssence.tres"
+  },
+  {
+    "id": 593,
+    "name": "Stone Dungeon Essence",
+    "source": "Resources/Items/Database/StoneDungeonEssence.tres"
+  },
+  {
+    "id": 594,
+    "name": "Dark Dungeon Essence",
+    "source": "Resources/Items/Database/DarkDungeonEssence.tres"
+  },
+  {
+    "id": 595,
+    "name": "Car on Head",
+    "source": "Resources/Items/Database/CarOnHead.tres"
+  },
+  {
+    "id": 596,
+    "name": "Lavana",
+    "source": "Resources/Items/Database/Lavana.tres"
+  },
+  {
+    "id": 597,
+    "name": "Ashen Wood",
+    "source": "Resources/Items/Database/AshenWood.tres"
+  },
+  {
+    "id": 598,
+    "name": "Hell Chili",
+    "source": "Resources/Items/Database/HellChili.tres"
+  },
+  {
+    "id": 599,
+    "name": "Fire Weed",
+    "source": "Resources/Items/Database/FireWeed.tres"
+  },
+  {
+    "id": 600,
+    "name": "Depth Vine",
+    "source": "Resources/Items/Database/DepthVine.tres"
+  },
+  {
+    "id": 601,
+    "name": "Angelic Algae",
+    "source": "Resources/Items/Database/AngelicAlgae.tres"
+  },
+  {
+    "id": 602,
+    "name": "Forbidden Fruit",
+    "source": "Resources/Items/Database/ForbiddenFruit.tres"
+  },
+  {
+    "id": 603,
+    "name": "Arcane Pearl",
+    "source": "Resources/Items/Database/ArcanePearl.tres"
+  },
+  {
+    "id": 604,
+    "name": "Eon Fruit",
+    "source": "Resources/Items/Database/EonFruit.tres"
+  },
+  {
+    "id": 605,
+    "name": "Eon Wood",
+    "source": "Resources/Items/Database/EonWood.tres"
+  },
+  {
+    "id": 606,
+    "name": "Censhroom",
+    "source": "Resources/Items/Database/Censhroom.tres"
+  },
+  {
+    "id": 607,
+    "name": "Ancient Fern",
+    "source": "Resources/Items/Database/AncientFern.tres"
+  },
+  {
+    "id": 608,
+    "name": "Rocky Wood",
+    "source": "Resources/Items/Database/RockyWood.tres"
+  },
+  {
+    "id": 609,
+    "name": "Red Dandelion",
+    "source": "Resources/Items/Database/RedDandelion.tres"
+  },
+  {
+    "id": 610,
+    "name": "Red Soy",
+    "source": "Resources/Items/Database/RedSoy.tres"
+  },
+  {
+    "id": 611,
+    "name": "Ashen Onion",
+    "source": "Resources/Items/Database/AshenOnion.tres"
+  },
+  {
+    "id": 612,
+    "name": "Blue Cinnamon Wood",
+    "source": "Resources/Items/Database/BlueCinnamonWood.tres"
+  },
+  {
+    "id": 613,
+    "name": "Ice Flax Seed",
+    "source": "Resources/Items/Database/IceFlaxSeed.tres"
+  },
+  {
+    "id": 614,
+    "name": "Blue Ginseng",
+    "source": "Resources/Items/Database/BlueGinseng.tres"
+  },
+  {
+    "id": 615,
+    "name": "Dew Bloom",
+    "source": "Resources/Items/Database/DewBloom.tres"
+  },
+  {
+    "id": 616,
+    "name": "Desert Flower",
+    "source": "Resources/Items/Database/DesertFlower.tres"
+  },
+  {
+    "id": 617,
+    "name": "Desert Sage",
+    "source": "Resources/Items/Database/DesertSage.tres"
+  },
+  {
+    "id": 618,
+    "name": "Cactus Fruit",
+    "source": "Resources/Items/Database/CactusFruit.tres"
+  },
+  {
+    "id": 619,
+    "name": "Cactus",
+    "source": "Resources/Items/Database/Cactus.tres"
+  },
+  {
+    "id": 620,
+    "name": "Poceanto",
+    "source": "Resources/Items/Database/Poceanto.tres"
+  },
+  {
+    "id": 621,
+    "name": "Corals",
+    "source": "Resources/Items/Database/Corals.tres"
+  },
+  {
+    "id": 622,
+    "name": "Blue Pepper",
+    "source": "Resources/Items/Database/BluePepper.tres"
+  },
+  {
+    "id": 623,
+    "name": "Melon",
+    "source": "Resources/Items/Database/Melon.tres"
+  },
+  {
+    "id": 624,
+    "name": "Green Cherry",
+    "source": "Resources/Items/Database/GreenCherry.tres"
+  },
+  {
+    "id": 625,
+    "name": "Hard Wood",
+    "source": "Resources/Items/Database/HardWood.tres"
+  },
+  {
+    "id": 626,
+    "name": "Sweet Fern",
+    "source": "Resources/Items/Database/SweetFern.tres"
+  },
+  {
+    "id": 627,
+    "name": "Forest Seal",
+    "source": "Resources/Items/Database/ForestSeal.tres"
+  },
+  {
+    "id": 628,
+    "name": "Misty Fruit",
+    "source": "Resources/Items/Database/MistyFruit.tres"
+  },
+  {
+    "id": 629,
+    "name": "Misty Wood",
+    "source": "Resources/Items/Database/MistyWood.tres"
+  },
+  {
+    "id": 630,
+    "name": "Lantern Bulb",
+    "source": "Resources/Items/Database/LanternBulb.tres"
+  },
+  {
+    "id": 631,
+    "name": "Acacia Wood",
+    "source": "Resources/Items/Database/AcaciaWood.tres"
+  },
+  {
+    "id": 632,
+    "name": "Pineapple",
+    "source": "Resources/Items/Database/Pineapple.tres"
+  },
+  {
+    "id": 633,
+    "name": "Aloe Vera",
+    "source": "Resources/Items/Database/AloeVera.tres"
+  },
+  {
+    "id": 634,
+    "name": "Spot Tomato",
+    "source": "Resources/Items/Database/SpotTomato.tres"
+  },
+  {
+    "id": 635,
+    "name": "Sulfuric Wood",
+    "source": "Resources/Items/Database/SulphuricWood.tres"
+  },
+  {
+    "id": 636,
+    "name": "Silver Leaf",
+    "source": "Resources/Items/Database/SilverLeaf.tres"
+  },
+  {
+    "id": 637,
+    "name": "Coconut Wood",
+    "source": "Resources/Items/Database/CoconutWood.tres"
+  },
+  {
+    "id": 638,
+    "name": "Coconut",
+    "source": "Resources/Items/Database/Coconut.tres"
+  },
+  {
+    "id": 639,
+    "name": "Sea Grapes",
+    "source": "Resources/Items/Database/SeaGrapes.tres"
+  },
+  {
+    "id": 640,
+    "name": "Oak Wood",
+    "source": "Resources/Items/Database/OakWood.tres"
+  },
+  {
+    "id": 641,
+    "name": "Apple",
+    "source": "Resources/Items/Database/Apple.tres"
+  },
+  {
+    "id": 642,
+    "name": "Cotton Ball",
+    "source": "Resources/Items/Database/CottonBall.tres"
+  },
+  {
+    "id": 643,
+    "name": "Birch Wood",
+    "source": "Resources/Items/Database/BirchWood.tres"
+  },
+  {
+    "id": 644,
+    "name": "Crystal Flower",
+    "source": "Resources/Items/Database/CrystalFlower.tres"
+  },
+  {
+    "id": 645,
+    "name": "Eternal Crystal Fruit",
+    "source": "Resources/Items/Database/EternalCrystalFruit.tres"
+  },
+  {
+    "id": 646,
+    "name": "Eternal Wood",
+    "source": "Resources/Items/Database/EternalWood.tres"
+  },
+  {
+    "id": 647,
+    "name": "Whitebloom",
+    "source": "Resources/Items/Database/Whitebloom.tres"
+  },
+  {
+    "id": 648,
+    "name": "Epochal Lily",
+    "source": "Resources/Items/Database/EpochalLily.tres"
+  },
+  {
+    "id": 649,
+    "name": "Memory Agave",
+    "source": "Resources/Items/Database/MemoryAgave.tres"
+  },
+  {
+    "id": 650,
+    "name": "History Fruit",
+    "source": "Resources/Items/Database/HistoryFruit.tres"
+  },
+  {
+    "id": 651,
+    "name": "Sculpted Cactus",
+    "source": "Resources/Items/Database/SculptedCactus.tres"
+  },
+  {
+    "id": 652,
+    "name": "Yellow Garlic",
+    "source": "Resources/Items/Database/YellowGarlic.tres"
+  },
+  {
+    "id": 653,
+    "name": "Petrified Bow",
+    "source": "Resources/Items/Database/PetrifiedBow.tres"
+  },
+  {
+    "id": 654,
+    "name": "Stinky Bow",
+    "source": "Resources/Items/Database/StinkyBow.tres"
+  },
+  {
+    "id": 655,
+    "name": "Mystical Bow",
+    "source": "Resources/Items/Database/MysticalBow.tres"
+  },
+  {
+    "id": 656,
+    "name": "Arcane Bow",
+    "source": "Resources/Items/Database/ArcaneBow.tres"
+  },
+  {
+    "id": 657,
+    "name": "Petrified Cross",
+    "source": "Resources/Items/Database/PetrifiedCross.tres"
+  },
+  {
+    "id": 658,
+    "name": "Stinky Cross",
+    "source": "Resources/Items/Database/StinkyCross.tres"
+  },
+  {
+    "id": 659,
+    "name": "Mystical Cross",
+    "source": "Resources/Items/Database/MysticalCross.tres"
+  },
+  {
+    "id": 660,
+    "name": "Arcane Cross",
+    "source": "Resources/Items/Database/ArcaneCross.tres"
+  },
+  {
+    "id": 661,
+    "name": "Petrified Focus",
+    "source": "Resources/Items/Database/PetrifiedFocus.tres"
+  },
+  {
+    "id": 662,
+    "name": "Stinky Focus",
+    "source": "Resources/Items/Database/StinkyFocus.tres"
+  },
+  {
+    "id": 663,
+    "name": "Mystical Focus",
+    "source": "Resources/Items/Database/MysticalFocus.tres"
+  },
+  {
+    "id": 664,
+    "name": "Arcane Focus",
+    "source": "Resources/Items/Database/ArcaneFocus.tres"
+  },
+  {
+    "id": 665,
+    "name": "Petrified Holy Arrow",
+    "source": "Resources/Items/Database/PetrifiedHolyArrow.tres"
+  },
+  {
+    "id": 666,
+    "name": "Stinky Holy Arrow",
+    "source": "Resources/Items/Database/StinkyHolyArrow.tres"
+  },
+  {
+    "id": 667,
+    "name": "Mystical Holy Arrow",
+    "source": "Resources/Items/Database/MysticalHolyArrow.tres"
+  },
+  {
+    "id": 668,
+    "name": "Arcane Holy Arrow",
+    "source": "Resources/Items/Database/ArcaneHolyArrow.tres"
+  },
+  {
+    "id": 669,
+    "name": "Petrified Javelin",
+    "source": "Resources/Items/Database/PetrifiedJavelin.tres"
+  },
+  {
+    "id": 670,
+    "name": "Stinky Javelin",
+    "source": "Resources/Items/Database/StinkyJavelin.tres"
+  },
+  {
+    "id": 671,
+    "name": "Mystical Javelin",
+    "source": "Resources/Items/Database/MysticalJavelin.tres"
+  },
+  {
+    "id": 672,
+    "name": "Arcane Javelin",
+    "source": "Resources/Items/Database/ArcaneJavelin.tres"
+  },
+  {
+    "id": 673,
+    "name": "Petrified Kunai",
+    "source": "Resources/Items/Database/PetrifiedKunai.tres"
+  },
+  {
+    "id": 674,
+    "name": "Stinky Kunai",
+    "source": "Resources/Items/Database/StinkyKunai.tres"
+  },
+  {
+    "id": 675,
+    "name": "Mystical Kunai",
+    "source": "Resources/Items/Database/MysticalKunai.tres"
+  },
+  {
+    "id": 676,
+    "name": "Arcane Kunai",
+    "source": "Resources/Items/Database/ArcaneKunai.tres"
+  },
+  {
+    "id": 677,
+    "name": "Petrified Magic Wand",
+    "source": "Resources/Items/Database/PetrifiedMagicWand.tres"
+  },
+  {
+    "id": 678,
+    "name": "Stinky Magic Wand",
+    "source": "Resources/Items/Database/StinkyMagicWand.tres"
+  },
+  {
+    "id": 679,
+    "name": "Mystical Magic Wand",
+    "source": "Resources/Items/Database/MysticalMagicWand.tres"
+  },
+  {
+    "id": 680,
+    "name": "Arcane Magic Wand",
+    "source": "Resources/Items/Database/ArcaneMagicWand.tres"
+  },
+  {
+    "id": 681,
+    "name": "Petrified Orb",
+    "source": "Resources/Items/Database/PetrifiedOrb.tres"
+  },
+  {
+    "id": 682,
+    "name": "Stinky Orb",
+    "source": "Resources/Items/Database/StinkyOrb.tres"
+  },
+  {
+    "id": 683,
+    "name": "Mystical Orb",
+    "source": "Resources/Items/Database/MysticalOrb.tres"
+  },
+  {
+    "id": 684,
+    "name": "Arcane Orb",
+    "source": "Resources/Items/Database/ArcaneOrb.tres"
+  },
+  {
+    "id": 685,
+    "name": "Petrified Shield",
+    "source": "Resources/Items/Database/PetrifiedShield.tres"
+  },
+  {
+    "id": 686,
+    "name": "Stinky Shield",
+    "source": "Resources/Items/Database/StinkyShield.tres"
+  },
+  {
+    "id": 687,
+    "name": "Mystical Shield",
+    "source": "Resources/Items/Database/MysticalShield.tres"
+  },
+  {
+    "id": 688,
+    "name": "Arcane Shield",
+    "source": "Resources/Items/Database/ArcaneShield.tres"
+  },
+  {
+    "id": 689,
+    "name": "Petrified Sword",
+    "source": "Resources/Items/Database/PetrifiedSword.tres"
+  },
+  {
+    "id": 690,
+    "name": "Stinky Sword",
+    "source": "Resources/Items/Database/StinkySword.tres"
+  },
+  {
+    "id": 691,
+    "name": "Mystical Sword",
+    "source": "Resources/Items/Database/MysticalSword.tres"
+  },
+  {
+    "id": 692,
+    "name": "Arcane Sword",
+    "source": "Resources/Items/Database/ArcaneSword.tres"
+  },
+  {
+    "id": 693,
+    "name": "Obsidium Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/ObsidiumRod.tres"
+  },
+  {
+    "id": 694,
+    "name": "Obsidium Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/ObsidiumPlate.tres"
+  },
+  {
+    "id": 695,
+    "name": "Obsidium Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/ObsidiumIngot.tres"
+  },
+  {
+    "id": 696,
+    "name": "Eternal Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalPlate.tres"
+  },
+  {
+    "id": 697,
+    "name": "Eternal Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalRod.tres"
+  },
+  {
+    "id": 698,
+    "name": "Eternal Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalIngot.tres"
+  },
+  {
+    "id": 699,
+    "name": "Star Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/StarRod.tres"
+  },
+  {
+    "id": 700,
+    "name": "Star Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/StarPlate.tres"
+  },
+  {
+    "id": 701,
+    "name": "Star Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/StarIngot.tres"
+  },
+  {
+    "id": 702,
+    "name": "Arcane Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcaneRod.tres"
+  },
+  {
+    "id": 703,
+    "name": "Arcane Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcanePlate.tres"
+  },
+  {
+    "id": 704,
+    "name": "Arcane Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcaneIngot.tres"
+  },
+  {
+    "id": 705,
+    "name": "Mithril Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/MithrilRod.tres"
+  },
+  {
+    "id": 706,
+    "name": "Mithril Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/MithrilPlate.tres"
+  },
+  {
+    "id": 707,
+    "name": "Mithril Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/MithrilIngot.tres"
+  },
+  {
+    "id": 708,
+    "name": "Gold Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/GoldRod.tres"
+  },
+  {
+    "id": 709,
+    "name": "Gold Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/GoldPlate.tres"
+  },
+  {
+    "id": 710,
+    "name": "Gold Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/GoldIngot.tres"
+  },
+  {
+    "id": 711,
+    "name": "Titanium Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/TitaniumRod.tres"
+  },
+  {
+    "id": 712,
+    "name": "Titanium Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/TitaniumPlate.tres"
+  },
+  {
+    "id": 713,
+    "name": "Titanium Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/TitaniumIngot.tres"
+  },
+  {
+    "id": 714,
+    "name": "Bismuth Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/BismuthRod.tres"
+  },
+  {
+    "id": 715,
+    "name": "Bismuth Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/BismuthPlate.tres"
+  },
+  {
+    "id": 716,
+    "name": "Bismuth Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/BismuthIngot.tres"
+  },
+  {
+    "id": 717,
+    "name": "Cobalt Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/CobaltRod.tres"
+  },
+  {
+    "id": 718,
+    "name": "Cobalt Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/CobaltPlate.tres"
+  },
+  {
+    "id": 719,
+    "name": "Cobalt Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/CobaltIngot.tres"
+  },
+  {
+    "id": 720,
+    "name": "Malachite Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/MalachiteRod.tres"
+  },
+  {
+    "id": 721,
+    "name": "Malachite Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/MalachitePlate.tres"
+  },
+  {
+    "id": 722,
+    "name": "Malachite Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/MalachiteIngot.tres"
+  },
+  {
+    "id": 723,
+    "name": "Stinky Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/StinkyRod.tres"
+  },
+  {
+    "id": 724,
+    "name": "Stinky Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/StinkyPlate.tres"
+  },
+  {
+    "id": 725,
+    "name": "Stinky Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/StinkyIngot.tres"
+  },
+  {
+    "id": 726,
+    "name": "Petrified Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/PetrifiedRod.tres"
+  },
+  {
+    "id": 727,
+    "name": "Petrified Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/PetrifiedPlate.tres"
+  },
+  {
+    "id": 728,
+    "name": "Petrified Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/PetrifiedIngot.tres"
+  },
+  {
+    "id": 729,
+    "name": "Iron Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/IronRod.tres"
+  },
+  {
+    "id": 730,
+    "name": "Iron Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/IronPlate.tres"
+  },
+  {
+    "id": 731,
+    "name": "Iron Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/IronIngot.tres"
+  },
+  {
+    "id": 732,
+    "name": "Refined Quartz Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/RefinedQuartzRod.tres"
+  },
+  {
+    "id": 733,
+    "name": "Refined Quartz Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/RefinedQuartzPlate.tres"
+  },
+  {
+    "id": 734,
+    "name": "Refined Quartz Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/RefinedQuartzIngot.tres"
+  },
+  {
+    "id": 735,
+    "name": "Copper Rod",
+    "source": "Resources/Items/Database/new_crafting_materials/CopperRod.tres"
+  },
+  {
+    "id": 736,
+    "name": "Copper Plate",
+    "source": "Resources/Items/Database/new_crafting_materials/CopperPlate.tres"
+  },
+  {
+    "id": 737,
+    "name": "Copper Ingot",
+    "source": "Resources/Items/Database/new_crafting_materials/CopperIngot.tres"
+  },
+  {
+    "id": 738,
+    "name": "Cobbled Stone",
+    "source": "Resources/Items/Database/new_crafting_materials/CobbledStone.tres"
+  },
+  {
+    "id": 739,
+    "name": "Raging Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/RagingMatter.tres"
+  },
+  {
+    "id": 740,
+    "name": "Eternal Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalMatter.tres"
+  },
+  {
+    "id": 741,
+    "name": "Historic Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/HistoricMatter.tres"
+  },
+  {
+    "id": 742,
+    "name": "Arcane Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcaneMatter.tres"
+  },
+  {
+    "id": 743,
+    "name": "Ancient Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/AncientMatter.tres"
+  },
+  {
+    "id": 744,
+    "name": "Smoldering Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/SmolderingMatter.tres"
+  },
+  {
+    "id": 745,
+    "name": "Snowy Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/SnowyMatter.tres"
+  },
+  {
+    "id": 746,
+    "name": "Vitality Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/VitalityMatter.tres"
+  },
+  {
+    "id": 747,
+    "name": "Energizing Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/EnergizingMatter.tres"
+  },
+  {
+    "id": 748,
+    "name": "Primal Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/PrimalMatter.tres"
+  },
+  {
+    "id": 749,
+    "name": "Cleansing Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/CleansingMatter.tres"
+  },
+  {
+    "id": 750,
+    "name": "Glowing Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/GlowingMatter.tres"
+  },
+  {
+    "id": 751,
+    "name": "Irritating Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/IrritatingMatter.tres"
+  },
+  {
+    "id": 752,
+    "name": "Soothing Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/SoothingMatter.tres"
+  },
+  {
+    "id": 753,
+    "name": "Coarse Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/CoarseMatter.tres"
+  },
+  {
+    "id": 754,
+    "name": "Lively Matter",
+    "source": "Resources/Items/Database/new_crafting_materials/LivelyMatter.tres"
+  },
+  {
+    "id": 755,
+    "name": "Raging Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/RagingFabric.tres"
+  },
+  {
+    "id": 756,
+    "name": "Eternal Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalFabric.tres"
+  },
+  {
+    "id": 757,
+    "name": "Historic Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/HistoricFabric.tres"
+  },
+  {
+    "id": 758,
+    "name": "Arcane Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcaneFabric.tres"
+  },
+  {
+    "id": 759,
+    "name": "Eon Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/EonFabric.tres"
+  },
+  {
+    "id": 760,
+    "name": "Red Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/RedFabric.tres"
+  },
+  {
+    "id": 761,
+    "name": "Ice Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/IceFabric.tres"
+  },
+  {
+    "id": 762,
+    "name": "Cactus Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/SageFabric.tres"
+  },
+  {
+    "id": 763,
+    "name": "Corals Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/CoralsFabric.tres"
+  },
+  {
+    "id": 764,
+    "name": "Fern Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/FernFabric.tres"
+  },
+  {
+    "id": 765,
+    "name": "Silverleaf Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/SilverleafFabric.tres"
+  },
+  {
+    "id": 766,
+    "name": "Glowing Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/GlowingFabric.tres"
+  },
+  {
+    "id": 767,
+    "name": "Yellow Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/PineappleFabric.tres"
+  },
+  {
+    "id": 768,
+    "name": "Coconut Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/CoconutFabric.tres"
+  },
+  {
+    "id": 769,
+    "name": "Cotton Fabric",
+    "source": "Resources/Items/Database/new_crafting_materials/CottonFabric.tres"
+  },
+  {
+    "id": 770,
+    "name": "Blood Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/BloodRing.tres"
+  },
+  {
+    "id": 771,
+    "name": "Eternal Oath",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalOath.tres"
+  },
+  {
+    "id": 772,
+    "name": "Star Bounding Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/StarBoundingRing.tres"
+  },
+  {
+    "id": 773,
+    "name": "Arcana Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcanaRing.tres"
+  },
+  {
+    "id": 774,
+    "name": "Dreamcatcher Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/DreamcatcherRing.tres"
+  },
+  {
+    "id": 775,
+    "name": "Amber Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/EmberRing.tres"
+  },
+  {
+    "id": 776,
+    "name": "Sapphire Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/SapphireRing.tres"
+  },
+  {
+    "id": 777,
+    "name": "Ruby Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/RubyRing.tres"
+  },
+  {
+    "id": 778,
+    "name": "Aquamarine Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/AquamarineRing.tres"
+  },
+  {
+    "id": 779,
+    "name": "Emerald Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/EmeraldRing.tres"
+  },
+  {
+    "id": 780,
+    "name": "Stinky Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/StinkyRing.tres"
+  },
+  {
+    "id": 781,
+    "name": "Petrified Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/PetrifiedRing.tres"
+  },
+  {
+    "id": 782,
+    "name": "Iron Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/IronRing.tres"
+  },
+  {
+    "id": 783,
+    "name": "Quartz Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/QuartzRing.tres"
+  },
+  {
+    "id": 784,
+    "name": "Copper Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/CopperRing.tres"
+  },
+  {
+    "id": 785,
+    "name": "Reaping Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/ReapingPotion.tres"
+  },
+  {
+    "id": 786,
+    "name": "Hellish Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/HellishPotion.tres"
+  },
+  {
+    "id": 787,
+    "name": "Eternal Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/EternalPotion.tres"
+  },
+  {
+    "id": 788,
+    "name": "Memory Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/MemoryPotion.tres"
+  },
+  {
+    "id": 789,
+    "name": "Arcane Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/ArcanePotion.tres"
+  },
+  {
+    "id": 790,
+    "name": "Guardian Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/GuardianPotion.tres"
+  },
+  {
+    "id": 791,
+    "name": "Raging Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/RagingPotion.tres"
+  },
+  {
+    "id": 792,
+    "name": "Elemental Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/ElementalPotion.tres"
+  },
+  {
+    "id": 793,
+    "name": "Regeneration Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/RegenerationPotion.tres"
+  },
+  {
+    "id": 794,
+    "name": "Haste Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/HastePotion.tres"
+  },
+  {
+    "id": 795,
+    "name": "Defense Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/DefensePotion.tres"
+  },
+  {
+    "id": 796,
+    "name": "Nimble Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/NimblePotion.tres"
+  },
+  {
+    "id": 797,
+    "name": "Prickly Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/PricklyPotion.tres"
+  },
+  {
+    "id": 798,
+    "name": "Glowing Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/GlowingPotion.tres"
+  },
+  {
+    "id": 799,
+    "name": "Cleansing Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/CleansingPotion.tres"
+  },
+  {
+    "id": 800,
+    "name": "Jump Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/JumpPotion.tres"
+  },
+  {
+    "id": 801,
+    "name": "Speed Potion",
+    "source": "Resources/Items/Database/new_crafting_materials/SpeedPotion.tres"
+  },
+  {
+    "id": 802,
+    "name": "Stone Slab",
+    "source": "Resources/Items/Database/new_crafting_materials/StoneSlab.tres"
+  },
+  {
+    "id": 803,
+    "name": "Stone Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/802_StoneRing.tres"
+  },
+  {
+    "id": 804,
+    "name": "Petrified Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/804_PetrifiedSpellblade.tres"
+  },
+  {
+    "id": 805,
+    "name": "Stinky Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/805_StinkySpellblade.tres"
+  },
+  {
+    "id": 806,
+    "name": "Mystical Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/806_MysticalSpellblade.tres"
+  },
+  {
+    "id": 807,
+    "name": "Arcane Spellblade",
+    "source": "Resources/Items/Database/weapons/_New/807_ArcaneSpellblade.tres"
+  },
+  {
+    "id": 808,
+    "name": "Stone Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/808_stone_chest_plate.tres"
+  },
+  {
+    "id": 809,
+    "name": "Stinky Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/809_stinky_chest_plate.tres"
+  },
+  {
+    "id": 810,
+    "name": "Star Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/810_star_chest_plate.tres"
+  },
+  {
+    "id": 811,
+    "name": "Sharp Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/811_sharp_chest_plate.tres"
+  },
+  {
+    "id": 812,
+    "name": "Repressive Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/812_repressive_chest_plate.tres"
+  },
+  {
+    "id": 813,
+    "name": "Radiant Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/813_radiant_chest_plate.tres"
+  },
+  {
+    "id": 814,
+    "name": "Quartz Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/814_quartz_chest_plate.tres"
+  },
+  {
+    "id": 815,
+    "name": "Petrified Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/815_petrified_chest_plate.tres"
+  },
+  {
+    "id": 816,
+    "name": "Obsidium Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/816_obsidium_chest_plate.tres"
+  },
+  {
+    "id": 817,
+    "name": "Mystical Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/817_mystical_chest_plate.tres"
+  },
+  {
+    "id": 818,
+    "name": "Iron Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/818_iron_chest_plate.tres"
+  },
+  {
+    "id": 819,
+    "name": "Eternal Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/819_eternal_chest_plate.tres"
+  },
+  {
+    "id": 820,
+    "name": "Eerie Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/820_eerie_chest_plate.tres"
+  },
+  {
+    "id": 821,
+    "name": "Deep Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/821_deep_chest_plate.tres"
+  },
+  {
+    "id": 822,
+    "name": "Copper Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/822_copper_chest_plate.tres"
+  },
+  {
+    "id": 823,
+    "name": "Arcane Chest Plate",
+    "source": "Resources/Items/Database/weapons/_New/823_arcane_chest_plate.tres"
+  },
+  {
+    "id": 824,
+    "name": "Stone Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/824_stone_armored_boots.tres"
+  },
+  {
+    "id": 825,
+    "name": "Stinky Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/825_stinky_armored_boots.tres"
+  },
+  {
+    "id": 826,
+    "name": "Star Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/826_star_armored_boots.tres"
+  },
+  {
+    "id": 827,
+    "name": "Sharp Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/827_sharp_armored_boots.tres"
+  },
+  {
+    "id": 828,
+    "name": "Repressive Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/828_repressive_armored_boots.tres"
+  },
+  {
+    "id": 829,
+    "name": "Radiant Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/829_radiant_armored_boots.tres"
+  },
+  {
+    "id": 830,
+    "name": "Quartz Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/830_quartz_armored_boots.tres"
+  },
+  {
+    "id": 831,
+    "name": "Petrified Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/831_petrified_armored_boots.tres"
+  },
+  {
+    "id": 832,
+    "name": "Obsidium Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/832_obsidium_armored_boots.tres"
+  },
+  {
+    "id": 833,
+    "name": "Mystical Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/833_mystical_armored_boots.tres"
+  },
+  {
+    "id": 834,
+    "name": "Iron Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/834_iron_armored_boots.tres"
+  },
+  {
+    "id": 835,
+    "name": "Eternal Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/835_eternal_armored_boots.tres"
+  },
+  {
+    "id": 836,
+    "name": "Eerie Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/836_eerie_armored_boots.tres"
+  },
+  {
+    "id": 837,
+    "name": "Deep Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/837_deep_armored_boots.tres"
+  },
+  {
+    "id": 838,
+    "name": "Copper Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/838_copper_armored_boots.tres"
+  },
+  {
+    "id": 839,
+    "name": "Arcane Armored Boots",
+    "source": "Resources/Items/Database/weapons/_New/839_arcane_armored_boots.tres"
+  },
+  {
+    "id": 840,
+    "name": "Stone Helmet",
+    "source": "Resources/Items/Database/weapons/_New/840_stone_helmet.tres"
+  },
+  {
+    "id": 841,
+    "name": "Stinky Helmet",
+    "source": "Resources/Items/Database/weapons/_New/841_stinky_helmet.tres"
+  },
+  {
+    "id": 842,
+    "name": "Star Helmet",
+    "source": "Resources/Items/Database/weapons/_New/842_star_helmet.tres"
+  },
+  {
+    "id": 843,
+    "name": "Sharp Helmet",
+    "source": "Resources/Items/Database/weapons/_New/843_sharp_helmet.tres"
+  },
+  {
+    "id": 844,
+    "name": "Repressive Helmet",
+    "source": "Resources/Items/Database/weapons/_New/844_repressive_helmet.tres"
+  },
+  {
+    "id": 845,
+    "name": "Radiant Helmet",
+    "source": "Resources/Items/Database/weapons/_New/845_radiant_helmet.tres"
+  },
+  {
+    "id": 846,
+    "name": "Quartz Helmet",
+    "source": "Resources/Items/Database/weapons/_New/846_quartz_helmet.tres"
+  },
+  {
+    "id": 847,
+    "name": "Petrified Helmet",
+    "source": "Resources/Items/Database/weapons/_New/847_petrified_helmet.tres"
+  },
+  {
+    "id": 848,
+    "name": "Obsidium Helmet",
+    "source": "Resources/Items/Database/weapons/_New/848_obsidium_helmet.tres"
+  },
+  {
+    "id": 849,
+    "name": "Mystical Helmet",
+    "source": "Resources/Items/Database/weapons/_New/849_mystical_helmet.tres"
+  },
+  {
+    "id": 850,
+    "name": "Iron Helmet",
+    "source": "Resources/Items/Database/weapons/_New/850_iron_helmet.tres"
+  },
+  {
+    "id": 851,
+    "name": "Eternal Helmet",
+    "source": "Resources/Items/Database/weapons/_New/851_eternal_helmet.tres"
+  },
+  {
+    "id": 852,
+    "name": "Eerie Helmet",
+    "source": "Resources/Items/Database/weapons/_New/852_eerie_helmet.tres"
+  },
+  {
+    "id": 853,
+    "name": "Deep Helmet",
+    "source": "Resources/Items/Database/weapons/_New/853_deep_helmet.tres"
+  },
+  {
+    "id": 854,
+    "name": "Copper Helmet",
+    "source": "Resources/Items/Database/weapons/_New/854_copper_helmet.tres"
+  },
+  {
+    "id": 855,
+    "name": "Arcane Helmet",
+    "source": "Resources/Items/Database/weapons/_New/855_arcane_helmet.tres"
+  },
+  {
+    "id": 856,
+    "name": "Stone Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/856_stone_leg_plate.tres"
+  },
+  {
+    "id": 857,
+    "name": "Stinky Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/857_stinky_leg_plate.tres"
+  },
+  {
+    "id": 858,
+    "name": "Star Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/858_star_leg_plate.tres"
+  },
+  {
+    "id": 859,
+    "name": "Sharp Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/859_sharp_leg_plate.tres"
+  },
+  {
+    "id": 860,
+    "name": "Repressive Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/860_repressive_leg_plate.tres"
+  },
+  {
+    "id": 861,
+    "name": "Radiant Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/861_radiant_leg_plate.tres"
+  },
+  {
+    "id": 862,
+    "name": "Quartz Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/862_quartz_leg_plate.tres"
+  },
+  {
+    "id": 863,
+    "name": "Petrified Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/863_petrified_leg_plate.tres"
+  },
+  {
+    "id": 864,
+    "name": "Obsidium Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/864_obsidium_leg_plate.tres"
+  },
+  {
+    "id": 865,
+    "name": "Mystical Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/865_mystical_leg_plate.tres"
+  },
+  {
+    "id": 866,
+    "name": "Iron Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/866_iron_leg_plate.tres"
+  },
+  {
+    "id": 867,
+    "name": "Eternal Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/867_eternal_leg_plate.tres"
+  },
+  {
+    "id": 868,
+    "name": "Eerie Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/868_eerie_leg_plate.tres"
+  },
+  {
+    "id": 869,
+    "name": "Deep Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/869_deep_leg_plate.tres"
+  },
+  {
+    "id": 870,
+    "name": "Copper Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/870_copper_leg_plate.tres"
+  },
+  {
+    "id": 871,
+    "name": "Arcane Leg Plate",
+    "source": "Resources/Items/Database/weapons/_New/871_arcane_leg_plate.tres"
+  },
+  {
+    "id": 872,
+    "name": "Yellow Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/872_yellow_scholar_robe.tres"
+  },
+  {
+    "id": 873,
+    "name": "Silverleaf Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/873_silverleaf_scholar_robe.tres"
+  },
+  {
+    "id": 874,
+    "name": "Red Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/874_red_scholar_robe.tres"
+  },
+  {
+    "id": 875,
+    "name": "Raging Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/875_raging_scholar_robe.tres"
+  },
+  {
+    "id": 876,
+    "name": "Ice Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/876_ice_scholar_robe.tres"
+  },
+  {
+    "id": 877,
+    "name": "Historic Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/877_historic_scholar_robe.tres"
+  },
+  {
+    "id": 878,
+    "name": "Green Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/878_green_scholar_robe.tres"
+  },
+  {
+    "id": 879,
+    "name": "Glowing Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/879_glowing_scholar_robe.tres"
+  },
+  {
+    "id": 880,
+    "name": "Fern Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/880_fern_scholar_robe.tres"
+  },
+  {
+    "id": 881,
+    "name": "Eternal Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/881_eternal_scholar_robe.tres"
+  },
+  {
+    "id": 882,
+    "name": "Eon Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/882_eon_scholar_robe.tres"
+  },
+  {
+    "id": 883,
+    "name": "Cotton Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/883_cotton_scholar_robe.tres"
+  },
+  {
+    "id": 884,
+    "name": "Coral Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/884_coral_scholar_robe.tres"
+  },
+  {
+    "id": 885,
+    "name": "Coconut Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/885_coconut_scholar_robe.tres"
+  },
+  {
+    "id": 886,
+    "name": "Cactus Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/886_cactus_scholar_robe.tres"
+  },
+  {
+    "id": 887,
+    "name": "Arcane Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/887_arcane_scholar_robe.tres"
+  },
+  {
+    "id": 888,
+    "name": "Yellow Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/888_yellow_scholar_shoes.tres"
+  },
+  {
+    "id": 889,
+    "name": "Silverleaf Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/889_silverleaf_scholar_shoes.tres"
+  },
+  {
+    "id": 890,
+    "name": "Red Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/890_red_scholar_shoes.tres"
+  },
+  {
+    "id": 891,
+    "name": "Raging Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/891_raging_scholar_shoes.tres"
+  },
+  {
+    "id": 892,
+    "name": "Ice Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/892_ice_scholar_shoes.tres"
+  },
+  {
+    "id": 893,
+    "name": "Historic Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/893_historic_scholar_shoes.tres"
+  },
+  {
+    "id": 894,
+    "name": "Green Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/894_green_scholar_shoes.tres"
+  },
+  {
+    "id": 895,
+    "name": "Glowing Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/895_glowing_scholar_shoes.tres"
+  },
+  {
+    "id": 896,
+    "name": "Fern Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/896_fern_scholar_shoes.tres"
+  },
+  {
+    "id": 897,
+    "name": "Eternal Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/897_eternal_scholar_shoes.tres"
+  },
+  {
+    "id": 898,
+    "name": "Eon Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/898_eon_scholar_shoes.tres"
+  },
+  {
+    "id": 899,
+    "name": "Cotton Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/899_cotton_scholar_shoes.tres"
+  },
+  {
+    "id": 900,
+    "name": "Coral Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/900_coral_scholar_shoes.tres"
+  },
+  {
+    "id": 901,
+    "name": "Coconut Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/901_coconut_scholar_shoes.tres"
+  },
+  {
+    "id": 902,
+    "name": "Cactus Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/902_cactus_scholar_shoes.tres"
+  },
+  {
+    "id": 903,
+    "name": "Arcane Scholar Shoes",
+    "source": "Resources/Items/Database/weapons/_New/903_arcane_scholar_shoes.tres"
+  },
+  {
+    "id": 904,
+    "name": "Yellow Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/904_yellow_scholar_hat.tres"
+  },
+  {
+    "id": 905,
+    "name": "Silverleaf Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/905_silverleaf_scholar_hat.tres"
+  },
+  {
+    "id": 906,
+    "name": "Red Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/906_red_scholar_hat.tres"
+  },
+  {
+    "id": 907,
+    "name": "Raging Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/907_raging_scholar_hat.tres"
+  },
+  {
+    "id": 908,
+    "name": "Ice Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/908_ice_scholar_hat.tres"
+  },
+  {
+    "id": 909,
+    "name": "Historic Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/909_historic_scholar_hat.tres"
+  },
+  {
+    "id": 910,
+    "name": "Green Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/910_green_scholar_hat.tres"
+  },
+  {
+    "id": 911,
+    "name": "Glowing Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/911_glowing_scholar_hat.tres"
+  },
+  {
+    "id": 912,
+    "name": "Fern Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/912_fern_scholar_hat.tres"
+  },
+  {
+    "id": 913,
+    "name": "Eternal Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/913_eternal_scholar_hat.tres"
+  },
+  {
+    "id": 914,
+    "name": "Eon Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/914_eon_scholar_hat.tres"
+  },
+  {
+    "id": 915,
+    "name": "Cotton Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/915_cotton_scholar_hat.tres"
+  },
+  {
+    "id": 916,
+    "name": "Coral Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/916_coral_scholar_hat.tres"
+  },
+  {
+    "id": 917,
+    "name": "Coconut Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/917_coconut_scholar_hat.tres"
+  },
+  {
+    "id": 918,
+    "name": "Cactus Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/918_cactus_scholar_hat.tres"
+  },
+  {
+    "id": 919,
+    "name": "Arcane Scholar Hat",
+    "source": "Resources/Items/Database/weapons/_New/919_arcane_scholar_hat.tres"
+  },
+  {
+    "id": 920,
+    "name": "Yellow Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/920_yellow_scholar_pants.tres"
+  },
+  {
+    "id": 921,
+    "name": "Silverleaf Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/921_silverleaf_scholar_pants.tres"
+  },
+  {
+    "id": 922,
+    "name": "Red Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/922_red_scholar_pants.tres"
+  },
+  {
+    "id": 923,
+    "name": "Raging Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/923_raging_scholar_pants.tres"
+  },
+  {
+    "id": 924,
+    "name": "Ice Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/924_ice_scholar_pants.tres"
+  },
+  {
+    "id": 925,
+    "name": "Historic Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/925_historic_scholar_pants.tres"
+  },
+  {
+    "id": 926,
+    "name": "Green Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/926_green_scholar_pants.tres"
+  },
+  {
+    "id": 927,
+    "name": "Glowing Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/927_glowing_scholar_pants.tres"
+  },
+  {
+    "id": 928,
+    "name": "Fern Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/928_fern_scholar_pants.tres"
+  },
+  {
+    "id": 929,
+    "name": "Eternal Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/929_eternal_scholar_pants.tres"
+  },
+  {
+    "id": 930,
+    "name": "Eon Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/930_eon_scholar_pants.tres"
+  },
+  {
+    "id": 931,
+    "name": "Cotton Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/931_cotton_scholar_pants.tres"
+  },
+  {
+    "id": 932,
+    "name": "Coral Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/932_coral_scholar_pants.tres"
+  },
+  {
+    "id": 933,
+    "name": "Coconut Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/933_coconut_scholar_pants.tres"
+  },
+  {
+    "id": 934,
+    "name": "Cactus Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/934_cactus_scholar_pants.tres"
+  },
+  {
+    "id": 935,
+    "name": "Arcane Scholar Pants",
+    "source": "Resources/Items/Database/weapons/_New/935_arcane_scholar_pants.tres"
+  },
+  {
+    "id": 936,
+    "name": "Yellow Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/936_yellow_priest_robe.tres"
+  },
+  {
+    "id": 937,
+    "name": "Silverleaf Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/937_silverleaf_priest_robe.tres"
+  },
+  {
+    "id": 938,
+    "name": "Red Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/938_red_priest_robe.tres"
+  },
+  {
+    "id": 939,
+    "name": "Raging Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/939_raging_priest_robe.tres"
+  },
+  {
+    "id": 940,
+    "name": "Ice Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/940_ice_priest_robe.tres"
+  },
+  {
+    "id": 941,
+    "name": "Historic Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/941_historic_priest_robe.tres"
+  },
+  {
+    "id": 942,
+    "name": "Green Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/942_green_priest_robe.tres"
+  },
+  {
+    "id": 943,
+    "name": "Glowing Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/943_glowing_priest_robe.tres"
+  },
+  {
+    "id": 944,
+    "name": "Fern Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/944_fern_priest_robe.tres"
+  },
+  {
+    "id": 945,
+    "name": "Eternal Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/945_eternal_priest_robe.tres"
+  },
+  {
+    "id": 946,
+    "name": "Eon Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/946_eon_priest_robe.tres"
+  },
+  {
+    "id": 947,
+    "name": "Cotton Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/947_cotton_priest_robe.tres"
+  },
+  {
+    "id": 948,
+    "name": "Coral Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/948_coral_priest_robe.tres"
+  },
+  {
+    "id": 949,
+    "name": "Coconut Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/949_coconut_priest_robe.tres"
+  },
+  {
+    "id": 950,
+    "name": "Cactus Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/950_cactus_priest_robe.tres"
+  },
+  {
+    "id": 951,
+    "name": "Arcane Priest Robe",
+    "source": "Resources/Items/Database/weapons/_New/951_arcane_priest_robe.tres"
+  },
+  {
+    "id": 952,
+    "name": "Yellow Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/952_yellow_priest_shoes.tres"
+  },
+  {
+    "id": 953,
+    "name": "Silverleaf Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/953_silverleaf_priest_shoes.tres"
+  },
+  {
+    "id": 954,
+    "name": "Red Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/954_red_priest_shoes.tres"
+  },
+  {
+    "id": 955,
+    "name": "Raging Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/955_raging_priest_shoes.tres"
+  },
+  {
+    "id": 956,
+    "name": "Ice Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/956_ice_priest_shoes.tres"
+  },
+  {
+    "id": 957,
+    "name": "Historic Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/957_historic_priest_shoes.tres"
+  },
+  {
+    "id": 958,
+    "name": "Green Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/958_green_priest_shoes.tres"
+  },
+  {
+    "id": 959,
+    "name": "Glowing Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/959_glowing_priest_shoes.tres"
+  },
+  {
+    "id": 960,
+    "name": "Fern Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/960_fern_priest_shoes.tres"
+  },
+  {
+    "id": 961,
+    "name": "Eternal Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/961_eternal_priest_shoes.tres"
+  },
+  {
+    "id": 962,
+    "name": "Eon Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/962_eon_priest_shoes.tres"
+  },
+  {
+    "id": 963,
+    "name": "Cotton Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/963_cotton_priest_shoes.tres"
+  },
+  {
+    "id": 964,
+    "name": "Coral Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/964_coral_priest_shoes.tres"
+  },
+  {
+    "id": 965,
+    "name": "Coconut Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/965_coconut_priest_shoes.tres"
+  },
+  {
+    "id": 966,
+    "name": "Cactus Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/966_cactus_priest_shoes.tres"
+  },
+  {
+    "id": 967,
+    "name": "Arcane Priest Shoes",
+    "source": "Resources/Items/Database/weapons/_New/967_arcane_priest_shoes.tres"
+  },
+  {
+    "id": 968,
+    "name": "Yellow Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/968_yellow_priest_hood.tres"
+  },
+  {
+    "id": 969,
+    "name": "Silverleaf Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/969_silverleaf_priest_hood.tres"
+  },
+  {
+    "id": 970,
+    "name": "Red Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/970_red_priest_hood.tres"
+  },
+  {
+    "id": 971,
+    "name": "Raging Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/971_raging_priest_hood.tres"
+  },
+  {
+    "id": 972,
+    "name": "Ice Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/972_ice_priest_hood.tres"
+  },
+  {
+    "id": 973,
+    "name": "Green Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/973_green_priest_hood.tres"
+  },
+  {
+    "id": 974,
+    "name": "Glowing Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/974_glowing_priest_hood.tres"
+  },
+  {
+    "id": 975,
+    "name": "Fern Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/975_fern_priest_hood.tres"
+  },
+  {
+    "id": 976,
+    "name": "Eternal Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/976_eternal_priest_hood.tres"
+  },
+  {
+    "id": 977,
+    "name": "Eon Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/977_eon_priest_hood.tres"
+  },
+  {
+    "id": 978,
+    "name": "Cotton Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/978_cotton_priest_hood.tres"
+  },
+  {
+    "id": 979,
+    "name": "Coral Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/979_coral_priest_hood.tres"
+  },
+  {
+    "id": 980,
+    "name": "Coconut Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/980_coconut_priest_hood.tres"
+  },
+  {
+    "id": 981,
+    "name": "Cactus Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/981_cactus_priest_hood.tres"
+  },
+  {
+    "id": 982,
+    "name": "Arcane Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/982_arcane_priest_hood.tres"
+  },
+  {
+    "id": 983,
+    "name": "Yellow Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/983_yellow_priest_bottom.tres"
+  },
+  {
+    "id": 984,
+    "name": "Silverleaf Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/984_silverleaf_priest_bottom.tres"
+  },
+  {
+    "id": 985,
+    "name": "Red Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/985_red_priest_bottom.tres"
+  },
+  {
+    "id": 986,
+    "name": "Raging Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/986_raging_priest_bottom.tres"
+  },
+  {
+    "id": 987,
+    "name": "Ice Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/987_ice_priest_bottom.tres"
+  },
+  {
+    "id": 988,
+    "name": "Historic Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/988_historic_priest_bottom.tres"
+  },
+  {
+    "id": 989,
+    "name": "Green Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/989_green_priest_bottom.tres"
+  },
+  {
+    "id": 990,
+    "name": "Glowing Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/990_glowing_priest_bottom.tres"
+  },
+  {
+    "id": 991,
+    "name": "Fern Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/991_fern_priest_bottom.tres"
+  },
+  {
+    "id": 992,
+    "name": "Eternal Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/992_eternal_priest_bottom.tres"
+  },
+  {
+    "id": 993,
+    "name": "Eon Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/993_eon_priest_bottom.tres"
+  },
+  {
+    "id": 994,
+    "name": "Cotton Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/994_cotton_priest_bottom.tres"
+  },
+  {
+    "id": 995,
+    "name": "Coral Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/995_coral_priest_bottom.tres"
+  },
+  {
+    "id": 996,
+    "name": "Coconut Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/996_coconut_priest_bottom.tres"
+  },
+  {
+    "id": 997,
+    "name": "Cactus Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/997_cactus_priest_bottom.tres"
+  },
+  {
+    "id": 998,
+    "name": "Arcane Priest Bottom",
+    "source": "Resources/Items/Database/weapons/_New/998_arcane_priest_bottom.tres"
+  },
+  {
+    "id": 999,
+    "name": "Yellow Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/999_yellow_hunter_robe.tres"
+  },
+  {
+    "id": 1000,
+    "name": "Silverleaf Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1000_silverleaf_hunter_robe.tres"
+  },
+  {
+    "id": 1001,
+    "name": "Red Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1001_red_hunter_robe.tres"
+  },
+  {
+    "id": 1002,
+    "name": "Raging Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1002_raging_hunter_robe.tres"
+  },
+  {
+    "id": 1003,
+    "name": "Ice Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1003_ice_hunter_robe.tres"
+  },
+  {
+    "id": 1004,
+    "name": "Historic Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1004_historic_hunter_robe.tres"
+  },
+  {
+    "id": 1005,
+    "name": "Green Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1005_green_hunter_robe.tres"
+  },
+  {
+    "id": 1006,
+    "name": "Glowing Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1006_glowing_hunter_robe.tres"
+  },
+  {
+    "id": 1007,
+    "name": "Fern Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1007_fern_hunter_robe.tres"
+  },
+  {
+    "id": 1008,
+    "name": "Eternal Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1008_eternal_hunter_robe.tres"
+  },
+  {
+    "id": 1009,
+    "name": "Eon Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1009_eon_hunter_robe.tres"
+  },
+  {
+    "id": 1010,
+    "name": "Cotton Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1010_cotton_hunter_robe.tres"
+  },
+  {
+    "id": 1011,
+    "name": "Coral Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1011_coral_hunter_robe.tres"
+  },
+  {
+    "id": 1012,
+    "name": "Coconut Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1012_coconut_hunter_robe.tres"
+  },
+  {
+    "id": 1013,
+    "name": "Cactus Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1013_cactus_hunter_robe.tres"
+  },
+  {
+    "id": 1014,
+    "name": "Arcane Hunter Robe",
+    "source": "Resources/Items/Database/weapons/_New/1014_arcane_hunter_robe.tres"
+  },
+  {
+    "id": 1015,
+    "name": "Yellow Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1015_yellow_hunter_shoes.tres"
+  },
+  {
+    "id": 1016,
+    "name": "Silverleaf Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1016_silverleaf_hunter_shoes.tres"
+  },
+  {
+    "id": 1017,
+    "name": "Red Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1017_red_hunter_shoes.tres"
+  },
+  {
+    "id": 1018,
+    "name": "Raging Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1018_raging_hunter_shoes.tres"
+  },
+  {
+    "id": 1019,
+    "name": "Ice Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1019_ice_hunter_shoes.tres"
+  },
+  {
+    "id": 1020,
+    "name": "Historic Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1020_historic_hunter_shoes.tres"
+  },
+  {
+    "id": 1021,
+    "name": "Green Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1021_green_hunter_shoes.tres"
+  },
+  {
+    "id": 1022,
+    "name": "Glowing Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1022_glowing_hunter_shoes.tres"
+  },
+  {
+    "id": 1023,
+    "name": "Fern Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1023_fern_hunter_shoes.tres"
+  },
+  {
+    "id": 1024,
+    "name": "Eternal Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1024_eternal_hunter_shoes.tres"
+  },
+  {
+    "id": 1025,
+    "name": "Eon Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1025_eon_hunter_shoes.tres"
+  },
+  {
+    "id": 1026,
+    "name": "Cotton Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1026_cotton_hunter_shoes.tres"
+  },
+  {
+    "id": 1027,
+    "name": "Coral Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1027_coral_hunter_shoes.tres"
+  },
+  {
+    "id": 1028,
+    "name": "Coconut Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1028_coconut_hunter_shoes.tres"
+  },
+  {
+    "id": 1029,
+    "name": "Cactus Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1029_cactus_hunter_shoes.tres"
+  },
+  {
+    "id": 1030,
+    "name": "Arcane Hunter Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1030_arcane_hunter_shoes.tres"
+  },
+  {
+    "id": 1031,
+    "name": "Yellow Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1031_yellow_hunter_cap.tres"
+  },
+  {
+    "id": 1032,
+    "name": "Silverleaf Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1032_silverleaf_hunter_cap.tres"
+  },
+  {
+    "id": 1033,
+    "name": "Red Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1033_red_hunter_cap.tres"
+  },
+  {
+    "id": 1034,
+    "name": "Raging Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1034_raging_hunter_cap.tres"
+  },
+  {
+    "id": 1035,
+    "name": "Ice Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1035_ice_hunter_cap.tres"
+  },
+  {
+    "id": 1036,
+    "name": "Historic Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1036_historic_hunter_cap.tres"
+  },
+  {
+    "id": 1037,
+    "name": "Green Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1037_green_hunter_cap.tres"
+  },
+  {
+    "id": 1038,
+    "name": "Glowing Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1038_glowing_hunter_cap.tres"
+  },
+  {
+    "id": 1039,
+    "name": "Fern Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1039_fern_hunter_cap.tres"
+  },
+  {
+    "id": 1040,
+    "name": "Eternal Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1040_eternal_hunter_cap.tres"
+  },
+  {
+    "id": 1041,
+    "name": "Eon Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1041_eon_hunter_cap.tres"
+  },
+  {
+    "id": 1042,
+    "name": "Cotton Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1042_cotton_hunter_cap.tres"
+  },
+  {
+    "id": 1043,
+    "name": "Coral Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1043_coral_hunter_cap.tres"
+  },
+  {
+    "id": 1044,
+    "name": "Coconut Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1044_coconut_hunter_cap.tres"
+  },
+  {
+    "id": 1045,
+    "name": "Cactus Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1045_cactus_hunter_cap.tres"
+  },
+  {
+    "id": 1046,
+    "name": "Arcane Hunter Cap",
+    "source": "Resources/Items/Database/weapons/_New/1046_arcane_hunter_cap.tres"
+  },
+  {
+    "id": 1047,
+    "name": "Yellow Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1047_yellow_hunter_pants.tres"
+  },
+  {
+    "id": 1048,
+    "name": "Silverleaf Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1048_silverleaf_hunter_pants.tres"
+  },
+  {
+    "id": 1049,
+    "name": "Red Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1049_red_hunter_pants.tres"
+  },
+  {
+    "id": 1050,
+    "name": "Raging Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1050_raging_hunter_pants.tres"
+  },
+  {
+    "id": 1051,
+    "name": "Ice Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1051_ice_hunter_pants.tres"
+  },
+  {
+    "id": 1052,
+    "name": "Historic Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1052_historic_hunter_pants.tres"
+  },
+  {
+    "id": 1053,
+    "name": "Green Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1053_green_hunter_pants.tres"
+  },
+  {
+    "id": 1054,
+    "name": "Glowing Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1054_glowing_hunter_pants.tres"
+  },
+  {
+    "id": 1055,
+    "name": "Fern Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1055_fern_hunter_pants.tres"
+  },
+  {
+    "id": 1056,
+    "name": "Eternal Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1056_eternal_hunter_pants.tres"
+  },
+  {
+    "id": 1057,
+    "name": "Eon Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1057_eon_hunter_pants.tres"
+  },
+  {
+    "id": 1058,
+    "name": "Cotton Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1058_cotton_hunter_pants.tres"
+  },
+  {
+    "id": 1059,
+    "name": "Coral Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1059_coral_hunter_pants.tres"
+  },
+  {
+    "id": 1060,
+    "name": "Coconut Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1060_coconut_hunter_pants.tres"
+  },
+  {
+    "id": 1061,
+    "name": "Cactus Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1061_cactus_hunter_pants.tres"
+  },
+  {
+    "id": 1062,
+    "name": "Arcane Hunter Pants",
+    "source": "Resources/Items/Database/weapons/_New/1062_arcane_hunter_pants.tres"
+  },
+  {
+    "id": 1063,
+    "name": "Historic Priest Hood",
+    "source": "Resources/Items/Database/weapons/_New/1063_historic_priest_hood.tres"
+  },
+  {
+    "id": 1064,
+    "name": "ChronoShroom Hat",
+    "source": "Resources/Items/Database/weapons/_New/1064_chronoshroom_hat.tres"
+  },
+  {
+    "id": 1065,
+    "name": "Invisible Face Accessory",
+    "source": "Resources/Items/Database/InvisibleFaceAccessory.tres"
+  },
+  {
+    "id": 1066,
+    "name": "Abyss Essence",
+    "source": "Resources/Items/Database/AbyssEssence.tres"
+  },
+  {
+    "id": 1071,
+    "name": "Abyssal Vision",
+    "source": "Resources/Items/Database/AbyssalVision.tres"
+  },
+  {
+    "id": 1072,
+    "name": "Toy Shadow",
+    "source": "Resources/Items/Database/ToyShadow.tres"
+  },
+  {
+    "id": 1073,
+    "name": "Reaper's Veil",
+    "source": "Resources/Items/Database/ReapersVeil.tres"
+  },
+  {
+    "id": 1074,
+    "name": "Soul Crystal Ice Cream Sandwich",
+    "source": "Resources/Items/Database/SoulCrystalIceCreamSandwich.tres"
+  },
+  {
+    "id": 1075,
+    "name": "Banana Bread",
+    "source": "Resources/Items/Database/BananaBread.tres"
+  },
+  {
+    "id": 1076,
+    "name": "Kmitty's Special Tea",
+    "source": "Resources/Items/Database/KmittysSpecialTea.tres"
+  },
+  {
+    "id": 1100,
+    "name": "Soul Pass (30 days)",
+    "source": "Resources/Items/Database/SoulPass30d.tres"
+  },
+  {
+    "id": 1101,
+    "name": "Soul Pass (90 days)",
+    "source": "Resources/Items/Database/SoulPass90d.tres"
+  },
+  {
+    "id": 1102,
+    "name": "Soul Pass (180 days)",
+    "source": "Resources/Items/Database/SoulPass180d.tres"
+  },
+  {
+    "id": 1103,
+    "name": "Kmitty Pass (30 days)",
+    "source": "Resources/Items/Database/KmittyPass30d.tres"
+  },
+  {
+    "id": 1104,
+    "name": "Kmitty Pass (90 days)",
+    "source": "Resources/Items/Database/KmittyPass90d.tres"
+  },
+  {
+    "id": 1105,
+    "name": "Kmitty Pass (180 days)",
+    "source": "Resources/Items/Database/KmittyPass180d.tres"
+  },
+  {
+    "id": 1106,
+    "name": "Shepherd's Ring",
+    "source": "Resources/Items/Database/new_crafting_materials/ShepherdRing.tres"
+  },
+  {
+    "id": 1107,
+    "name": "Shepherd's Hat",
+    "source": "Resources/Items/Database/new_crafting_materials/ShepherdHat.tres"
+  },
+  {
+    "id": 1108,
+    "name": "Shepherd's Aura",
+    "source": "Resources/Items/Database/ShepherdAura.tres"
+  },
+  {
+    "id": 1109,
+    "name": "Wolf Ears",
+    "source": "Resources/Items/Database/WolfEars.tres"
+  },
+  {
+    "id": 1110,
+    "name": "Grilled Clam",
+    "source": "Resources/Items/Database/GrilledClam.tres"
+  },
+  {
+    "id": 1111,
+    "name": "Bread",
+    "source": "Resources/Items/Database/Bread.tres"
+  },
+  {
+    "id": 1112,
+    "name": "Coconut Milk",
+    "source": "Resources/Items/Database/CoconutMilk.tres"
+  },
+  {
+    "id": 1113,
+    "name": "Fish Sauce",
+    "source": "Resources/Items/Database/FishSauce.tres"
+  },
+  {
+    "id": 1114,
+    "name": "Coconut Butter",
+    "source": "Resources/Items/Database/CoconutButter.tres"
+  },
+  {
+    "id": 1115,
+    "name": "Fern Sugar",
+    "source": "Resources/Items/Database/FernSugar.tres"
+  },
+  {
+    "id": 1116,
+    "name": "Tomato Sauce",
+    "source": "Resources/Items/Database/TomatoSauce.tres"
+  },
+  {
+    "id": 1117,
+    "name": "Fruit Jam",
+    "source": "Resources/Items/Database/FruitJam.tres"
+  },
+  {
+    "id": 1118,
+    "name": "Soy Sauce",
+    "source": "Resources/Items/Database/SoySauce.tres"
+  },
+  {
+    "id": 1119,
+    "name": "Wasabi",
+    "source": "Resources/Items/Database/Wasabi.tres"
+  },
+  {
+    "id": 1120,
+    "name": "Coconut Oil",
+    "source": "Resources/Items/Database/CoconutOil.tres"
+  },
+  {
+    "id": 1121,
+    "name": "Soul's Rub",
+    "source": "Resources/Items/Database/SoulsRub.tres"
+  },
+  {
+    "id": 1122,
+    "name": "Deep Sea Flour",
+    "source": "Resources/Items/Database/DeepSeaFlour.tres"
+  },
+  {
+    "id": 1123,
+    "name": "Whipped Cream",
+    "source": "Resources/Items/Database/WhippedCream.tres"
+  },
+  {
+    "id": 1124,
+    "name": "Deep Sea Bread",
+    "source": "Resources/Items/Database/DeepSeaBread.tres"
+  },
+  {
+    "id": 1125,
+    "name": "Time in a Bottle",
+    "source": "Resources/Items/Database/TimeInABottle.tres"
+  },
+  {
+    "id": 1126,
+    "name": "Crushed Ice",
+    "source": "Resources/Items/Database/CrushedIce.tres"
+  },
+  {
+    "id": 1127,
+    "name": "4 Season Fruit Salad",
+    "source": "Resources/Items/Database/FourSeasonsFruitSalad.tres"
+  },
+  {
+    "id": 1128,
+    "name": "Eternal Ice Cream",
+    "source": "Resources/Items/Database/EternalIceCream.tres"
+  },
+  {
+    "id": 1129,
+    "name": "Curry Base",
+    "source": "Resources/Items/Database/CurryBase.tres"
+  },
+  {
+    "id": 1130,
+    "name": "Clam Salad",
+    "source": "Resources/Items/Database/ClamSalad.tres"
+  },
+  {
+    "id": 1131,
+    "name": "Plain Salad",
+    "source": "Resources/Items/Database/PlainSalad.tres"
+  },
+  {
+    "id": 1132,
+    "name": "Grilled Clam Salad",
+    "source": "Resources/Items/Database/GrilledClamSalad.tres"
+  },
+  {
+    "id": 1133,
+    "name": "Apple Salad",
+    "source": "Resources/Items/Database/AppleSalad.tres"
+  },
+  {
+    "id": 1134,
+    "name": "Apple Pie",
+    "source": "Resources/Items/Database/ApplePie.tres"
+  },
+  {
+    "id": 1135,
+    "name": "Tempura",
+    "source": "Resources/Items/Database/Tempura.tres"
+  },
+  {
+    "id": 1136,
+    "name": "Shrimp Sushi",
+    "source": "Resources/Items/Database/ShrimpSushi.tres"
+  },
+  {
+    "id": 1137,
+    "name": "Fishwich",
+    "source": "Resources/Items/Database/Fishwich.tres"
+  },
+  {
+    "id": 1138,
+    "name": "Trout Sushi",
+    "source": "Resources/Items/Database/TroutSushi.tres"
+  },
+  {
+    "id": 1139,
+    "name": "Star Fish Sushi",
+    "source": "Resources/Items/Database/StarfishSushi.tres"
+  },
+  {
+    "id": 1140,
+    "name": "Refreshing Roll",
+    "source": "Resources/Items/Database/RefreshingRoll.tres"
+  },
+  {
+    "id": 1141,
+    "name": "Shrimp Pineapple Fry Rice",
+    "source": "Resources/Items/Database/ShrimpPineappleFryRice.tres"
+  },
+  {
+    "id": 1142,
+    "name": "Shrimp Cocktail",
+    "source": "Resources/Items/Database/ShrimpCocktail.tres"
+  },
+  {
+    "id": 1143,
+    "name": "Purple Salad",
+    "source": "Resources/Items/Database/PurpleSalad.tres"
+  },
+  {
+    "id": 1144,
+    "name": "Stuffed Chomper",
+    "source": "Resources/Items/Database/StuffedChomper.tres"
+  },
+  {
+    "id": 1145,
+    "name": "Bread and Butter",
+    "source": "Resources/Items/Database/BreadAndButter.tres"
+  },
+  {
+    "id": 1146,
+    "name": "Chomper Soup",
+    "source": "Resources/Items/Database/ChomperSoup.tres"
+  },
+  {
+    "id": 1147,
+    "name": "Star Stir Fry",
+    "source": "Resources/Items/Database/StarStirFried.tres"
+  },
+  {
+    "id": 1148,
+    "name": "Garlic Bread",
+    "source": "Resources/Items/Database/GarlicBread.tres"
+  },
+  {
+    "id": 1149,
+    "name": "Bread and Jam",
+    "source": "Resources/Items/Database/BreadAndJam.tres"
+  },
+  {
+    "id": 1150,
+    "name": "Melon Smoothie",
+    "source": "Resources/Items/Database/MelonSmoothie.tres"
+  },
+  {
+    "id": 1151,
+    "name": "Octopus Sushi",
+    "source": "Resources/Items/Database/SquidSushi.tres"
+  },
+  {
+    "id": 1152,
+    "name": "Pepper Lunch",
+    "source": "Resources/Items/Database/PepperLunch.tres"
+  },
+  {
+    "id": 1153,
+    "name": "Herbal Angel",
+    "source": "Resources/Items/Database/HerbalAngel.tres"
+  },
+  {
+    "id": 1154,
+    "name": "Seaweed Salad",
+    "source": "Resources/Items/Database/SeaweedSalad.tres"
+  },
+  {
+    "id": 1155,
+    "name": "Fish Stew",
+    "source": "Resources/Items/Database/FishStew.tres"
+  },
+  {
+    "id": 1156,
+    "name": "Desert Stir Fry",
+    "source": "Resources/Items/Database/DesertStirFry.tres"
+  },
+  {
+    "id": 1157,
+    "name": "French Fries",
+    "source": "Resources/Items/Database/FrenchFries.tres"
+  },
+  {
+    "id": 1158,
+    "name": "Stuffed Glowfish",
+    "source": "Resources/Items/Database/StuffedGlowfish.tres"
+  },
+  {
+    "id": 1159,
+    "name": "Deep Sea Noodles",
+    "source": "Resources/Items/Database/DeepSeaNoodles.tres"
+  },
+  {
+    "id": 1160,
+    "name": "Forbidden Parfait",
+    "source": "Resources/Items/Database/ForbiddenParfait.tres"
+  },
+  {
+    "id": 1161,
+    "name": "Algae Balls",
+    "source": "Resources/Items/Database/AlgaeBalls.tres"
+  },
+  {
+    "id": 1162,
+    "name": "Smell of Home",
+    "source": "Resources/Items/Database/SmellOfHome.tres"
+  },
+  {
+    "id": 1163,
+    "name": "Dustwich",
+    "source": "Resources/Items/Database/Dustwich.tres"
+  },
+  {
+    "id": 1164,
+    "name": "Desert's Refreshment",
+    "source": "Resources/Items/Database/DesertsRefreshment.tres"
+  },
+  {
+    "id": 1165,
+    "name": "Birthday Cake",
+    "source": "Resources/Items/Database/BirthdayCake.tres"
+  },
+  {
+    "id": 1166,
+    "name": "Melon Bingsu",
+    "source": "Resources/Items/Database/MelonBingsu.tres"
+  },
+  {
+    "id": 1167,
+    "name": "Forbidden Delight",
+    "source": "Resources/Items/Database/ForbiddenDelight.tres"
+  },
+  {
+    "id": 1168,
+    "name": "4 Season Ice Cream",
+    "source": "Resources/Items/Database/FourSeasonsIceCream.tres"
+  },
+  {
+    "id": 1169,
+    "name": "Tom Yum",
+    "source": "Resources/Items/Database/TomYum.tres"
+  },
+  {
+    "id": 1170,
+    "name": "Banana Split",
+    "source": "Resources/Items/Database/BananaSplit.tres"
+  },
+  {
+    "id": 1171,
+    "name": "Tikka Masala",
+    "source": "Resources/Items/Database/TikkaMasala.tres"
+  },
+  {
+    "id": 1172,
+    "name": "Thievery Aura",
+    "source": "Resources/Items/Database/ThieveryAura.tres"
+  },
+  {
+    "id": 1173,
+    "name": "Reaper Aura",
+    "source": "Resources/Items/Database/ReaperAura.tres"
+  },
+  {
+    "id": 1174,
+    "name": "Tailor Bath Water",
+    "source": "Resources/Items/Database/TailorBathWater.tres"
+  },
+  {
+    "id": 1175,
+    "name": "Kmitty Bath Water",
+    "source": "Resources/Items/Database/KmittyBathWater.tres"
+  },
+  {
+    "id": 1176,
+    "name": "Scythe Ticket",
+    "source": "Resources/Items/Database/ScytheTicket.tres"
+  },
+  {
+    "id": 1177,
+    "name": "Angler Ticket",
+    "source": "Resources/Items/Database/AnglerTicket.tres"
+  },
+  {
+    "id": 1178,
+    "name": "Puppeteer Ticket",
+    "source": "Resources/Items/Database/PupeteerTicket.tres"
+  },
+  {
+    "id": 1179,
+    "name": "Seeker Ticket",
+    "source": "Resources/Items/Database/SeekerTicket.tres"
+  },
+  {
+    "id": 1180,
+    "name": "Kmitty on Head",
+    "source": "Resources/Items/Database/KmittyOnHead.tres"
+  },
+  {
+    "id": 1181,
+    "name": "Simple Cape",
+    "source": "Resources/Items/Database/SimpleCape.tres"
+  },
+  {
+    "id": 1182,
+    "name": "Reaper Cape",
+    "source": "Resources/Items/Database/ReaperCape.tres"
+  },
+  {
+    "id": 1183,
+    "name": "Storage Slot Expansion Coupon",
+    "source": "Resources/Items/Database/StorageSlotCoupon.tres"
+  },
+  {
+    "id": 1184,
+    "name": "Soulblood Cape",
+    "source": "Resources/Items/Database/SoulbloodCape.tres"
+  },
+  {
+    "id": 1185,
+    "name": "Ring of Atlas",
+    "source": "Resources/Items/Database/RingOfAtlas.tres"
+  },
+  {
+    "id": 1186,
+    "name": "Old Sickle",
+    "source": "Resources/Items/Database/weapons/OldSickle.tres"
+  },
+  {
+    "id": 1187,
+    "name": "Soul Stealer Staff",
+    "source": "Resources/Items/Database/weapons/SoulStealerStaff.tres"
+  },
+  {
+    "id": 1188,
+    "name": "Barrier Iron Ore",
+    "source": "Resources/Items/Database/BarrierOre.tres"
+  },
+  {
+    "id": 1189,
+    "name": "Barrier Copper Ore",
+    "source": "Resources/Items/Database/BarrierCopperOre.tres"
+  },
+  {
+    "id": 1190,
+    "name": "Barrier Malachite Ore",
+    "source": "Resources/Items/Database/BarrierMalachiteOre.tres"
+  },
+  {
+    "id": 1191,
+    "name": "Barrier Cobalt Ore",
+    "source": "Resources/Items/Database/BarrierCobaltOre.tres"
+  },
+  {
+    "id": 1192,
+    "name": "Barrier Titanium Ore",
+    "source": "Resources/Items/Database/BarrierTitaniumOre.tres"
+  },
+  {
+    "id": 1193,
+    "name": "Barrier Gold Ore",
+    "source": "Resources/Items/Database/BarrierGoldOre.tres"
+  },
+  {
+    "id": 1194,
+    "name": "Barrier Mithril Ore",
+    "source": "Resources/Items/Database/BarrierMithrilOre.tres"
+  },
+  {
+    "id": 1195,
+    "name": "Barrier Obsidian Ore",
+    "source": "Resources/Items/Database/BarrierObsidianOre.tres"
+  },
+  {
+    "id": 1196,
+    "name": "Kmitty's Fresh Fish",
+    "source": "Resources/Items/Database/KitchenRawFish.tres"
+  },
+  {
+    "id": 1197,
+    "name": "Kmitty's Sushi",
+    "source": "Resources/Items/Database/KitchenSushi.tres"
+  },
+  {
+    "id": 1198,
+    "name": "Kmitty's Grilled Fish",
+    "source": "Resources/Items/Database/KitchenGrilledFish.tres"
+  },
+  {
+    "id": 1199,
+    "name": "Kmitty's Stuffed Fish",
+    "source": "Resources/Items/Database/KitchenStuffedFish.tres"
+  },
+  {
+    "id": 1200,
+    "name": "Berserker Aura",
+    "source": "Resources/Items/Database/BerserkerAura.tres"
+  },
+  {
+    "id": 1201,
+    "name": "Radiant Pass (30 days)",
+    "source": "Resources/Items/Database/RadiantPass30d.tres"
+  },
+  {
+    "id": 1202,
+    "name": "Radiant Pass (90 days)",
+    "source": "Resources/Items/Database/RadiantPass90d.tres"
+  },
+  {
+    "id": 1203,
+    "name": "Radiant Pass (180 days)",
+    "source": "Resources/Items/Database/RadiantPass180d.tres"
+  },
+  {
+    "id": 1204,
+    "name": "Red Herb (Gloopy)",
+    "source": "Resources/Items/Database/GloopyHerbRed.tres"
+  },
+  {
+    "id": 1205,
+    "name": "Green Herb (Gloopy)",
+    "source": "Resources/Items/Database/GloopyHerbGreen.tres"
+  },
+  {
+    "id": 1206,
+    "name": "Blue Herb (Gloopy)",
+    "source": "Resources/Items/Database/GloopyHerbBlue.tres"
+  },
+  {
+    "id": 1207,
+    "name": "Red Potion",
+    "source": "Resources/Items/Database/GloopyPotionRed.tres"
+  },
+  {
+    "id": 1208,
+    "name": "Green Potion",
+    "source": "Resources/Items/Database/GloopyPotionGreen.tres"
+  },
+  {
+    "id": 1209,
+    "name": "Blue Potion",
+    "source": "Resources/Items/Database/GloopyPotionBlue.tres"
+  },
+  {
+    "id": 1210,
+    "name": "Pink Potion",
+    "source": "Resources/Items/Database/GloopyPotionPink.tres"
+  },
+  {
+    "id": 1211,
+    "name": "Yellow Potion",
+    "source": "Resources/Items/Database/GloopyPotionYellow.tres"
+  },
+  {
+    "id": 1212,
+    "name": "Azure Potion",
+    "source": "Resources/Items/Database/GloopyPotionAzure.tres"
+  },
+  {
+    "id": 1213,
+    "name": "White Potion",
+    "source": "Resources/Items/Database/GloopyPotionWhite.tres"
+  },
+  {
+    "id": 1214,
+    "name": "Black Potion",
+    "source": "Resources/Items/Database/GloopyPotionBlack.tres"
+  },
+  {
+    "id": 1215,
+    "name": "Pickaxe",
+    "source": "Resources/Items/Database/weapons/Pickaxe.tres"
+  },
+  {
+    "id": 1216,
+    "name": "Mining Hat",
+    "source": "Resources/Items/Database/weapons/_New/1216_mining_hat.tres"
+  },
+  {
+    "id": 1217,
+    "name": "Mining Shirt",
+    "source": "Resources/Items/Database/weapons/_New/1217_mining_shirt.tres"
+  },
+  {
+    "id": 1218,
+    "name": "Mining Pants",
+    "source": "Resources/Items/Database/weapons/_New/1218_mining_pants.tres"
+  },
+  {
+    "id": 1219,
+    "name": "Mining Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1219_mining_shoes.tres"
+  },
+  {
+    "id": 1220,
+    "name": "Herb Basket",
+    "source": "Resources/Items/Database/weapons/HerbBasket.tres"
+  },
+  {
+    "id": 1221,
+    "name": "Herbalist Hat",
+    "source": "Resources/Items/Database/weapons/_New/1221_herbalist_hat.tres"
+  },
+  {
+    "id": 1222,
+    "name": "Herbalist Coat",
+    "source": "Resources/Items/Database/weapons/_New/1222_herbalist_coat.tres"
+  },
+  {
+    "id": 1223,
+    "name": "Herbalist Skirt",
+    "source": "Resources/Items/Database/weapons/_New/1223_herbalist_skirt.tres"
+  },
+  {
+    "id": 1224,
+    "name": "Herbalist Shoes",
+    "source": "Resources/Items/Database/weapons/_New/1224_herbalist_shoes.tres"
+  },
+  {
+    "id": 1225,
+    "name": "Fishing Rod",
+    "source": "Resources/Items/Database/weapons/FishingRod.tres"
+  },
+  {
+    "id": 1226,
+    "name": "Fisher Hat",
+    "source": "Resources/Items/Database/weapons/_New/1226_fisher_hat.tres"
+  },
+  {
+    "id": 1227,
+    "name": "Fisher Shirt",
+    "source": "Resources/Items/Database/weapons/_New/1227_fisher_shirt.tres"
+  },
+  {
+    "id": 1228,
+    "name": "Fisher Pants",
+    "source": "Resources/Items/Database/weapons/_New/1228_fisher_pants.tres"
+  },
+  {
+    "id": 1229,
+    "name": "Fisher Boots",
+    "source": "Resources/Items/Database/weapons/_New/1229_fisher_boots.tres"
+  },
+  {
+    "id": 1230,
+    "name": "Prismatic Dye",
+    "source": "Resources/Items/Database/PrismaticDye.tres"
+  },
+  {
+    "id": 1235,
+    "name": "Angel Wings",
+    "source": "Resources/Items/Database/AngelWings.tres"
+  },
+  {
+    "id": 1241,
+    "name": "Shiny Attack Effect",
+    "source": "Resources/Items/Database/SkillEffectCoupon.tres"
+  },
+  {
+    "id": 1242,
+    "name": "Gradient Mixing",
+    "source": "Resources/Items/Database/GradientMixingUnlock.tres"
+  },
+  {
+    "id": 1243,
+    "name": "Animated Gradient: Vertical",
+    "source": "Resources/Items/Database/AnimatedGradientVerticalUnlock.tres"
+  },
+  {
+    "id": 1244,
+    "name": "Animated Gradient: Horizontal",
+    "source": "Resources/Items/Database/AnimatedGradientHorizontalUnlock.tres"
+  },
+  {
+    "id": 1245,
+    "name": "Animated Gradient: Circle",
+    "source": "Resources/Items/Database/AnimatedGradientCircleUnlock.tres"
+  },
+  {
+    "id": 1246,
+    "name": "Rainbow: Vertical",
+    "source": "Resources/Items/Database/RainbowVerticalUnlock.tres"
+  },
+  {
+    "id": 1247,
+    "name": "Rainbow: Horizontal",
+    "source": "Resources/Items/Database/RainbowHorizontalUnlock.tres"
+  },
+  {
+    "id": 1248,
+    "name": "Rainbow: Circle",
+    "source": "Resources/Items/Database/RainbowCircleUnlock.tres"
+  },
+  {
+    "id": 1249,
+    "name": "Pistol",
+    "source": "Resources/Items/Database/Pistol.tres"
+  },
+  {
+    "id": 1250,
+    "name": "Baseball Bat",
+    "source": "Resources/Items/Database/BaseballBat.tres"
+  },
+  {
+    "id": 1251,
+    "name": "Bloody Knife",
+    "source": "Resources/Items/Database/BloodyKnife.tres"
+  },
+  {
+    "id": 1252,
+    "name": "Pan",
+    "source": "Resources/Items/Database/Pan.tres"
+  },
+  {
+    "id": 1253,
+    "name": "Hellish Sickle",
+    "source": "Resources/Items/Database/HellishSickle.tres"
+  },
+  {
+    "id": 1254,
+    "name": "Shadow Scythe",
+    "source": "Resources/Items/Database/ShadowScythe.tres"
+  },
+  {
+    "id": 1255,
+    "name": "Guild Name Change Coupon",
+    "source": "Resources/Items/Database/GuildNameChangeCoupon.tres"
+  },
+  {
+    "id": 1256,
+    "name": "Character Name Change Coupon",
+    "source": "Resources/Items/Database/CharacterNameChangeCoupon.tres"
+  },
+  {
+    "id": 1257,
+    "name": "Soul Staff",
+    "source": "Resources/Items/Database/SoulStaff.tres"
+  },
+  {
+    "id": 1258,
+    "name": "Cursed Damage Skin",
+    "source": "Resources/Items/Database/DamageSkinCouponCursed.tres"
+  },
+  {
+    "id": 1259,
+    "name": "Halo of Faith",
+    "source": "Resources/Items/Database/HaloOfFaith.tres"
+  },
+  {
+    "id": 1260,
+    "name": "Custom Dye",
+    "source": "Resources/Items/Database/CustomDye.tres"
+  },
+  {
+    "id": 1261,
+    "name": "Weapon Orientation Coupon",
+    "source": "Resources/Items/Database/WeaponOrientationCoupon.tres"
+  },
+  {
+    "id": 1262,
+    "name": "Shiny Rainbow Attack Effect",
+    "source": "Resources/Items/Database/ShinyRainbowAttackEffect.tres"
+  },
+  {
+    "id": 1263,
+    "name": "Rainbow Attack Effect",
+    "source": "Resources/Items/Database/RainbowAttackEffect.tres"
+  },
+  {
+    "id": 1264,
+    "name": "Light Bringer",
+    "source": "Resources/Items/Database/LightBringer.tres"
+  },
+  {
+    "id": 1265,
+    "name": "Cupid",
+    "source": "Resources/Items/Database/Cupid.tres"
+  },
+  {
+    "id": 1266,
+    "name": "Soul Saber",
+    "source": "Resources/Items/Database/SoulSaber.tres"
+  },
+  {
+    "id": 1267,
+    "name": "Soul Blade",
+    "source": "Resources/Items/Database/SoulBlade.tres"
+  },
+  {
+    "id": 1268,
+    "name": "Animated Gradient Bundle",
+    "source": "Resources/Items/Database/AnimatedGradientBundle.tres"
+  },
+  {
+    "id": 1269,
+    "name": "Rainbow Bundle",
+    "source": "Resources/Items/Database/RainbowBundle.tres"
+  },
+  {
+    "id": 1270,
+    "name": "Lush Damage Skin",
+    "source": "Resources/Items/Database/DamageSkinCouponLush.tres"
+  },
+  {
+    "id": 1271,
+    "name": "Angelic Damage Skin",
+    "source": "Resources/Items/Database/DamageSkinCouponAngelic.tres"
+  },
+  {
+    "id": 1272,
+    "name": "Tower Shield",
+    "source": "Resources/Items/Database/TowerShield.tres"
+  },
+  {
+    "id": 1273,
+    "name": "Cat Tail",
+    "source": "Resources/Items/Database/CatTail.tres"
+  },
+  {
+    "id": 1274,
+    "name": "Devil Tail",
+    "source": "Resources/Items/Database/DevilTail.tres"
+  },
+  {
+    "id": 1275,
+    "name": "Fox Tail",
+    "source": "Resources/Items/Database/FoxTail.tres"
+  },
+  {
+    "id": 1276,
+    "name": "Traveler's Backpack",
+    "source": "Resources/Items/Database/TravelersBackpack.tres"
+  },
+  {
+    "id": 1277,
+    "name": "Academy Witch Hat",
+    "source": "Resources/Items/Database/AcademyWitchHat.tres"
+  },
+  {
+    "id": 1278,
+    "name": "Beach Hat",
+    "source": "Resources/Items/Database/BeachHat.tres"
+  },
+  {
+    "id": 1279,
+    "name": "Cat Ear Headphones",
+    "source": "Resources/Items/Database/CatEarHeadphones.tres"
+  },
+  {
+    "id": 1280,
+    "name": "Headphones",
+    "source": "Resources/Items/Database/Headphones.tres"
+  },
+  {
+    "id": 1281,
+    "name": "Circle Glasses",
+    "source": "Resources/Items/Database/CircleGlasses.tres"
+  },
+  {
+    "id": 1282,
+    "name": "Academy Outfit",
+    "source": "Resources/Items/Database/AcademyOutfit.tres"
+  },
+  {
+    "id": 1283,
+    "name": "Bikini",
+    "source": "Resources/Items/Database/Bikini.tres"
+  },
+  {
+    "id": 1284,
+    "name": "Kimono",
+    "source": "Resources/Items/Database/Kimono.tres"
+  },
+  {
+    "id": 1285,
+    "name": "Loose Hoodie",
+    "source": "Resources/Items/Database/LooseHoodie.tres"
+  },
+  {
+    "id": 1286,
+    "name": "Loose Shirt",
+    "source": "Resources/Items/Database/LooseShirt.tres"
+  },
+  {
+    "id": 1287,
+    "name": "Suit",
+    "source": "Resources/Items/Database/Suit.tres"
+  },
+  {
+    "id": 1288,
+    "name": "Academy Skirt",
+    "source": "Resources/Items/Database/AcademySkirt.tres"
+  },
+  {
+    "id": 1289,
+    "name": "Buddy List Expansion Coupon",
+    "source": "Resources/Items/Database/BuddyListExpansionCoupon.tres"
+  },
+  {
+    "id": 1290,
+    "name": "Ferni on Head",
+    "source": "Resources/Items/Database/FerniOnHead.tres"
+  },
+  {
+    "id": 1291,
+    "name": "Halo of Faith (Cape)",
+    "source": "Resources/Items/Database/HaloOfFaithCape.tres"
+  },
+  {
+    "id": 1292,
+    "name": "Mirage",
+    "source": "Resources/Items/Database/Mirage.tres"
+  },
+  {
+    "id": 1293,
+    "name": "Dull Mirage",
+    "source": "Resources/Items/Database/MirageDull.tres"
+  },
+  {
+    "id": 1294,
+    "name": "Radiant Mirage",
+    "source": "Resources/Items/Database/MirageRadiant.tres"
+  },
+  {
+    "id": 1295,
+    "name": "Invisible Weapon",
+    "source": "Resources/Items/Database/InvisibleWeapon.tres"
+  },
+  {
+    "id": 1296,
+    "name": "Guild Name Color Coupon",
+    "source": "Resources/Items/Database/GuildNameColorCoupon.tres"
+  },
+  {
+    "id": 1297,
+    "name": "Parchment Chat Bubble",
+    "source": "Resources/Items/Database/ParchmentChatBubble.tres"
+  },
+  {
+    "id": 1298,
+    "name": "Bubblegum Chat Bubble",
+    "source": "Resources/Items/Database/BubblegumChatBubble.tres"
+  },
+  {
+    "id": 1299,
+    "name": "Slime Chat Bubble",
+    "source": "Resources/Items/Database/SlimeChatBubble.tres"
+  },
+  {
+    "id": 1300,
+    "name": "Royal Chat Bubble",
+    "source": "Resources/Items/Database/RoyalChatBubble.tres"
+  },
+  {
+    "id": 1301,
+    "name": "Frostbite Chat Bubble",
+    "source": "Resources/Items/Database/FrostbiteChatBubble.tres"
+  },
+  {
+    "id": 1302,
+    "name": "Ember Chat Bubble",
+    "source": "Resources/Items/Database/EmberChatBubble.tres"
+  },
+  {
+    "id": 1303,
+    "name": "Void Chat Bubble",
+    "source": "Resources/Items/Database/VoidChatBubble.tres"
+  },
+  {
+    "id": 1304,
+    "name": "Lovestruck Chat Bubble",
+    "source": "Resources/Items/Database/LovestruckChatBubble.tres"
+  },
+  {
+    "id": 1305,
+    "name": "Prismatic Chat Bubble",
+    "source": "Resources/Items/Database/PrismaticChatBubble.tres"
+  },
+  {
+    "id": 1306,
+    "name": "Pet Turtle",
+    "source": "Resources/Items/Database/PetTurtle.tres"
+  },
+  {
+    "id": 1307,
+    "name": "Pet Cat",
+    "source": "Resources/Items/Database/PetCat.tres"
+  },
+  {
+    "id": 1308,
+    "name": "Pet Rabbit",
+    "source": "Resources/Items/Database/PetRabbit.tres"
+  },
+  {
+    "id": 1309,
+    "name": "Pet Bat",
+    "source": "Resources/Items/Database/PetBat.tres"
+  },
+  {
+    "id": 1310,
+    "name": "Pet Snake",
+    "source": "Resources/Items/Database/PetSnake.tres"
+  },
+  {
+    "id": 1311,
+    "name": "Pet Panda",
+    "source": "Resources/Items/Database/PetPanda.tres"
+  },
+  {
+    "id": 1312,
+    "name": "Invisible Top",
+    "source": "Resources/Items/Database/InvisibleTop.tres"
+  },
+  {
+    "id": 1313,
+    "name": "Invisible Pants",
+    "source": "Resources/Items/Database/InvisiblePants.tres"
+  },
+  {
+    "id": 1314,
+    "name": "2x EXP Coupon (5 min)",
+    "source": "Resources/Items/Database/gathering_material/2xEXPCoupon5Min.tres"
+  },
+  {
+    "id": 1315,
+    "name": "2x Combat Skill EXP Coupon (5 min)",
+    "source": "Resources/Items/Database/gathering_material/2xCombatSkillEXPCoupon5Min.tres"
+  },
+  {
+    "id": 1316,
+    "name": "Bat Wings",
+    "source": "Resources/Items/Database/BatWings.tres"
+  },
+  {
+    "id": 1317,
+    "name": "Dragon Wings",
+    "source": "Resources/Items/Database/DragonWings.tres"
+  },
+  {
+    "id": 1318,
+    "name": "Dragon Tail",
+    "source": "Resources/Items/Database/DragonTail.tres"
+  },
+  {
+    "id": 1319,
+    "name": "Dragon Horns",
+    "source": "Resources/Items/Database/DragonHorns.tres"
+  },
+  {
+    "id": 1320,
+    "name": "Pointy Ears",
+    "source": "Resources/Items/Database/PointyEars.tres"
+  },
+  {
+    "id": 1321,
+    "name": "Pirate Hat",
+    "source": "Resources/Items/Database/PirateHat.tres"
+  },
+  {
+    "id": 1322,
+    "name": "Pirate Coat",
+    "source": "Resources/Items/Database/PirateTop.tres"
+  },
+  {
+    "id": 1323,
+    "name": "Cutlass",
+    "source": "Resources/Items/Database/Cutlass.tres"
+  },
+  {
+    "id": 1324,
+    "name": "Flintlock Pistol",
+    "source": "Resources/Items/Database/FlintlockPistol.tres"
+  },
+  {
+    "id": 1325,
+    "name": "Minigun",
+    "source": "Resources/Items/Database/Minigun.tres"
+  },
+  {
+    "id": 1326,
+    "name": "Trailing Star Aura",
+    "source": "Resources/Items/Database/StarAura.tres"
+  },
+  {
+    "id": 1327,
+    "name": "Super Star Aura",
+    "source": "Resources/Items/Database/SuperStarAura.tres"
+  },
+  {
+    "id": 1328,
+    "name": "Unusual Scholar Robe",
+    "source": "Resources/Items/Database/weapons/_New/1328_unusual_scholar_robe.tres"
+  },
+  {
+    "id": 1329,
+    "name": "Deep Key",
+    "source": "Resources/Items/Database/DeepKey.tres"
+  },
+  {
+    "id": 1330,
+    "name": "Head Bow",
+    "source": "Resources/Items/Database/HeadBow.tres"
+  },
+  {
+    "id": 1331,
+    "name": "Traffic Cone",
+    "source": "Resources/Items/Database/TrafficCone.tres"
+  },
+  {
+    "id": 1332,
+    "name": "Maid Top",
+    "source": "Resources/Items/Database/MaidTop.tres"
+  },
+  {
+    "id": 1333,
+    "name": "Maid Skirt",
+    "source": "Resources/Items/Database/MaidSkirt.tres"
+  },
+  {
+    "id": 1334,
+    "name": "2x Gathering Skill EXP Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xGatheringSkillEXPCoupon.tres"
+  },
+  {
+    "id": 1335,
+    "name": "2x Gathering Skill EXP Coupon (5 min)",
+    "source": "Resources/Items/Database/gathering_material/2xGatheringSkillEXPCoupon5Min.tres"
+  },
+  {
+    "id": 1336,
+    "name": "2x Crafting Skill EXP Coupon",
+    "source": "Resources/Items/Database/gathering_material/2xCraftingSkillEXPCoupon.tres"
+  },
+  {
+    "id": 1337,
+    "name": "2x Crafting Skill EXP Coupon (5 min)",
+    "source": "Resources/Items/Database/gathering_material/2xCraftingSkillEXPCoupon5Min.tres"
+  }
+]

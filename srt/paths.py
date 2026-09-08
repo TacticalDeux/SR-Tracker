@@ -32,6 +32,11 @@ def assets_dir() -> Path:
     return _bundle_dir() / "assets"
 
 
+def data_files_dir() -> Path:
+    """Location of the bundled data files (monster/item name tables)."""
+    return _bundle_dir() / "data"
+
+
 def dll_path() -> Path:
     return _bundle_dir() / "dll" / "sr_tracker.dll"
 

@@ -12,10 +12,39 @@ called inline on every event without measurable cost.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import paths
+
+_FILES = ("monsters.json", "items.json")
+
+
+def _ensure_user_copies() -> None:
+    """Copy bundled tables into the user data dir when missing.
+
+    Frozen builds read from the user data dir so the tables survive
+    upgrades; the bundle is the seed copy. Existing user files are
+    never overwritten. In dev mode the bundle dir and the user data
+    dir are the same in-tree folder, so this is a no-op.
+    """
+    dest_dir = paths.user_data_dir()
+    src_dir = paths.data_files_dir()
+    if src_dir.resolve() == dest_dir.resolve():
+        return
+    for name in _FILES:
+        dest = dest_dir / name
+        if dest.exists():
+            continue
+        src = src_dir / name
+        if not src.exists():
+            continue
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dest)
+        except OSError:
+            continue
 
 
 @dataclass(frozen=True)
@@ -53,6 +82,7 @@ def _load_one(path: Path) -> dict[int, str]:
 
 def load() -> NameTables:
     """Load the name tables. Falls back to empty dicts if files are missing."""
+    _ensure_user_copies()
     monsters = _load_one(paths.user_data_dir() / "monsters.json")
     items    = _load_one(paths.user_data_dir() / "items.json")
     # In dev mode, prefer the in-tree `data/` next to the source.

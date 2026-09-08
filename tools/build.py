@@ -45,6 +45,8 @@ def build(clean: bool, console: bool, uac_admin: bool = True) -> int:
         "--name", APP_NAME,
         "--add-binary", "dll/sr_tracker.dll;dll",
         "--add-data", "assets/soul_crystal.png;assets",
+        "--add-data", "data/monsters.json;data",
+        "--add-data", "data/items.json;data",
     ]
     if not console:
         cmd.append("--windowed")

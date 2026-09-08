@@ -1,0 +1,682 @@
+[
+  {
+    "id": 1,
+    "name": "Slime",
+    "source": "Resources/Monsters/Database/Slime.tres"
+  },
+  {
+    "id": 2,
+    "name": "Bubble Spirit",
+    "source": "Resources/Monsters/Database/BubbleSpirit.tres"
+  },
+  {
+    "id": 3,
+    "name": "Big Slime",
+    "source": "Resources/Monsters/Database/BigSlime.tres"
+  },
+  {
+    "id": 4,
+    "name": "Humblebee",
+    "source": "Resources/Monsters/Database/Humblebee.tres"
+  },
+  {
+    "id": 5,
+    "name": "Chrono",
+    "source": "Resources/Monsters/Database/Chrono.tres"
+  },
+  {
+    "id": 6,
+    "name": "Monoghoul",
+    "source": "Resources/Monsters/Database/Monoghoul.tres"
+  },
+  {
+    "id": 7,
+    "name": "Pin Pin",
+    "source": "Resources/Monsters/Database/PinPin.tres"
+  },
+  {
+    "id": 8,
+    "name": "Giant Slime",
+    "source": "Resources/Monsters/Database/GiantSlime.tres"
+  },
+  {
+    "id": 9,
+    "name": "Squishling",
+    "source": "Resources/Monsters/Database/Squishling.tres"
+  },
+  {
+    "id": 10,
+    "name": "Troppo",
+    "source": "Resources/Monsters/Database/Troppo.tres"
+  },
+  {
+    "id": 11,
+    "name": "Sweel",
+    "source": "Resources/Monsters/Database/Sweel.tres"
+  },
+  {
+    "id": 12,
+    "name": "Fish",
+    "source": "Resources/Monsters/Database/Fish.tres"
+  },
+  {
+    "id": 13,
+    "name": "Minireap",
+    "source": "Resources/Monsters/Database/Minireap.tres"
+  },
+  {
+    "id": 14,
+    "name": "Reaperfish",
+    "source": "Resources/Monsters/Database/Reaperfish.tres"
+  },
+  {
+    "id": 15,
+    "name": "Angeling",
+    "source": "Resources/Monsters/Database/Angeling.tres"
+  },
+  {
+    "id": 16,
+    "name": "Jel",
+    "source": "Resources/Monsters/Database/Jel.tres"
+  },
+  {
+    "id": 17,
+    "name": "Hopper",
+    "source": "Resources/Monsters/Database/Hopper.tres"
+  },
+  {
+    "id": 18,
+    "name": "Bubble Snake",
+    "source": "Resources/Monsters/Database/BubbleSnake.tres"
+  },
+  {
+    "id": 19,
+    "name": "Cat Golem",
+    "source": "Resources/Monsters/Database/CatGolem.tres"
+  },
+  {
+    "id": 20,
+    "name": "Snapper",
+    "source": "Resources/Monsters/Database/Snapper.tres"
+  },
+  {
+    "id": 21,
+    "name": "Crusher",
+    "source": "Resources/Monsters/Database/Crusher.tres"
+  },
+  {
+    "id": 22,
+    "name": "Soulfish",
+    "source": "Resources/Monsters/Database/Soulfish.tres"
+  },
+  {
+    "id": 23,
+    "name": "Droppo",
+    "source": "Resources/Monsters/Database/Droppo.tres"
+  },
+  {
+    "id": 24,
+    "name": "Giga",
+    "source": "Resources/Monsters/Database/Giga.tres"
+  },
+  {
+    "id": 25,
+    "name": "Scythe Reaper",
+    "source": "Resources/Monsters/Database/ScytheReaper.tres"
+  },
+  {
+    "id": 26,
+    "name": "Pimchy",
+    "source": "Resources/Monsters/Database/Pimchy.tres"
+  },
+  {
+    "id": 27,
+    "name": "Blorp",
+    "source": "Resources/Monsters/Database/Blorp.tres"
+  },
+  {
+    "id": 28,
+    "name": "Dark Pumpkin",
+    "source": "Resources/Monsters/Database/DarkPumpkin.tres"
+  },
+  {
+    "id": 29,
+    "name": "Target Dummy",
+    "source": "Resources/Monsters/Database/TestDummy.tres"
+  },
+  {
+    "id": 30,
+    "name": "Dark Matter",
+    "source": "Resources/Monsters/Database/DarkMatter.tres"
+  },
+  {
+    "id": 31,
+    "name": "Cactus",
+    "source": "Resources/Monsters/Database/Cactus.tres"
+  },
+  {
+    "id": 32,
+    "name": "Seeker Reaper",
+    "source": "Resources/Monsters/Database/SeekerReaper.tres"
+  },
+  {
+    "id": 33,
+    "name": "Shadow Sprite",
+    "source": "Resources/Monsters/Database/ShadowSprite.tres"
+  },
+  {
+    "id": 34,
+    "name": "Dark Mass",
+    "source": "Resources/Monsters/Database/DarkMass.tres"
+  },
+  {
+    "id": 35,
+    "name": "Death Mist",
+    "source": "Resources/Monsters/Database/DeathMist.tres"
+  },
+  {
+    "id": 36,
+    "name": "Puppet Reaper (Wandering)",
+    "source": "Resources/Monsters/Database/PuppetReaperWandering.tres"
+  },
+  {
+    "id": 37,
+    "name": "Puppet Reaper",
+    "source": "Resources/Monsters/Database/PuppetReaper.tres"
+  },
+  {
+    "id": 38,
+    "name": "Puppet Reaper (Panic)",
+    "source": "Resources/Monsters/Database/PuppetReaperPanic.tres"
+  },
+  {
+    "id": 39,
+    "name": "Ghost Puppet",
+    "source": "Resources/Monsters/Database/GhostPuppet.tres"
+  },
+  {
+    "id": 40,
+    "name": "Seeker Reaper Mini",
+    "source": "Resources/Monsters/Database/SeekerReaperMini.tres"
+  },
+  {
+    "id": 41,
+    "name": "Seeker Reaper (Wandering)",
+    "source": "Resources/Monsters/Database/SeekerReaperWandering.tres"
+  },
+  {
+    "id": 42,
+    "name": "Blaze",
+    "source": "Resources/Monsters/Database/Blaze.tres"
+  },
+  {
+    "id": 43,
+    "name": "Haunted Flame",
+    "source": "Resources/Monsters/Database/HauntedFlame.tres"
+  },
+  {
+    "id": 44,
+    "name": "Rokkik",
+    "source": "Resources/Monsters/Database/Rokkik.tres"
+  },
+  {
+    "id": 45,
+    "name": "Phantom",
+    "source": "Resources/Monsters/Database/Phantom.tres"
+  },
+  {
+    "id": 46,
+    "name": "Lost Bard",
+    "source": "Resources/Monsters/Database/LostBard.tres"
+  },
+  {
+    "id": 47,
+    "name": "Lost Ruins",
+    "source": "Resources/Monsters/Database/LostRuins.tres"
+  },
+  {
+    "id": 48,
+    "name": "Elemental",
+    "source": "Resources/Monsters/Database/Elemental.tres"
+  },
+  {
+    "id": 49,
+    "name": "Fallen",
+    "source": "Resources/Monsters/Database/Fallen.tres"
+  },
+  {
+    "id": 50,
+    "name": "Desert Bandit",
+    "source": "Resources/Monsters/Database/DesertBandit.tres"
+  },
+  {
+    "id": 51,
+    "name": "Desert Bandit (Fleeing)",
+    "source": "Resources/Monsters/Database/DesertBanditFleeing.tres"
+  },
+  {
+    "id": 52,
+    "name": "Shadow Golem",
+    "source": "Resources/Monsters/Database/ShadowGolem.tres"
+  },
+  {
+    "id": 53,
+    "name": "Glowsnail",
+    "source": "Resources/Monsters/Database/Glowsnail.tres"
+  },
+  {
+    "id": 54,
+    "name": "Soul Squid",
+    "source": "Resources/Monsters/Database/SoulSquid.tres"
+  },
+  {
+    "id": 55,
+    "name": "Licki",
+    "source": "Resources/Monsters/Database/Licki.tres"
+  },
+  {
+    "id": 56,
+    "name": "Licku",
+    "source": "Resources/Monsters/Database/Licku.tres"
+  },
+  {
+    "id": 57,
+    "name": "Ferni",
+    "source": "Resources/Monsters/Database/Ferni.tres"
+  },
+  {
+    "id": 58,
+    "name": "Soulpling",
+    "source": "Resources/Monsters/Database/Soulpling.tres"
+  },
+  {
+    "id": 59,
+    "name": "Soultree",
+    "source": "Resources/Monsters/Database/Soultree.tres"
+  },
+  {
+    "id": 60,
+    "name": "Cloudsheep",
+    "source": "Resources/Monsters/Database/Cloudsheep.tres"
+  },
+  {
+    "id": 61,
+    "name": "Sadling",
+    "source": "Resources/Monsters/Database/Sadling.tres"
+  },
+  {
+    "id": 62,
+    "name": "Depression",
+    "source": "Resources/Monsters/Database/Depression.tres"
+  },
+  {
+    "id": 63,
+    "name": "Gloopy",
+    "source": "Resources/Monsters/Database/Gloopy.tres"
+  },
+  {
+    "id": 64,
+    "name": "Deerlime",
+    "source": "Resources/Monsters/Database/Deerlime.tres"
+  },
+  {
+    "id": 65,
+    "name": "Slibbit",
+    "source": "Resources/Monsters/Database/Slibbit.tres"
+  },
+  {
+    "id": 66,
+    "name": "Haowl",
+    "source": "Resources/Monsters/Database/Haowl.tres"
+  },
+  {
+    "id": 67,
+    "name": "Acceptance",
+    "source": "Resources/Monsters/Database/Acceptance.tres"
+  },
+  {
+    "id": 68,
+    "name": "Bananek",
+    "source": "Resources/Monsters/Database/Bananek.tres"
+  },
+  {
+    "id": 69,
+    "name": "Citruslime",
+    "source": "Resources/Monsters/Database/Citruslime.tres"
+  },
+  {
+    "id": 70,
+    "name": "Black Cloudsheep",
+    "source": "Resources/Monsters/Database/BlackCloudsheep.tres"
+  },
+  {
+    "id": 71,
+    "name": "Rainbow Cloudsheep",
+    "source": "Resources/Monsters/Database/RainbowCloudsheep.tres"
+  },
+  {
+    "id": 72,
+    "name": "Slabbit",
+    "source": "Resources/Monsters/Database/Slabbit.tres"
+  },
+  {
+    "id": 73,
+    "name": "Saowl",
+    "source": "Resources/Monsters/Database/Saowl.tres"
+  },
+  {
+    "id": 74,
+    "name": "Ancient Soul",
+    "source": "Resources/Monsters/Database/AncientSoul.tres"
+  },
+  {
+    "id": 75,
+    "name": "Cat Guardian",
+    "source": "Resources/Monsters/Database/CatGuardian.tres"
+  },
+  {
+    "id": 76,
+    "name": "Flows",
+    "source": "Resources/Monsters/Database/Flows.tres"
+  },
+  {
+    "id": 77,
+    "name": "Slip",
+    "source": "Resources/Monsters/Database/Slip.tres"
+  },
+  {
+    "id": 78,
+    "name": "Frostmite",
+    "source": "Resources/Monsters/Database/Frostmite.tres"
+  },
+  {
+    "id": 79,
+    "name": "Flowsnail",
+    "source": "Resources/Monsters/Database/Flowsnail.tres"
+  },
+  {
+    "id": 80,
+    "name": "Stinky Sheep",
+    "source": "Resources/Monsters/Database/StinkySheep.tres"
+  },
+  {
+    "id": 81,
+    "name": "Licke",
+    "source": "Resources/Monsters/Database/Licke.tres"
+  },
+  {
+    "id": 82,
+    "name": "Spot Slime",
+    "source": "Resources/Monsters/Database/spot_slime.tres"
+  },
+  {
+    "id": 83,
+    "name": "Blizzy",
+    "source": "Resources/Monsters/Database/blizzy.tres"
+  },
+  {
+    "id": 84,
+    "name": "Snowball",
+    "source": "Resources/Monsters/Database/snowball.tres"
+  },
+  {
+    "id": 85,
+    "name": "Shroomie",
+    "source": "Resources/Monsters/Database/shroomie.tres"
+  },
+  {
+    "id": 86,
+    "name": "Tallshroom",
+    "source": "Resources/Monsters/Database/tallshroom.tres"
+  },
+  {
+    "id": 87,
+    "name": "Chrono Shroom",
+    "source": "Resources/Monsters/Database/chrono_shroom.tres"
+  },
+  {
+    "id": 88,
+    "name": "Rokkak",
+    "source": "Resources/Monsters/Database/rokkak.tres"
+  },
+  {
+    "id": 89,
+    "name": "Puppeteer Anchor",
+    "source": "Resources/Monsters/Database/PuppeteerAnchor.tres"
+  },
+  {
+    "id": 90,
+    "name": "Coral",
+    "source": "Resources/Monsters/Database/Coral.tres"
+  },
+  {
+    "id": 91,
+    "name": "Dragonfruit",
+    "source": "Resources/Monsters/Database/Dragonfruit.tres"
+  },
+  {
+    "id": 92,
+    "name": "Fernek",
+    "source": "Resources/Monsters/Database/Fernek.tres"
+  },
+  {
+    "id": 93,
+    "name": "Kiwi",
+    "source": "Resources/Monsters/Database/Kiwi.tres"
+  },
+  {
+    "id": 94,
+    "name": "Lime Slime",
+    "source": "Resources/Monsters/Database/LimeSlime.tres"
+  },
+  {
+    "id": 95,
+    "name": "Pyramid Guardian",
+    "source": "Resources/Monsters/Database/PyramidGuardian.tres"
+  },
+  {
+    "id": 96,
+    "name": "Rocky",
+    "source": "Resources/Monsters/Database/Rocky.tres"
+  },
+  {
+    "id": 97,
+    "name": "Upsivase",
+    "source": "Resources/Monsters/Database/Upsivase.tres"
+  },
+  {
+    "id": 98,
+    "name": "Licka",
+    "source": "Resources/Monsters/Database/Licka.tres"
+  },
+  {
+    "id": 99,
+    "name": "Cursed Slime",
+    "source": "Resources/Monsters/Database/CursedSlime.tres"
+  },
+  {
+    "id": 100,
+    "name": "Cursed Cloudsheep",
+    "source": "Resources/Monsters/Database/CursedCloudsheep.tres"
+  },
+  {
+    "id": 101,
+    "name": "Fallentree",
+    "source": "Resources/Monsters/Database/Fallentree.tres"
+  },
+  {
+    "id": 102,
+    "name": "Ashball",
+    "source": "Resources/Monsters/Database/Ashball.tres"
+  },
+  {
+    "id": 103,
+    "name": "Gilded Slime",
+    "source": "Resources/Monsters/Database/GildedSlime.tres"
+  },
+  {
+    "id": 104,
+    "name": "Lampshroom",
+    "source": "Resources/Monsters/Database/Lampshroom.tres"
+  },
+  {
+    "id": 105,
+    "name": "Denial",
+    "source": "Resources/Monsters/Database/Denial.tres"
+  },
+  {
+    "id": 106,
+    "name": "Anger",
+    "source": "Resources/Monsters/Database/Anger.tres"
+  },
+  {
+    "id": 107,
+    "name": "Overripe Bananek",
+    "source": "Resources/Monsters/Database/OverripeBananek.tres"
+  },
+  {
+    "id": 108,
+    "name": "Lumen Sprite",
+    "source": "Resources/Monsters/Database/LumenSprite.tres"
+  },
+  {
+    "id": 109,
+    "name": "Frostfruit",
+    "source": "Resources/Monsters/Database/Frostfruit.tres"
+  },
+  {
+    "id": 110,
+    "name": "Cosmowl",
+    "source": "Resources/Monsters/Database/Cosmowl.tres"
+  },
+  {
+    "id": 111,
+    "name": "Cursed Spot",
+    "source": "Resources/Monsters/Database/CursedSpot.tres"
+  },
+  {
+    "id": 112,
+    "name": "Water Spot",
+    "source": "Resources/Monsters/Database/WaterSpot.tres"
+  },
+  {
+    "id": 113,
+    "name": "Mangosteen Slime",
+    "source": "Resources/Monsters/Database/MangosteenSlime.tres"
+  },
+  {
+    "id": 114,
+    "name": "Lime Guardian",
+    "source": "Resources/Monsters/Database/LimeGuardian.tres"
+  },
+  {
+    "id": 115,
+    "name": "Red Shroom",
+    "source": "Resources/Monsters/Database/RedShroom.tres"
+  },
+  {
+    "id": 116,
+    "name": "Molten Shroom",
+    "source": "Resources/Monsters/Database/MoltenShroom.tres"
+  },
+  {
+    "id": 117,
+    "name": "Froni",
+    "source": "Resources/Monsters/Database/Froni.tres"
+  },
+  {
+    "id": 118,
+    "name": "Duniga",
+    "source": "Resources/Monsters/Database/Duniga.tres"
+  },
+  {
+    "id": 119,
+    "name": "Icyghoul",
+    "source": "Resources/Monsters/Database/Icyghoul.tres"
+  },
+  {
+    "id": 120,
+    "name": "Deviling",
+    "source": "Resources/Monsters/Database/Deviling.tres"
+  },
+  {
+    "id": 121,
+    "name": "Anjel",
+    "source": "Resources/Monsters/Database/Anjel.tres"
+  },
+  {
+    "id": 122,
+    "name": "Lava Gloopy",
+    "source": "Resources/Monsters/Database/LavaGloopy.tres"
+  },
+  {
+    "id": 123,
+    "name": "Cursed Gloopy",
+    "source": "Resources/Monsters/Database/CursedGloopy.tres"
+  },
+  {
+    "id": 124,
+    "name": "Sandball",
+    "source": "Resources/Monsters/Database/Sandball.tres"
+  },
+  {
+    "id": 125,
+    "name": "Cursed Slibbit",
+    "source": "Resources/Monsters/Database/CursedSlibbit.tres"
+  },
+  {
+    "id": 126,
+    "name": "Cursed Tallshroom",
+    "source": "Resources/Monsters/Database/CursedTallshroom.tres"
+  },
+  {
+    "id": 127,
+    "name": "Frostshroom",
+    "source": "Resources/Monsters/Database/Frostshroom.tres"
+  },
+  {
+    "id": 128,
+    "name": "Verduniga",
+    "source": "Resources/Monsters/Database/Verduniga.tres"
+  },
+  {
+    "id": 129,
+    "name": "Blossnek",
+    "source": "Resources/Monsters/Database/Blossnek.tres"
+  },
+  {
+    "id": 130,
+    "name": "Banshek",
+    "source": "Resources/Monsters/Database/Banshek.tres"
+  },
+  {
+    "id": 131,
+    "name": "Goldling",
+    "source": "Resources/Monsters/Database/Goldling.tres"
+  },
+  {
+    "id": 132,
+    "name": "Forgotten Deerlime",
+    "source": "Resources/Monsters/Database/ForgottenDeerlime.tres"
+  },
+  {
+    "id": 133,
+    "name": "Gilded Deerlime",
+    "source": "Resources/Monsters/Database/GildedDeerlime.tres"
+  },
+  {
+    "id": 134,
+    "name": "Blorpghoul",
+    "source": "Resources/Monsters/Database/Blorpghoul.tres"
+  },
+  {
+    "id": 135,
+    "name": "Tantrum Gloopy",
+    "source": "Resources/Monsters/Database/TantrumGloopy.tres"
+  },
+  {
+    "id": 136,
+    "name": "Eternal Target Dummy",
+    "source": "Resources/Monsters/Database/EternalTargetDummy.tres"
+  }
+]
