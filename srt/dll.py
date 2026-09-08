@@ -2,7 +2,7 @@
 
 The DLL exposes a small C API (sr_tracker_install / uninstall / active /
 get_cube / get_account_id) and writes parsed events into a named
-REMOVED section "Global\\REMOVED" that this wrapper maps
+event buffer that this wrapper maps
 into the tracker process. has_event() / next_event() read framed JSON
 records directly from the section - no log file, no polling through
 the DLL.
@@ -23,7 +23,7 @@ from pathlib import Path
 from . import paths
 
 
-_SHM_NAME = "Global\\REMOVED"
+_SHM_NAME = "Global\\SRTrackerEvents"
 _SHM_CAP = 65520
 _SHM_SIZE = 65536
 _PAGE_READWRITE = 0x04
@@ -113,7 +113,7 @@ class TrackerDLL:
 
         self._lib = lib
 
-        # Map the REMOVED section the injected DLL uses. The
+        # Map the event buffer the injected DLL uses. The
         # tracker runs elevated (built --uac-admin), so creating a
         # Global\ section is allowed. We try OpenFileMappingA first so
         # the tracker can attach to a section that the previous run's
@@ -282,7 +282,7 @@ class TrackerDLL:
     def account_id(self) -> int:
         return self._lib.sr_tracker_get_account_id()
 
-    # --- REMOVED helpers ---
+    # --- buffer helpers ---
     def _read_head(self) -> int:
         # Atomic 8-byte load at offset 0. ctypes does a single mov on
         # x64; the producer's release-store makes this safe.

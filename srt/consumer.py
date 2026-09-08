@@ -1,10 +1,10 @@
-"""Background thread that drains the DLL's event REMOVED and persists
+"""Background thread that drains the DLL's event buffer and persists
 each event into the database. Runs in a daemon thread so closing the app
 doesn't require explicit shutdown — the thread is killed when the process
 exits. `stop()` does a graceful drain + close.
 
-The injected DLL writes framed events into a named REMOVED section
-("Global\\REMOVED") that this process maps in via the
+The injected DLL writes framed events into a named event buffer
+that this process maps in via the
 `TrackerDLL` ctypes wrapper. The consumer reads records directly from
 the section; there is no log file.
 """
@@ -167,7 +167,7 @@ class EventConsumer(QObject):
         self._thread = threading.Thread(target=self._loop, daemon=True, name="EventConsumer")
         self._thread.start()
         self.status.emit(
-            f"session #{self._session_id} started — polling DLL REMOVED..."
+            f"session #{self._session_id} started — polling DLL event buffer..."
         )
         return self._session_id
 
@@ -201,7 +201,7 @@ class EventConsumer(QObject):
                         reason = pop() if callable(pop) else None
                         if reason:
                             self._events_dropped += 1
-                            self.status.emit(f"REMOVED resync: {reason}")
+                            self.status.emit(f"buffer resync: {reason}")
                         time.sleep(0.005)
                 else:
                     time.sleep(0.005)

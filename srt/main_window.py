@@ -27,7 +27,10 @@ from PySide6.QtWidgets import (
 
 from . import paths as _paths
 from . import theme
-from REMOVED import inject as _inject_tool
+try:
+    from tools.private import inject as _inject_tool
+except ImportError:
+    _inject_tool = None
 from .consumer import EventConsumer
 from .crystal import crystal_pixmap
 from .debug_console import DebugConsole, is_dev_mode
@@ -454,7 +457,7 @@ class MainWindow(QMainWindow):
         self._last_tab_refresh = 0.0
         # Silence watchdog state for _on_tick: warn once per idle stretch
         # when tracking runs but no events arrive, with enough detail
-        # (REMOVED head, game process state) to tell a quiet game
+        # (event-buffer head, game process state) to tell a quiet game
         # apart from a dead bridge. Reset whenever events flow again.
         self._silence_warned = False
 
@@ -1099,6 +1102,12 @@ class MainWindow(QMainWindow):
             # The hooks must live in the GAME process — the tracker's own
             # copy of the DLL never sees game traffic. Make sure the DLL
             # is injected before starting a session.
+            if _inject_tool is None:
+                msg = ("Injection helper not available (tools/private/ is "
+                       "not present) — cannot start tracking")
+                self._on_consumer_status(msg)
+                QMessageBox.critical(self, "Injection unavailable", msg + ".")
+                return
             self._on_consumer_status("[1/6] looking for game process...")
             game = _inject_tool.DEFAULT_PROCESS
             pid = _inject_tool.find_pid(game)
@@ -2273,17 +2282,21 @@ class MainWindow(QMainWindow):
         # even there anymore.
         game_state = ""
         try:
-            game = _inject_tool.DEFAULT_PROCESS
-            pid = _inject_tool.find_pid(game)
-            if not pid:
-                game_state = (f" {game} is not running — if it closed or"
-                              " relaunched, Stop and Start tracking again")
-            elif not _inject_tool.is_module_loaded(pid, "sr_tracker.dll"):
-                game_state = (f" game PID={pid} alive but sr_tracker.dll is"
-                              " not loaded in it — Stop, then Start to reinject")
+            if _inject_tool is None:
+                game_state = (" injection helper unavailable — Stop and "
+                              "Start tracking again once tools/private/ is present")
             else:
-                game_state = (f" game PID={pid} alive, DLL loaded — hooks see"
-                              " no traffic (channel reconnect the DLL missed?)")
+                game = _inject_tool.DEFAULT_PROCESS
+                pid = _inject_tool.find_pid(game)
+                if not pid:
+                    game_state = (f" {game} is not running — if it closed or"
+                                  " relaunched, Stop and Start tracking again")
+                elif not _inject_tool.is_module_loaded(pid, "sr_tracker.dll"):
+                    game_state = (f" game PID={pid} alive but sr_tracker.dll is"
+                                  " not loaded in it — Stop, then Start to reinject")
+                else:
+                    game_state = (f" game PID={pid} alive, DLL loaded — hooks see"
+                                  " no traffic (channel reconnect the DLL missed?)")
         except Exception:
             pass
         self._on_consumer_status(

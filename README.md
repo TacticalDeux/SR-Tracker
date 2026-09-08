@@ -1,11 +1,11 @@
 # SR Tracker
 
 Desktop tracker for Soul's Remnant. Injects a hook DLL into
-the running game, decodes gameplay events from REMOVED, and shows kills / drops /
+the running game, decodes gameplay events from the game, and shows kills / drops /
 soul crystals / XP / level / zone / deaths in a native Qt UI plus an always-on-top overlay.
 
-The hook DLL lives in `dll/sr_tracker.dll` (C++ source in `dll/REMOVED` alongside
-the binary). Everything else here is the Python/Qt application that drives it.
+The hook DLL lives in `dll/sr_tracker.dll` (private build, binary bundled
+into releases). Everything else here is the Python/Qt application that drives it.
 
 ## Project layout
 
@@ -14,8 +14,8 @@ srt/                  Application package
   app.py              Qt entry point + tray menu (Toggle Overlay / Show Main / Quit)
   main_window.py      Main tracker window (Summary, Sessions, Kills, Drops, Zones, Graphs, Overlay + Debug)
   overlay.py          Frameless / always-on-top HUD window
-  consumer.py         Background thread that drains the DLL REMOVED into SQLite
-  dll.py              ctypes wrapper around sr_tracker.dll (Global\REMOVED)
+  consumer.py         Background thread that drains the DLL event buffer into SQLite
+  dll.py              ctypes wrapper around sr_tracker.dll
   db.py               SQLite persistence (sessions, kills, drops, deaths, xp_events, zone_visits, ...)
   settings.py         User settings (Settings dataclass + thread-safe SettingsStore)
   paths.py            File locations (dev vs frozen bundle)
@@ -27,7 +27,6 @@ srt/                  Application package
 
 tools/
   build.py            Build a standalone exe with PyInstaller (--clean / --console / --no-uac-admin)
-  REMOVED       REMOVED
   private/            Private submodule
 
 dll/                  Private hook DLL (submodule pointer; binary bundled into releases)
@@ -51,19 +50,17 @@ python sr_tracker.py
 The first run creates `data/srtracker.db` next to the source. Settings
 live in `data/settings.json` while developing.
 
-To inject the DLL into the game (default target `REMOVED`):
+To inject the DLL into the game (default game process):
 
 ```sh
-python -m REMOVED               # auto-find the game
-python -m REMOVED 12345         # inject into a specific PID
-python -m REMOVED --launch      # launch the game then inject
-python -m REMOVED --name proc.exe  # match a different process name
+# Injection is handled from the UI via Start Tracking.
+
 ```
 
-In the UI, **Start Tracking** does this automatically: finds the game PID →
-checks if the DLL is loaded → injects via `REMOVED` → waits for
-install → starts the `EventConsumer`, which drains the `Global\REMOVED`
-REMOVED into SQLite. **Stop** ends the session; **Reset session** clears
+In the UI, **Start Tracking** does this automatically: finds the game →
+loads the game hooks → waits for
+install → starts the `EventConsumer`, which drains the event buffer
+into SQLite. **Stop** ends the session; **Reset session** clears
 kills/drops/XP/etc. for the current session id (keeps the id).
 
 Deaths are recorded from the game's death screen with the exact toll
@@ -74,15 +71,15 @@ Deaths are recorded from the game's death screen with the exact toll
 ```sh
 python -m tools.build --clean
 python -m tools.build --console    # debug build with a console window
-python -m tools.build --no-uac-admin  # skip the REMOVED manifest
+python -m tools.build --no-uac-admin  # skip the admin manifest
 ```
 
 Output: `dist/SR Tracker/SR Tracker.exe` (small bootloader) +
 `dist/SR Tracker/_internal/` (Python runtime + the `srt/` package +
 bundled `dll/sr_tracker.dll` + `assets/soul_crystal.png`).
 
-The exe embeds a `REMOVED` manifest by default (REMOVED on every
-launch) so `REMOVED` / `REMOVED` injection works without a
+The exe embeds an admin manifest by default (UAC prompt on every
+launch) so DLL injection works without a
 separate "run as admin" step.
 
 When frozen, the database and settings file live under
@@ -94,7 +91,7 @@ When frozen, the database and settings file live under
 | --- | --- | --- |
 | Database | `data/srtracker.db` | `%LOCALAPPDATA%\SRTracker\srtracker.db` |
 | Settings | `data/settings.json` | `%LOCALAPPDATA%\SRTracker\settings.json` |
-| DLL events log | `%TEMP%\REMOVED` (DLL-owned) | same |
+| DLL events log | `%TEMP%` tracker event log (DLL-owned) | same |
 
 SQLite tables: `sessions`, `kills`, `drops`, `deaths`, `xp_events`, `damage`,
 `spawn_notifications`, `events`, `zone_visits` (+ `zone_stats` view), with
@@ -106,7 +103,7 @@ migration logic for legacy DBs.
   - **Summary**: soul-crystal orb + at-a-glance metrics. Every count states
     what it means: kills/drops/damage read "yours / session total", soul
     crystals read "picked up / total" (your crystals only), XP is the session
-    total. Fields set to visit scope show the current visit (zone name,
+    total. Fields set to per-zone scope show the current visit (zone name,
     mirage marker, visit stats) instead.
   - **Sessions**: session list (double-click a row to open details) with the
     same yours/total labeling, plus damage and DPS columns; detail dialog
@@ -117,7 +114,7 @@ migration logic for legacy DBs.
   - **Zones**: per-zone breakdown with mirage markers.
   - **Graphs**: metric/chart/zone selectors + session selector + Details / Refresh.
     Damage and DPS are chartable alongside the other metrics.
-  - **Overlay**: all overlay settings (fields, order, per-field visit/session
+  - **Overlay**: all overlay settings (fields, order, per-field per-zone/session
     scope, opacity, scale, colors, orientation).
    - **Debug**: dev event stream (`debug_console.py`).
   - Header band: **Start/Stop Tracking** (primary), **Show overlay**,

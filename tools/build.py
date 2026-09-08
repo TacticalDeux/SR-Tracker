@@ -49,9 +49,9 @@ def build(clean: bool, console: bool, uac_admin: bool = True) -> int:
     if not console:
         cmd.append("--windowed")
     if uac_admin:
-        # Embed a REMOVED manifest so Windows shows a UAC
-        # prompt on every launch. Needed for REMOVED/REMOVED
-        # injection into the game without a separate "run as admin" step.
+        # Embed an admin manifest so Windows shows a UAC
+        # prompt on every launch. Needed for DLL injection
+        # into the game without a separate "run as admin" step.
         cmd.append("--uac-admin")
     cmd.append(ENTRY)
     _run(cmd)
@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build SR Tracker with PyInstaller.")
     parser.add_argument("--clean", action="store_true", help="Wipe build/ and dist/ first")
     parser.add_argument("--console", action="store_true", help="Build with a console window for debugging")
-    parser.add_argument("--no-uac-admin", action="store_true", help="Skip the REMOVED manifest (no REMOVED)")
+    parser.add_argument("--no-uac-admin", action="store_true", help="Skip the admin manifest (no UAC prompt)")
     args = parser.parse_args(argv)
     return build(args.clean, args.console, uac_admin=not args.no_uac_admin)
 
