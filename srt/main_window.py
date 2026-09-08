@@ -518,15 +518,15 @@ class MainWindow(QMainWindow):
         # unlinked. A filled crimson chip (INK text on the theme red)
         # so it reads as a warning against the ink header. State-driven,
         # never dismissable.
-        self._badge_channel = QLabel("NOT LINKED — LOG INTO A CHANNEL")
+        self._badge_channel = QLabel("NOT LINKED — LOG IN OR CHANGE CHANNELS")
         self._badge_channel.setFont(QFont("Segoe UI", 10, QFont.Bold))
         self._badge_channel.setStyleSheet(
             f"color: {theme.INK_0}; background: {theme.CRIMSON};"
             " padding: 7px 14px; letter-spacing: 1px;"
         )
         self._badge_channel.setToolTip(
-            "The tracker hasn't seen a channel yet. Log into a channel "
-            "(or change channels) to start recording.")
+            "The tracker hasn't seen a channel yet. Log in "
+            "or change channels to start recording.")
         self._badge_channel.hide()
         lay.addWidget(self._badge_channel)
 

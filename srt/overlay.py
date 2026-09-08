@@ -50,9 +50,9 @@ SESSION_SCOPE = "session"
 
 #: runs but the session is not yet channel-linked; clears the moment
 #: linkage lands.
-CHANNEL_BADGE_TEXT = "NOT LINKED — LOG INTO A CHANNEL"
-CHANNEL_BADGE_TIP = ("The tracker hasn't seen a channel yet. Log into "
-                     "a channel (or change channels) to start recording.")
+CHANNEL_BADGE_TEXT = "NOT LINKED — LOG IN OR CHANGE CHANNELS"
+CHANNEL_BADGE_TIP = ("The tracker hasn't seen a channel yet. Log in "
+                     "or change channels to start recording.")
 
 
 def field_scope(settings, key: str) -> str:
@@ -1118,8 +1118,14 @@ class OverlayWindow(QWidget):
             s = self._db.summary(sid)
         except Exception:
             return
-        # Legacy snapshots predate the flag — default to hidden.
-        self.set_needs_channel(bool(s.get("needs_channel", False)))
+        # The flag rides on snapshots the main window assembles — a raw
+        # db.summary() never carries it. A missing key is missing data,
+        # not a state change, so leave the badge alone (the main-window
+        # push owns the steady state); only an actual present flag may
+        # move visibility. This is what keeps the badge steady instead
+        # of flashing on alternate polls.
+        if "needs_channel" in s:
+            self.set_needs_channel(bool(s.get("needs_channel", False)))
         per_field = {key: field_scope(self._settings, key)
                      for key in self._rows}
         visit = s.get("visit")
