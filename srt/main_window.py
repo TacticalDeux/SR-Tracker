@@ -514,6 +514,22 @@ class MainWindow(QMainWindow):
         lay.addWidget(brand, 0)
         lay.addStretch(1)
 
+        # Channel-linkage badge: visible exactly while tracking runs
+        # unlinked. A filled crimson chip (INK text on the theme red)
+        # so it reads as a warning against the ink header. State-driven,
+        # never dismissable.
+        self._badge_channel = QLabel("NOT LINKED — LOG INTO A CHANNEL")
+        self._badge_channel.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        self._badge_channel.setStyleSheet(
+            f"color: {theme.INK_0}; background: {theme.CRIMSON};"
+            " padding: 7px 14px; letter-spacing: 1px;"
+        )
+        self._badge_channel.setToolTip(
+            "The tracker hasn't seen a channel yet. Log into a channel "
+            "(or change channels) to start recording.")
+        self._badge_channel.hide()
+        lay.addWidget(self._badge_channel)
+
         # The four command chips
         self.btn_toggle = QPushButton("Start")
         self.btn_toggle.setProperty("role", "primary")
@@ -1179,6 +1195,17 @@ class MainWindow(QMainWindow):
             "tracker to start.",
         )
 
+    def _set_channel_badge(self, needs: bool) -> None:
+        """Drive both channel badges from one flag: the header chip
+        here and the overlay's banner row. The overlay reads
+        db.summary() on its own poll loop, which never carries the
+        flag — so the main window pushes it (mirroring how lock state
+        is pushed into the overlay)."""
+        if hasattr(self, "_badge_channel"):
+            self._badge_channel.setVisible(bool(needs))
+        if self._overlay is not None:
+            self._overlay.set_needs_channel(bool(needs))
+
     def _toggle_overlay(self) -> None:
         # Reuse the window: building a fresh OverlayWindow on every show
         # leaked the old one — its poll timer kept running against the
@@ -1201,6 +1228,7 @@ class MainWindow(QMainWindow):
             self._overlay.reload_settings()
             self._overlay.show()
             self.btn_overlay.setText("Hide overlay")
+            self._overlay.set_needs_channel(self._consumer.needs_channel())
         self._refresh_overlay_tab()
 
     def _reset_session(self) -> None:
@@ -1256,6 +1284,7 @@ class MainWindow(QMainWindow):
             self._overlay.reload_settings()
             self._overlay.show()
             self.btn_overlay.setText("Hide overlay")
+            self._overlay.set_needs_channel(self._consumer.needs_channel())
         self._overlay.set_locked(locked)
         self._refresh_lock_button()
         self._refresh_overlay_tab()
@@ -1648,6 +1677,7 @@ class MainWindow(QMainWindow):
         sid = self._display_session_id()
         if sid is None:
             self._summary.set_summary(None)
+            self._set_channel_badge(False)
             return
         try:
             s = self._db.summary(sid)
@@ -1655,6 +1685,10 @@ class MainWindow(QMainWindow):
             self._set_status(f"(error: {e})")
             return
         s["needs_channel"] = self._consumer.needs_channel()
+        # Channel badge (header chip + overlay banner) follows the flag
+        # every tick — it clears the moment linkage lands. Legacy
+        # snapshots predate the flag and default to hidden.
+        self._set_channel_badge(bool(s.get("needs_channel", False)))
         # Session-side XP/HR + DPS rows need session-wide rates, but only
         # when one of them is actually scoped to the session.
         scopes = all_field_scopes(self._settings)

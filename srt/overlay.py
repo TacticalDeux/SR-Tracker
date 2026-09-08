@@ -46,6 +46,14 @@ from .settings import (
 VISIT_SCOPE = "visit"
 SESSION_SCOPE = "session"
 
+#: Channel-linkage warning badge. Shown while tracking
+
+#: runs but the session is not yet channel-linked; clears the moment
+#: linkage lands.
+CHANNEL_BADGE_TEXT = "NOT LINKED — LOG INTO A CHANNEL"
+CHANNEL_BADGE_TIP = ("The tracker hasn't seen a channel yet. Log into "
+                     "a channel (or change channels) to start recording.")
+
 
 def field_scope(settings, key: str) -> str:
     """Effective reset scope for one overlay field.
@@ -374,6 +382,31 @@ class OverlayWindow(QWidget):
         layout.addWidget(_hairline())
         layout.addSpacing(10)
 
+        # --- channel-linkage badge (hidden unless tracking runs
+        # unlinked). A red badge row above the fields: display-only, so
+        # it coexists with lock — pass-through covers it like every
+        # other child, and its colors never dim. A _FitLabel sizes it
+        # to its full text, so the window widens instead of clipping.
+        # Lives outside _fields_host, so orientation rebuilds and field
+        # toggles never touch it.
+        self._badge_box = QWidget()
+        badge_lay = QVBoxLayout(self._badge_box)
+        badge_lay.setContentsMargins(0, 0, 0, 0)
+        badge_lay.setSpacing(0)
+        self._badge = _FitLabel(CHANNEL_BADGE_TEXT,
+                                Qt.AlignVCenter | Qt.AlignLeft)
+        self._badge.setToolTip(CHANNEL_BADGE_TIP)
+        # A leaf label: inline colors here affect only this badge. The
+        # shared OverlayLabel rule still owns font/padding, and the
+        # scale rule still sizes it with the rest of the content.
+        self._badge.setStyleSheet(
+            f"color: {theme.INK_0}; background: {theme.CRIMSON};")
+        badge_lay.addWidget(self._badge)
+        badge_lay.addSpacing(10)
+        layout.addWidget(self._badge_box)
+        self._badge_box.hide()
+        self._needs_channel = False
+
         # --- metric rows (rebuildable: an orientation switch throws the
         # whole box away and re-creates it, which is simpler and safer
         # than swapping layouts on live widgets) ---
@@ -653,6 +686,20 @@ class OverlayWindow(QWidget):
     # ------------------------------------------------------------------
     def is_overlay_locked(self) -> bool:
         return self._settings.overlay_locked
+
+    def set_needs_channel(self, needs: bool) -> None:
+        """Show or hide the channel-linkage badge. State-driven and not
+        dismissable: visible exactly while tracking runs unlinked, gone
+        the moment linkage lands. A no-op when the state didn't change,
+        so the poll loop never churns the layout. Display-only — lock,
+        opacity, scale and drag are untouched."""
+        needs = bool(needs)
+        if needs == self._needs_channel:
+            return
+        self._needs_channel = needs
+        self._badge_box.setVisible(needs)
+        # Structural change: measure after the layout pass settles.
+        self._refit_window_soon()
 
     def reload_settings(self) -> None:
         """Re-read the settings store and apply everything live. Called
@@ -1065,11 +1112,14 @@ class OverlayWindow(QWidget):
             for _, num in self._rows.values():
                 num.set_value("—")
                 num.setToolTip("")
+            self.set_needs_channel(False)
             return
         try:
             s = self._db.summary(sid)
         except Exception:
             return
+        # Legacy snapshots predate the flag — default to hidden.
+        self.set_needs_channel(bool(s.get("needs_channel", False)))
         per_field = {key: field_scope(self._settings, key)
                      for key in self._rows}
         visit = s.get("visit")
