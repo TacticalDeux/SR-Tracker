@@ -128,9 +128,9 @@ migration logic for legacy DBs.
   long zone names and big counts widen the window instead of clipping.
   - 9 toggleable fields: kills, sc (soul crystals, picked up / total),
     xp, level, zone, deaths, xp_lost, xp/hr, dps — drag-to-reorder
-    (top to bottom). Each field independently picks visit scope (resets on
-    zone change) or session scope (persists), so you can watch the current
-    area without resetting.
+    (top to bottom). Each field independently picks per-zone scope (resets
+    on zone change) or session scope (persists), so you can watch the
+    current area without resetting.
   - Large counts render compact (1.5K, 3.4M, 5.6B); exact values on hover
     and in the main window.
   - Two opacity paths: card-background alpha + whole-window opacity, each with a

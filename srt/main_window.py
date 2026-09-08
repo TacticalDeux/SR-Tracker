@@ -120,13 +120,13 @@ class _SummaryPanel(QWidget):
         self._visit_header.hide()
         right.addWidget(self._visit_header)
 
-        self._v_kills   = self._make_metric("VISIT KILLS")
-        self._v_sc      = self._make_metric("VISIT SOUL CRYSTALS")
-        self._v_xp      = self._make_metric("VISIT EXPERIENCE")
-        self._v_deaths  = self._make_metric("VISIT DEATHS")
-        self._v_xp_lost = self._make_metric("VISIT XP LOST")
-        self._v_xp_hr   = self._make_metric("VISIT XP/HR")
-        self._v_dps     = self._make_metric("VISIT DPS")
+        self._v_kills   = self._make_metric("PER-ZONE KILLS")
+        self._v_sc      = self._make_metric("PER-ZONE SOUL CRYSTALS")
+        self._v_xp      = self._make_metric("PER-ZONE EXPERIENCE")
+        self._v_deaths  = self._make_metric("PER-ZONE DEATHS")
+        self._v_xp_lost = self._make_metric("PER-ZONE XP LOST")
+        self._v_xp_hr   = self._make_metric("PER-ZONE XP/HR")
+        self._v_dps     = self._make_metric("PER-ZONE DPS")
         self._visit_rows = (self._v_kills, self._v_sc, self._v_xp,
                             self._v_deaths, self._v_xp_lost,
                             self._v_xp_hr, self._v_dps)
@@ -261,41 +261,41 @@ class _SummaryPanel(QWidget):
         any_visit_row = False
         if visit is not None:
             display = (visit.get("display_name") or visit.get("map_name")
-                       or "Current visit")
-            header = f"CURRENT VISIT — {display}"
+                       or "Current zone")
+            header = f"PER-ZONE — {display}"
             if visit.get("is_mirage"):
                 header += "  ◈ MIRAGE"
             self._visit_header.setText(header)
             self._visit_header.setToolTip(
-                f"{display} (visit #{visit.get('visit_id')})"
+                f"{display} (zone #{visit.get('visit_id')})"
                 + (" — mirage run" if visit.get("is_mirage") else ""))
             sc_total = visit["sc_picked"] + visit["sc_unpicked"]
             self._v_kills._num.setText(
                 _mine_total(visit["my_kills"], visit["kills"]))
             self._v_kills._num.setToolTip(
-                f"{visit['my_kills']} yours / {visit['kills']} in this visit")
+                f"{visit['my_kills']} yours / {visit['kills']} in this zone")
             self._v_sc._num.setText(
                 _mine_total(visit["sc_picked"], sc_total))
             self._v_sc._num.setToolTip(
-                f"{visit['sc_picked']:,} picked up / {sc_total:,} in this visit")
+                f"{visit['sc_picked']:,} picked up / {sc_total:,} in this zone")
             self._v_xp._num.setText(f"{visit['xp']:,}")
             self._v_xp._num.setToolTip(
-                f"{visit['xp']:,} XP in this visit")
+                f"{visit['xp']:,} XP in this zone")
             self._v_deaths._num.setText(str(visit.get("deaths", 0)))
             self._v_deaths._num.setToolTip(
-                f"{visit.get('deaths', 0)} deaths in this visit")
+                f"{visit.get('deaths', 0)} deaths in this zone")
             self._v_xp_lost._num.setText(f"{visit.get('xp_lost', 0):,}")
             self._v_xp_lost._num.setToolTip(
-                f"{visit.get('xp_lost', 0):,} XP lost to deaths in this visit")
+                f"{visit.get('xp_lost', 0):,} XP lost to deaths in this zone")
             self._v_xp_hr._num.setText(
                 f"{_compact_rate(visit['xp_hr'])}/hr")
             self._v_xp_hr._num.setToolTip(
-                f"{visit['xp_hr']:,.1f} XP/hr in this visit")
+                f"{visit['xp_hr']:,.1f} XP/hr per-zone (this zone)")
             self._v_dps._num.setText(
                 f"{_compact_rate(visit['dps_mine'])} DPS")
             self._v_dps._num.setToolTip(
                 f"{visit['dps_mine']:,.1f} yours / "
-                f"{visit['dps']:,.1f} total DPS in this visit")
+                f"{visit['dps']:,.1f} total DPS per-zone (this zone)")
             for key, w in self._visit_widgets.items():
                 show = eff(key) == "visit"
                 w.setVisible(show)
@@ -312,10 +312,10 @@ class _SummaryPanel(QWidget):
             self._visit_header.show()
             header_on = True
         elif want_visit:
-            # Visit-scoped fields but no visit open yet — say so, keep
+            # Per-zone fields but no zone open yet — say so, keep
             # session totals beneath exactly as today.
-            self._visit_header.setText("CURRENT VISIT — none open yet")
-            self._visit_header.setToolTip("Enter a zone to open a visit")
+            self._visit_header.setText("PER-ZONE — none open yet")
+            self._visit_header.setToolTip("Enter a zone to start per-zone stats")
             self._visit_header.show()
             header_on = False
         else:
@@ -869,7 +869,19 @@ class MainWindow(QMainWindow):
         overlay in place; the overlay's own drawer stays as a second,
         always-synced way to change the same values."""
         tab = QWidget()
-        outer = QVBoxLayout(tab)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(0, 0, 0, 0)
+        # The field list grows with per-field scope rows; a fixed tab
+        # would cut the bottom rows off with no way to reach them. A
+        # frameless resizable scroll area keeps the exact same look
+        # (same INK_0 containers on the INK_1 pane, as in Summary) and
+        # only scrolls when the content outgrows the tab.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        self._overlay_scroll = scroll
+        content = QWidget()
+        outer = QVBoxLayout(content)
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
 
@@ -1000,7 +1012,7 @@ class MainWindow(QMainWindow):
             f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
         )
         outer.addWidget(fields_label)
-        scope_hint = QLabel("Scope per field: Visit resets on zone change · Session persists")
+        scope_hint = QLabel("Scope per field: Per-zone resets on zone change · Session persists")
         scope_hint.setFont(QFont("Georgia", 9))
         scope_hint.setStyleSheet(
             f"color: {theme.ASH_BRIGHT}; font-style: italic;")
@@ -1010,16 +1022,36 @@ class MainWindow(QMainWindow):
         # drag (or nudge with the arrows) into display order.
         fields_row = QHBoxLayout()
         self._ov_fields = QListWidget()
+        self._ov_fields.setObjectName("OvFields")
+        # Theme-consistent selected row: crystal fill with ink text so
+        # the row behind the up/down reorder target always reads
+        # (see _paint_ov_field_selection for the label side). Row
+        # widgets stay transparent so this fill shows through.
+        self._ov_fields.setStyleSheet(
+            f"#OvFields {{ background: transparent; outline: 0; }}"
+            f" #OvFields::item {{ background: transparent; border: 0; }}"
+            f" #OvFields::item:selected {{ background: {theme.CRYSTAL};"
+            f" color: {theme.INK_0}; border: 0; }}"
+            f" #OvFields::item:selected:active {{ background: {theme.CRYSTAL};"
+            f" color: {theme.INK_0}; }}"
+            f" #OvFields QLabel {{ background: transparent; }}"
+            f" #OvFields QCheckBox {{ background: transparent; }}")
         self._ov_fields.setDragDropMode(
             QAbstractItemView.InternalMove)
         self._ov_fields.setDefaultDropAction(Qt.MoveAction)
         self._ov_fields.setSelectionMode(
             QAbstractItemView.SingleSelection)
-        self._ov_fields.setMaximumHeight(178)
+        # Tall enough to show every field without scrolling the list
+        # itself; the tab scrolls instead when space runs out.
+        self._ov_fields.setMinimumHeight(320)
         self._ov_fields.itemChanged.connect(
             lambda _i: self._push_overlay_settings())
         self._ov_fields.model().rowsMoved.connect(
             lambda *_a: self._push_overlay_settings())
+        self._ov_fields.currentRowChanged.connect(
+            lambda _r: self._paint_ov_field_selection())
+        self._ov_fields.itemSelectionChanged.connect(
+            self._paint_ov_field_selection)
         fields_row.addWidget(self._ov_fields, 1)
         move_col = QVBoxLayout()
         self._ov_field_up = QPushButton("▲")
@@ -1043,6 +1075,9 @@ class MainWindow(QMainWindow):
         note.setFont(QFont("Georgia", 10))
         note.setStyleSheet(f"color: {theme.ASH_BRIGHT}; font-style: italic;")
         outer.addWidget(note)
+
+        scroll.setWidget(content)
+        layout.addWidget(scroll)
 
         self._overlay_tab_idx = self._tabs.addTab(tab, "Overlay")
 
@@ -1365,8 +1400,11 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _sync_scope_button(btn: QPushButton, is_visit: bool, key: str) -> None:
-        """Paint a scope toggle: Visit (resets on zone change) or Session
-        (persists). Level is account-wide, so its toggle stays parked on
+        """Paint a scope toggle: Per-zone (resets on zone change) or
+        Session (persists). The button is checkable — checked reads
+        Per-zone, unchecked reads Session — so the pressed crystal
+        fill from the theme marks the per-zone side like any other
+        toggle. Level is account-wide, so its toggle stays parked on
         Session and disabled."""
         btn.blockSignals(True)
         try:
@@ -1378,9 +1416,9 @@ class MainWindow(QMainWindow):
                 btn.setEnabled(False)
             else:
                 btn.setChecked(is_visit)
-                btn.setText("Visit" if is_visit else "Session")
+                btn.setText("Per-zone" if is_visit else "Session")
                 btn.setToolTip(
-                    "Visit — resets on zone change" if is_visit
+                    "Per-zone — resets on zone change" if is_visit
                     else "Session — persists through the session")
                 btn.setEnabled(True)
         finally:
@@ -1388,9 +1426,9 @@ class MainWindow(QMainWindow):
 
     def _make_ov_field_row(self, key: str, label: str) -> QWidget:
         """One field row: visibility checkbox, name, compact scope toggle.
-        The scope button is checkable — checked reads Visit, unchecked
-        reads Session — and pinned to the wider label so toggling never
-        reflows the list."""
+        The scope button is checkable — checked reads Per-zone,
+        unchecked reads Session — and pinned to the wider label so
+        toggling never reflows the list."""
         row = QWidget()
         h = QHBoxLayout(row)
         h.setContentsMargins(2, 2, 2, 2)
@@ -1419,9 +1457,9 @@ class MainWindow(QMainWindow):
         if btn is None:
             return
         is_visit = btn.isChecked()
-        btn.setText("Visit" if is_visit else "Session")
+        btn.setText("Per-zone" if is_visit else "Session")
         btn.setToolTip(
-            "Visit — resets on zone change" if is_visit
+            "Per-zone — resets on zone change" if is_visit
             else "Session — persists through the session")
         self._push_overlay_settings()
 
@@ -1433,7 +1471,8 @@ class MainWindow(QMainWindow):
         labels = dict(OVERLAY_FIELDS)
         if not getattr(self, "_ov_scope_btn_w", 0):
             self._ov_scope_btn_w = (
-                self._ov_fields.fontMetrics().horizontalAdvance("Session")
+                max(self._ov_fields.fontMetrics().horizontalAdvance(t)
+                    for t in ("Per-zone", "Session"))
                 + 24)
         order = list(getattr(s, "overlay_field_order", None)
                      or [k for k, _ in OVERLAY_FIELDS])
@@ -1480,6 +1519,30 @@ class MainWindow(QMainWindow):
                 chk.blockSignals(False)
             self._sync_scope_button(
                 row_w._scope, scopes.get(key) == "visit", key)
+        self._paint_ov_field_selection()
+
+    def _paint_ov_field_selection(self) -> None:
+        """Repaint the field list's selected row so keyboard and click
+        selection both read at a glance.
+
+        The rows are item widgets, so the view's own ::item:selected
+        fill only shows around them — each row's name label carries
+        the state too (crystal, bold for the selected row, plain
+        otherwise). Leaf labels only, never a container sheet, so the
+        scope toggles' checked fill is untouched."""
+        if not hasattr(self, "_ov_fields"):
+            return
+        cur = self._ov_fields.currentRow()
+        for i in range(self._ov_fields.count()):
+            row_w = self._ov_fields.itemWidget(self._ov_fields.item(i))
+            if row_w is None:
+                continue
+            if i == cur:
+                row_w._name.setStyleSheet(
+                    f"background: transparent; color: {theme.CRYSTAL_LIGHT};"
+                    " font-weight: bold;")
+            else:
+                row_w._name.setStyleSheet("background: transparent;")
 
     def _on_ov_field_move(self, delta: int) -> None:
         """Nudge the selected field up (-1) or down (+1) in the order.

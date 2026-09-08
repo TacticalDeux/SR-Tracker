@@ -1111,9 +1111,9 @@ class OverlayWindow(QWidget):
                 "xp_lost": _exact_number(visit["xp_lost"])
                 if isinstance(visit["xp_lost"], int)
                 else str(visit["xp_lost"]),
-                "xp_hr": f"{visit['xp_hr']:,.1f} XP/hr (this visit)",
+                "xp_hr": f"{visit['xp_hr']:,.1f} XP/hr per-zone (this zone)",
                 "dps": (f"{visit['dps_mine']:,.1f} yours / "
-                        f"{visit['dps']:,.1f} total DPS (this visit)"),
+                        f"{visit['dps']:,.1f} total DPS per-zone (this zone)"),
             }
         # Session totals — today's behavior. The two rate rows read
         # session-wide rates; the extra query runs only when a visible
