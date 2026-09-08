@@ -73,6 +73,13 @@ class Settings:
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False
+    # Buff window. Defaults sit below the main overlay's default spot
+    # so the two never overlap on a fresh setup.
+    REMOVED_x: int = 60
+    REMOVED_y: int = 340
+    REMOVED: float = 1.0
+    REMOVED: bool = False
+    REMOVED: bool = True
     overlay_orientation: str = "vertical"  # "vertical" (stacked rows) or "horizontal" (strip)
 
     @classmethod

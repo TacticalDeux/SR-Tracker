@@ -46,6 +46,7 @@ _GAMEPLAY_TYPES = frozenset({
     "level_up",
     "mirage_exit",
     "portal_sight",
+    "REMOVED",
     "zone_change",
 })
 
@@ -353,6 +354,18 @@ class EventConsumer(QObject):
             # zone change closes the visit, so flag-then-close ordering
             # holds: the open visit is still open here.
             self._db.mark_current_visit_mirage(sid, ts)
+        elif etype == "REMOVED":
+            # A buff add/update/remove sighting. Stored as-is; the
+            # active set is derived at query time.
+            try:
+                buff_id = int(data.get("buff_id", 0))
+                mode = str(data.get("mode", ""))
+                duration = int(data.get("duration", 0))
+            except (TypeError, ValueError):
+                return
+            if mode not in ("add", "update", "remove"):
+                return
+            self._db.REMOVED(sid, buff_id, mode, duration, ts)
         elif etype == "portal_sight":
             # A portal listing with its label and pass cost. Remembered
             # briefly for same-zone arrival correlation below.
