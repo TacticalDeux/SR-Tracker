@@ -63,6 +63,9 @@ install → starts the `EventConsumer`, which drains the event buffer
 into SQLite. **Stop** ends the session; **Reset session** clears
 kills/drops/XP/etc. for the current session id (keeps the id).
 
+If nothing is being tracked a short while after starting, a popup asks
+you to log into a channel (or change channels) at least once.
+
 Deaths are recorded from the game's death screen with the exact toll
 (XP / money / items lost); pickups resolve per drop (yours vs others).
 
