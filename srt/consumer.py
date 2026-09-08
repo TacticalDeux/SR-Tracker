@@ -22,6 +22,11 @@ from .db import Database
 from .dll import TrackerDLL
 
 
+# Without any session traffic for this long, a running session reads
+# as not connected (see is_connected).
+_STALE_AFTER_S = 60.0
+
+
 # Event types that mean the game is actually doing something, as opposed
 # to bridge chatter (net_seen, net_connect, net_close, session_setup,
 # key_rotation, shm_open, hook_install, dll_heartbeat) or ambient noise
@@ -137,6 +142,15 @@ class EventConsumer(QObject):
 
     def seconds_since_gameplay(self) -> float:
         return time.monotonic() - self._last_gameplay_at
+
+    def is_connected(self) -> bool:
+        """Pure query: this session has joined a channel (local player
+        seen) and session traffic flowed recently."""
+        return (
+            self._running
+            and self._local_account_id is not None
+            and self.seconds_since_gameplay() < _STALE_AFTER_S
+        )
 
     def start(self) -> int:
         if self._running:

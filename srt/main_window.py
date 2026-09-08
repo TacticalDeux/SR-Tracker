@@ -364,6 +364,11 @@ class _SummaryPanel(QWidget):
 # ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
+# Delay after tracking starts before checking for a channel
+# connection (one-shot per start; firing is a no-op when connected).
+_CONNECT_WARN_AFTER_MS = 30000
+
+
 class MainWindow(QMainWindow):
     def __init__(
         self,
@@ -1154,6 +1159,25 @@ class MainWindow(QMainWindow):
             sid = self._consumer.start()
             self.btn_toggle.setText("Stop")
             self._set_status(f"Session #{sid} started.")
+            QTimer.singleShot(
+                _CONNECT_WARN_AFTER_MS, self._check_channel_connection
+            )
+
+    def _check_channel_connection(self) -> None:
+        # One-shot, armed when tracking starts. If the session never
+        # reached a channel there is nothing to record yet — say so
+        # once, in plain terms. Silent when stopped or connected.
+        if not self._consumer.running:
+            return
+        if self._consumer.is_connected():
+            return
+        QMessageBox.warning(
+            self,
+            "Not connected yet",
+            "The tracker hasn't seen any game activity yet. Log into "
+            "a channel (or change channels) at least once for the "
+            "tracker to start.",
+        )
 
     def _toggle_overlay(self) -> None:
         # Reuse the window: building a fresh OverlayWindow on every show
