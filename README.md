@@ -91,6 +91,7 @@ When frozen, the database and settings file live under
 | --- | --- | --- |
 | Database | `data/srtracker.db` | `%LOCALAPPDATA%\SRTracker\srtracker.db` |
 | Settings | `data/settings.json` | `%LOCALAPPDATA%\SRTracker\settings.json` |
+| Monster/item names | `data/monsters.json`, `data/items.json` (bundled in the exe, seeded on first run; your copies win) | `%LOCALAPPDATA%\SRTracker\monsters.json`, `...\items.json` |
 | DLL events log | `%TEMP%` tracker event log (DLL-owned) | same |
 
 SQLite tables: `sessions`, `kills`, `drops`, `deaths`, `xp_events`, `damage`,
