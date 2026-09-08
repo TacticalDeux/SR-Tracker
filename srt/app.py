@@ -56,10 +56,6 @@ def _install_tray(app: QApplication, win: MainWindow) -> None:
     act_overlay.triggered.connect(win._toggle_overlay)
     menu.addAction(act_overlay)
 
-    act_boosts = QAction("Toggle Boosts", app)
-    act_boosts.triggered.connect(win._toggle_boosts)
-    menu.addAction(act_boosts)
-
     act_show = QAction("Show Main Window", app)
     act_show.triggered.connect(win.show)
     menu.addAction(act_show)

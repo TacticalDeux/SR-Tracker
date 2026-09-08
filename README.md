@@ -14,9 +14,6 @@ srt/                  Application package
   app.py              Qt entry point + tray menu (Toggle Overlay / Show Main / Quit)
   main_window.py      Main tracker window (Summary, Sessions, Kills, Drops, Zones, Graphs, Overlay + Debug)
   overlay.py          Frameless / always-on-top HUD window
-  REMOVED.py      Separate boosts tracker window (active buffs + modifiers)
-  REMOVED            Buff name catalog for the boosts window
-  REMOVED        Boost text catalog for the boosts window
   consumer.py         Background thread that drains the DLL REMOVED into SQLite
   dll.py              ctypes wrapper around sr_tracker.dll (Global\REMOVED)
   db.py               SQLite persistence (sessions, kills, drops, deaths, xp_events, zone_visits, ...)
@@ -44,6 +41,34 @@ SR Tracker.spec       Legacy PyInstaller spec (superseded by tools/build.py)
 
 No `requirements*.txt` — you need Python 3 + PySide6 + PyInstaller.
 
+## Running from source
+
+```sh
+python sr_tracker.py
+# equivalent: python -m srt.app
+```
+
+The first run creates `data/srtracker.db` next to the source. Settings
+live in `data/settings.json` while developing.
+
+To inject the DLL into the game (default target `REMOVED`):
+
+```sh
+python -m REMOVED               # auto-find the game
+python -m REMOVED 12345         # inject into a specific PID
+python -m REMOVED --launch      # launch the game then inject
+python -m REMOVED --name proc.exe  # match a different process name
+```
+
+In the UI, **Start Tracking** does this automatically: finds the game PID →
+checks if the DLL is loaded → injects via `REMOVED` → waits for
+install → starts the `EventConsumer`, which drains the `Global\REMOVED`
+REMOVED into SQLite. **Stop** ends the session; **Reset session** clears
+kills/drops/XP/etc. for the current session id (keeps the id).
+
+Deaths are recorded from the game's death screen with the exact toll
+(XP / money / items lost); pickups resolve per drop (yours vs others).
+
 ## Building a standalone exe
 
 ```sh
@@ -69,6 +94,7 @@ When frozen, the database and settings file live under
 | --- | --- | --- |
 | Database | `data/srtracker.db` | `%LOCALAPPDATA%\SRTracker\srtracker.db` |
 | Settings | `data/settings.json` | `%LOCALAPPDATA%\SRTracker\settings.json` |
+| DLL events log | `%TEMP%\REMOVED` (DLL-owned) | same |
 
 SQLite tables: `sessions`, `kills`, `drops`, `deaths`, `xp_events`, `damage`,
 `spawn_notifications`, `events`, `zone_visits` (+ `zone_stats` view), with
@@ -95,14 +121,9 @@ migration logic for legacy DBs.
     scope, opacity, scale, colors, orientation).
    - **Debug**: dev event stream (`debug_console.py`).
   - Header band: **Start/Stop Tracking** (primary), **Show overlay**,
-    **Show boosts**, **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
-  - Status bar with event counters. Tray icon: Toggle Overlay / Toggle Boosts /
-    Show Main Window / Quit
+    **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
+  - Status bar with event counters. Tray icon: Toggle Overlay / Show Main Window / Quit
     (Quit routes through `closeEvent`: stops consumer, uninstalls hooks, releases DB).
-- **Boosts**: separate always-on-top tracker listing active buffs with their
-  boosts, grouped by buff; buffs granted during a mirage run get a marker.
-  Own position/scale (saved separately), lockable with click-through like
-  the main overlay. Toggle from the header or tray.
 - **Overlay**: frameless, always-on-top HUD. Rows size to their full text —
   long zone names and big counts widen the window instead of clipping.
   - 9 toggleable fields: kills, sc (soul crystals, picked up / total),
@@ -148,12 +169,7 @@ migration logic for legacy DBs.
   "overlay_pos_x": 60,
   "overlay_pos_y": 60,
   "overlay_locked": false,
-  "overlay_orientation": "vertical",
-  "REMOVED_x": 60,
-  "REMOVED_y": 340,
-  "REMOVED": 1.0,
-  "REMOVED": false,
-  "REMOVED": true
+  "overlay_orientation": "vertical"
 }
 ```
 

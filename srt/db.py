@@ -6,14 +6,10 @@ are not safe to share across threads without serialization.
 """
 from __future__ import annotations
 
-import json
 import sqlite3
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-
-from . import buffs as buffs_mod
-from . import modifiers as modifiers_mod
 
 
 SCHEMA = [
@@ -87,15 +83,6 @@ SCHEMA = [
         timestamp TEXT NOT NULL,
         FOREIGN KEY(session_id) REFERENCES sessions(id)
     )""",
-    """CREATE TABLE IF NOT EXISTS REMOVED (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER NOT NULL,
-        buff_id INTEGER NOT NULL,
-        mode TEXT NOT NULL,
-        duration INTEGER NOT NULL DEFAULT 0,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY(session_id) REFERENCES sessions(id)
-    )""",
     """CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id INTEGER,
@@ -153,12 +140,10 @@ SCHEMA = [
     """CREATE INDEX IF NOT EXISTS idx_damage_session_enemy ON damage(session_id, enemy_id)""",
     """CREATE INDEX IF NOT EXISTS idx_deaths_session_ts ON deaths(session_id, timestamp)""",
     """CREATE INDEX IF NOT EXISTS idx_drops_session_drop ON drops(session_id, drop_id)""",
-    """CREATE INDEX IF NOT EXISTS idx_buffs_session_buff ON REMOVED(session_id, buff_id)""",
 ]
 
 # Tables wiped by reset_session (everything per-session, but not the session row).
-_RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage", "deaths",
-                 "REMOVED")
+_RESET_TABLES = ("kills", "drops", "xp_events", "spawn_notifications", "zone_visits", "events", "damage", "deaths")
 
 
 def _span_seconds(started: str | None, ended: str | None) -> float:
@@ -243,7 +228,6 @@ class Database:
             self._ensure_column("xp_events", "bonus_party", "INTEGER")
             self._ensure_column("zone_visits", "display_name", "TEXT")
             self._ensure_column("zone_visits", "is_mirage", "INTEGER NOT NULL DEFAULT 0")
-            self._ensure_column("REMOVED", "modifiers", "TEXT")
             # Old builds created zone_visits with a NOT NULL `timestamp`
             # column; current code writes entered_at/left_at instead, so
             # every zone insert fails on the legacy constraint until the
@@ -416,12 +400,12 @@ class Database:
         with self._lock:
             for table in ("damage", "kills", "drops", "xp_events",
                           "spawn_notifications", "zone_visits", "events",
-                          "deaths", "sessions", "REMOVED"):
+                          "deaths", "sessions"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.execute(
                 "DELETE FROM sqlite_sequence WHERE name IN "
                 "('sessions','drops','xp_events','spawn_notifications',"
-                "'zone_visits','events','damage','deaths','REMOVED')"
+                "'zone_visits','events','damage','deaths')"
             )
             self._conn.commit()
             self._conn.execute("VACUUM")
@@ -512,88 +496,6 @@ class Database:
                 (session_id, name, rarity, ts),
             )
             self._conn.commit()
-
-    def REMOVED(self, session_id: int, buff_id: int, mode: str,
-                    duration: int, ts: str,
-                    modifiers: list[dict] | None = None) -> None:
-        """Record one buff sighting (add, update or remove). Durations
-        ride in milliseconds; 0 means no expiry. Modifiers ride as a
-        JSON list of {id, text} pairs."""
-        mods_json = json.dumps(modifiers or [], ensure_ascii=True)
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO REMOVED "
-                "(session_id, buff_id, mode, duration, modifiers, timestamp)"
-                " VALUES (?,?,?,?,?,?)",
-                (session_id, _i64(buff_id), mode, _i64(duration), mods_json, ts),
-            )
-            self._conn.commit()
-
-    @staticmethod
-    def _decode_modifiers(raw: str | None) -> list[dict]:
-        """Parse the stored modifiers JSON into {id, text, display}
-        rows. Display is the raw text when present, else the catalog
-        template, else the id itself."""
-        try:
-            items = json.loads(raw) if raw else []
-        except (TypeError, ValueError):
-            return []
-        out = []
-        for m in items if isinstance(items, list) else []:
-            if not isinstance(m, dict):
-                continue
-            mid = str(m.get("id", ""))
-            text = str(m.get("text", ""))
-            out.append({
-                "id": mid,
-                "text": text,
-                "display": (text or modifiers_mod.REMOVED(mid, fallback=text)
-                            or mid),
-            })
-        return out
-
-    def REMOVED(self, session_id: int) -> list[dict]:
-        """Buffs currently in effect: the latest sighting per buff id is
-        an add/update that has not expired (duration 0 never expires).
-        Each row carries buff_id, name, mode, duration_ms, granted_at,
-        expires_at (None when open-ended) and modifiers. Oldest grant
-        first."""
-        now = datetime.now()
-        with self._lock:
-            cur = self._conn.execute(
-                """SELECT buff_id, mode, duration, modifiers, timestamp
-                   FROM REMOVED WHERE session_id = ? ORDER BY id""",
-                (session_id,),
-            )
-            latest: dict[int, tuple] = {}
-            for buff_id, mode, duration, mods, ts in cur.fetchall():
-                latest[int(buff_id)] = (mode, int(duration or 0), mods, ts)
-            out = []
-            for buff_id, (mode, duration, mods, ts) in latest.items():
-                if mode == "remove":
-                    continue
-                expires_at = None
-                if duration > 0:
-                    try:
-                        granted = datetime.fromisoformat(ts)
-                    except (TypeError, ValueError):
-                        granted = None
-                    if granted is not None:
-                        expires_at = granted + timedelta(milliseconds=duration)
-                        if expires_at <= now:
-                            continue
-                out.append({
-                    "buff_id": buff_id,
-                    "name": buffs_mod.buff_name(buff_id),
-                    "mode": mode,
-                    "duration_ms": duration,
-                    "granted_at": ts,
-                    "expires_at": (expires_at.isoformat(timespec="milliseconds")
-                                   if expires_at else None),
-                    "modifiers": self._decode_modifiers(mods),
-                })
-            out.sort(key=lambda r: r["granted_at"] or "")
-            return out
 
     def insert_zone_visit(self, session_id: int, map_name: str, display_name: str, ts: str) -> None:
         # Close the previous zone visit (if any) for this session by stamping
@@ -848,17 +750,6 @@ class Database:
             damage_mine = int(cur.fetchone()[0] or 0)
             open_id = self.open_visit_id(session_id)
             visit = self.visit_stats(session_id, open_id) if open_id else None
-            buffs = self.REMOVED(session_id)
-            # Flag buffs granted while the current open visit is a
-            # flagged mirage run (grant at/after its entry).
-            mirage_since = None
-            if visit is not None and visit["is_mirage"]:
-                mirage_since = visit["entered_at"]
-            for b in buffs:
-                b["mirage"] = (
-                    mirage_since is not None
-                    and (b["granted_at"] or "") >= mirage_since
-                )
             return {
                 "session_id": session_id,
                 "kills": kills,
@@ -879,7 +770,6 @@ class Database:
                 "damage_mine": damage_mine,
                 "damage_total": damage_total,
                 "visit": visit,
-                "buffs": buffs,
                 "current_zone": zone_display,
             }
 
