@@ -37,6 +37,7 @@ from .overlay import (
     OverlayWindow,
     all_field_scopes,
 )
+from .REMOVED import REMOVEDWindow
 from .settings import Settings, SettingsStore
 from .charts import (
     Point, SeriesChart, SpiderChart, SpiderSeries,
@@ -384,6 +385,7 @@ class MainWindow(QMainWindow):
         self._consumer.event_seen.connect(self._on_event_seen)
         self._consumer.status.connect(self._on_consumer_status)
         self._overlay: OverlayWindow | None = None
+        self._REMOVED: REMOVEDWindow | None = None
         self.setWindowTitle("SR Tracker — Soul's Remnant")
         self._fit_to_screen()
 
@@ -459,6 +461,15 @@ class MainWindow(QMainWindow):
         self._silence_warned = False
 
         self._refresh_lock_button()
+        self._refresh_boost_buttons()
+        # The boosts badge persists its visibility: a fresh setup (or a
+        # legacy file without the buff keys, which upgrade to visible)
+        # opens with the badge showing.
+        if self._settings.REMOVED:
+            self._ensure_boost_window()
+            if self._REMOVED is not None:
+                self._REMOVED.show()
+                self.btn_boosts.setText("Hide boosts")
         # Populate right away rather than leaving tables blank until the
         # first tick or a manual "Re-read". The graphs combo fills here
         # too — otherwise the Graphs tab starts with no session selected
@@ -506,7 +517,8 @@ class MainWindow(QMainWindow):
         lay.addWidget(brand, 0)
         lay.addStretch(1)
 
-        # The four command chips
+        # The command chips: tracking, the two floating windows
+        # (overlay + boosts badge, each with its own lock), reset.
         self.btn_toggle = QPushButton("Start")
         self.btn_toggle.setProperty("role", "primary")
         self.btn_toggle.clicked.connect(self._toggle_tracking)
@@ -520,6 +532,15 @@ class MainWindow(QMainWindow):
         self.btn_lock.setCheckable(True)
         self.btn_lock.clicked.connect(self._on_lock_button_clicked)
         lay.addWidget(self.btn_lock)
+
+        self.btn_boosts = QPushButton("Show boosts")
+        self.btn_boosts.clicked.connect(self._toggle_boosts)
+        lay.addWidget(self.btn_boosts)
+
+        self.btn_boost_lock = QPushButton()
+        self.btn_boost_lock.setCheckable(True)
+        self.btn_boost_lock.clicked.connect(self._on_boost_lock_clicked)
+        lay.addWidget(self.btn_boost_lock)
 
         self.btn_reset = QPushButton("Reset session")
         self.btn_reset.setProperty("role", "destructive")
@@ -1169,6 +1190,92 @@ class MainWindow(QMainWindow):
             self._overlay.show()
             self.btn_overlay.setText("Hide overlay")
         self._refresh_overlay_tab()
+
+    # ------------------------------------------------------------------
+    # Boosts badge (separate floating window from the main overlay)
+    # ------------------------------------------------------------------
+    def _ensure_boost_window(self) -> None:
+        """Create the badge window on first use (mirrors the overlay's
+        lazy reuse: a hidden badge is never destroyed, so its poll
+        timer and screen position survive hides)."""
+        if self._REMOVED is None:
+            self._REMOVED = REMOVEDWindow(
+                self._db,
+                self._settings_store,
+                lambda: self._display_session_id(),
+                on_settings_changed=self._on_REMOVED_settings_changed,
+            )
+
+    def _toggle_boosts(self) -> None:
+        self._ensure_boost_window()
+        assert self._REMOVED is not None
+        if self._REMOVED.isVisible():
+            self._set_boosts_visible(False)
+        else:
+            # Pick up anything changed while hidden before showing.
+            self._REMOVED.reload_settings()
+            self._REMOVED.show()
+            self._set_boosts_visible(True)
+
+    def _set_boosts_visible(self, visible: bool) -> None:
+        """Single funnel for badge show/hide: the store owns the flag,
+        then the window and the header chip follow it."""
+        self._ensure_boost_window()
+        assert self._REMOVED is not None
+        s = self._settings_store.load()
+        s.REMOVED = visible
+        self._settings_store.save(s)
+        self._settings = s
+        if visible:
+            self._REMOVED.reload_settings()
+            self._REMOVED.show()
+            self.btn_boosts.setText("Hide boosts")
+        else:
+            self._REMOVED.hide()
+            self.btn_boosts.setText("Show boosts")
+
+    def _on_boost_lock_clicked(self) -> None:
+        self._set_REMOVED(self.btn_boost_lock.isChecked())
+
+    def _set_REMOVED(self, locked: bool) -> None:
+        """Single funnel for every badge lock/unlock path (header chip,
+        badge pill). Mirrors _set_overlay_locked: the store is the one
+        source of truth, written first."""
+        s = self._settings_store.load()
+        s.REMOVED = locked
+        self._settings_store.save(s)
+        self._settings = s
+        self._ensure_boost_window()
+        assert self._REMOVED is not None
+        if not self._REMOVED.isVisible():
+            self._REMOVED.reload_settings()
+            self._REMOVED.show()
+            self.btn_boosts.setText("Hide boosts")
+        self._REMOVED.set_locked(locked)
+        self._refresh_boost_buttons()
+
+    def _refresh_boost_buttons(self) -> None:
+        s = self._settings_store.load()
+        self._settings.REMOVED = s.REMOVED
+        self._settings.REMOVED = s.REMOVED
+        if hasattr(self, "btn_boosts"):
+            self.btn_boosts.setText(
+                "Hide boosts"
+                if (self._REMOVED is not None and self._REMOVED.isVisible())
+                else "Show boosts")
+        if hasattr(self, "btn_boost_lock"):
+            btn = self.btn_boost_lock
+            btn.blockSignals(True)
+            btn.setChecked(s.REMOVED)
+            btn.setText("Unlock" if s.REMOVED else "Lock")
+            need = max(btn.fontMetrics().horizontalAdvance(t)
+                       for t in ("Lock", "Unlock")) + 30
+            btn.setMinimumWidth(need)
+            btn.blockSignals(False)
+
+    def _on_REMOVED_settings_changed(self, settings: Settings) -> None:
+        self._settings = settings
+        self._refresh_boost_buttons()
 
     def _reset_session(self) -> None:
         sid = self._consumer.session_id
@@ -2337,6 +2444,8 @@ class MainWindow(QMainWindow):
         try:
             if self._overlay is not None:
                 self._overlay.close()
+            if self._REMOVED is not None:
+                self._REMOVED.close()
             if self._consumer.running:
                 self._consumer.stop()
             if self._dll.active():

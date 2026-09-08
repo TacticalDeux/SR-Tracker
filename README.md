@@ -14,6 +14,9 @@ srt/                  Application package
   app.py              Qt entry point + tray menu (Toggle Overlay / Show Main / Quit)
   main_window.py      Main tracker window (Summary, Sessions, Kills, Drops, Zones, Graphs, Overlay + Debug)
   overlay.py          Frameless / always-on-top HUD window
+  REMOVED.py      Separate boosts tracker window (active buffs + modifiers)
+  REMOVED            Buff name catalog for the boosts window
+  REMOVED        Boost text catalog for the boosts window
   consumer.py         Background thread that drains the DLL REMOVED into SQLite
   dll.py              ctypes wrapper around sr_tracker.dll (Global\REMOVED)
   db.py               SQLite persistence (sessions, kills, drops, deaths, xp_events, zone_visits, ...)
@@ -92,9 +95,14 @@ migration logic for legacy DBs.
     scope, opacity, scale, colors, orientation).
    - **Debug**: dev event stream (`debug_console.py`).
   - Header band: **Start/Stop Tracking** (primary), **Show overlay**,
-    **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
-  - Status bar with event counters. Tray icon: Toggle Overlay / Show Main Window / Quit
+    **Show boosts**, **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
+  - Status bar with event counters. Tray icon: Toggle Overlay / Toggle Boosts /
+    Show Main Window / Quit
     (Quit routes through `closeEvent`: stops consumer, uninstalls hooks, releases DB).
+- **Boosts**: separate always-on-top tracker listing active buffs with their
+  boosts, grouped by buff; buffs granted during a mirage run get a marker.
+  Own position/scale (saved separately), lockable with click-through like
+  the main overlay. Toggle from the header or tray.
 - **Overlay**: frameless, always-on-top HUD. Rows size to their full text —
   long zone names and big counts widen the window instead of clipping.
   - 9 toggleable fields: kills, sc (soul crystals, picked up / total),
@@ -140,7 +148,12 @@ migration logic for legacy DBs.
   "overlay_pos_x": 60,
   "overlay_pos_y": 60,
   "overlay_locked": false,
-  "overlay_orientation": "vertical"
+  "overlay_orientation": "vertical",
+  "REMOVED_x": 60,
+  "REMOVED_y": 340,
+  "REMOVED": 1.0,
+  "REMOVED": false,
+  "REMOVED": true
 }
 ```
 
