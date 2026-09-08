@@ -366,7 +366,7 @@ class _SummaryPanel(QWidget):
 # ---------------------------------------------------------------------------
 # Delay after tracking starts before checking for a channel
 # connection (one-shot per start; firing is a no-op when connected).
-_CONNECT_WARN_AFTER_MS = 30000
+_CONNECT_WARN_AFTER_MS = 15000
 
 
 class MainWindow(QMainWindow):
