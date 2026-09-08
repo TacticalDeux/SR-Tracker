@@ -84,6 +84,11 @@ class EventConsumer(QObject):
         # instance id -> mob type id built from spawn events so death
         # rows can carry a displayable monster name.
         self._local_account_id: int | None = None
+        # Channel-linkage gate, reset per session in start(): the player
+        # id and the session setup must both arrive before anything
+        # persists. Pre-link gameplay is discarded, not queued.
+        self._link_player = False
+        self._link_session = False
         self._mob_of_enemy: dict[int, int] = {}
         # Recent portal sightings as (monotonic-ts, text, cost), oldest
         # first. A free non-housing sighting shortly before a same-zone
@@ -144,13 +149,30 @@ class EventConsumer(QObject):
         return time.monotonic() - self._last_gameplay_at
 
     def is_connected(self) -> bool:
-        """Pure query: this session has joined a channel (local player
-        seen) and session traffic flowed recently."""
+        """Pure query: this session is linked (see needs_channel) and
+        session traffic flowed recently."""
         return (
             self._running
-            and self._local_account_id is not None
+            and self._link_player
+            and self._link_session
             and self.seconds_since_gameplay() < _STALE_AFTER_S
         )
+
+    def needs_channel(self) -> bool:
+        """Pure query: tracking is running but the session is not yet
+        linked — the UI snapshot carries this for the display lane."""
+        return self._running and not (
+            self._link_player and self._link_session
+        )
+
+    def reset_link(self) -> None:
+        """Drop linkage plus session-position state (used when the
+        session's rows are wiped mid-run)."""
+        self._link_player = False
+        self._link_session = False
+        self._portal_sights = deque(maxlen=16)
+        self._current_zone = None
+        self._current_visit_id = None
 
     def start(self) -> int:
         if self._running:
@@ -159,6 +181,8 @@ class EventConsumer(QObject):
         self._events_parsed = 0
         self._events_dropped = 0
         self._local_account_id = None
+        self._link_player = False
+        self._link_session = False
         self._mob_of_enemy = {}
         self._portal_sights = deque(maxlen=16)
         self._current_zone = None
@@ -187,6 +211,8 @@ class EventConsumer(QObject):
 
     def stop(self) -> None:
         self._running = False
+        self._link_player = False
+        self._link_session = False
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None
@@ -272,8 +298,17 @@ class EventConsumer(QObject):
                 acct = 0
             if acct:
                 self._local_account_id = acct
+                self._link_player = True
                 self._db.set_session_account(sid, acct)
                 self._db.backfill_kill_attribution(sid, acct)
+        elif etype == "session_setup":
+            # Second half of the channel link. Gameplay persistence
+            # below stays closed until both halves arrive.
+            self._link_session = True
+        elif not (self._link_player and self._link_session):
+            # Pre-link: discard gameplay persistence (counters and
+            # liveness above keep flowing). Never queued.
+            return
         elif etype == "damage_dealt":
             # damage == 0xFFFFFFFF is the post-mortem deathblow sentinel,
             # not real damage — skip it so it can never grant kill credit.
@@ -414,7 +449,6 @@ class EventConsumer(QObject):
             )
         elif etype in (
             # Bridge/session flow signals: nothing to persist.
-            "session_setup",
             "key_rotation",
             "net_seen",
             "net_connect",

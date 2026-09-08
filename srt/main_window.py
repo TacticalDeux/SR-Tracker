@@ -1221,6 +1221,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Reset failed", str(e))
             return
+        self._consumer.reset_link()
         self.tbl_kills.setRowCount(0)
         self._show_empty(self.tbl_kills, self._kills_empty, True)
         self.tbl_drops.setRowCount(0)
@@ -1653,6 +1654,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._set_status(f"(error: {e})")
             return
+        s["needs_channel"] = self._consumer.needs_channel()
         # Session-side XP/HR + DPS rows need session-wide rates, but only
         # when one of them is actually scoped to the session.
         scopes = all_field_scopes(self._settings)
