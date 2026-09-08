@@ -106,8 +106,8 @@ migration logic for legacy DBs.
   - **Summary**: soul-crystal orb + at-a-glance metrics. Every count states
     what it means: kills/drops/damage read "yours / session total", soul
     crystals read "picked up / total" (your crystals only), XP is the session
-    total. With per-zone mode on, Summary leads with the current visit
-    (zone name, mirage marker, visit stats) over session totals.
+    total. Fields set to visit scope show the current visit (zone name,
+    mirage marker, visit stats) instead.
   - **Sessions**: session list (double-click a row to open details) with the
     same yours/total labeling, plus damage and DPS columns; detail dialog
     adds a per-zone breakdown with mirage markers.
@@ -117,8 +117,8 @@ migration logic for legacy DBs.
   - **Zones**: per-zone breakdown with mirage markers.
   - **Graphs**: metric/chart/zone selectors + session selector + Details / Refresh.
     Damage and DPS are chartable alongside the other metrics.
-  - **Overlay**: all overlay settings (fields, order, opacity, scale, colors,
-    orientation, per-zone mode toggle).
+  - **Overlay**: all overlay settings (fields, order, per-field visit/session
+    scope, opacity, scale, colors, orientation).
    - **Debug**: dev event stream (`debug_console.py`).
   - Header band: **Start/Stop Tracking** (primary), **Show overlay**,
     **Lock/Unlock overlay** toggle, **Reset session** (destructive, confirms first).
@@ -128,8 +128,9 @@ migration logic for legacy DBs.
   long zone names and big counts widen the window instead of clipping.
   - 9 toggleable fields: kills, sc (soul crystals, picked up / total),
     xp, level, zone, deaths, xp_lost, xp/hr, dps — drag-to-reorder
-    (top to bottom). Per-zone mode swaps every row to the current visit
-    (zone/mirage/dungeon) so you can read each area without resetting.
+    (top to bottom). Each field independently picks visit scope (resets on
+    zone change) or session scope (persists), so you can watch the current
+    area without resetting.
   - Large counts render compact (1.5K, 3.4M, 5.6B); exact values on hover
     and in the main window.
   - Two opacity paths: card-background alpha + whole-window opacity, each with a
@@ -159,7 +160,11 @@ migration logic for legacy DBs.
   "overlay_show_xp_lost": true,
   "overlay_show_xp_hr": true,
   "overlay_show_dps": true,
-  "overlay_per_zone": false,
+  "overlay_field_scope": {
+    "kills": "session", "sc": "session", "xp": "session",
+    "level": "session", "zone": "session", "deaths": "session",
+    "xp_lost": "session", "xp_hr": "session", "dps": "session"
+  },
   "overlay_field_order": ["kills", "sc", "xp", "level", "zone", "deaths", "xp_lost", "xp_hr", "dps"],
   "overlay_pos_x": 60,
   "overlay_pos_y": 60,

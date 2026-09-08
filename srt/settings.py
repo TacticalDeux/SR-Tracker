@@ -16,6 +16,17 @@ from typing import Any
 from . import paths
 
 
+#: Overlay fields that can choose a reset scope. Kept in sync with
+#: overlay.OVERLAY_FIELDS (this module stays Qt-free, so the key list
+#: lives here and overlay.py mirrors it).
+OVERLAY_FIELD_KEYS = ("kills", "sc", "xp", "level", "zone",
+                      "deaths", "xp_lost", "xp_hr", "dps")
+
+#: Valid per-field scopes: "visit" resets on zone change, "session"
+#: persists through the session.
+FIELD_SCOPES = ("visit", "session")
+
+
 @dataclass
 class Settings:
     # Overlay window. overlay_opacity drives the card BACKGROUND fill
@@ -45,9 +56,14 @@ class Settings:
     overlay_show_xp_lost: bool = True
     overlay_show_xp_hr: bool = True
     overlay_show_dps: bool = True
-    # Per-zone mode: overlay/summary show the current visit instead of
-    # session totals. Off by default; missing keys upgrade to False.
-    overlay_per_zone: bool = False
+    # Per-field reset scope: each movable overlay field independently
+    # chooses "visit" (reset on zone change) or "session" (persist
+    # through the session). Missing keys upgrade to "session" (today's
+    # behavior); junk values sanitize to "session". "level" is
+    # account-scoped and always reads session-wide regardless of its
+    # entry (see overlay.field_scope).
+    overlay_field_scope: dict[str, str] = field(
+        default_factory=lambda: {k: "session" for k in OVERLAY_FIELD_KEYS})
     # Display order of the overlay fields, top to bottom. Unknown keys
     # are ignored and missing known keys append at the end, so older
     # files and future fields both degrade gracefully.
@@ -69,6 +85,26 @@ class Settings:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Settings":
         # Drop unknown keys (forward compat) and fill missing ones with defaults.
+        d = dict(d)
+        # Legacy migration: the old global `overlay_per_zone` bool becomes
+        # a per-field scope map (True -> every field "visit", False -> every
+        # field "session" which equals the default), then the old key is
+        # dropped. An explicit `overlay_field_scope` map always wins over
+        # the legacy flag when both are present.
+        legacy = d.pop("overlay_per_zone", None)
+        raw_scopes = d.get("overlay_field_scope")
+        if isinstance(raw_scopes, dict):
+            scopes = {k: "session" for k in OVERLAY_FIELD_KEYS}
+            for k, v in raw_scopes.items():
+                if isinstance(k, str) and k:
+                    scopes[k] = v if v in FIELD_SCOPES else "session"
+            d["overlay_field_scope"] = scopes
+        elif legacy is True:
+            d["overlay_field_scope"] = {
+                k: "visit" for k in OVERLAY_FIELD_KEYS}
+        elif legacy is False:
+            d["overlay_field_scope"] = {
+                k: "session" for k in OVERLAY_FIELD_KEYS}
         valid = {f.name for f in fields(cls)}
         clean = {k: v for k, v in d.items() if k in valid}
         merged = asdict(cls.defaults())

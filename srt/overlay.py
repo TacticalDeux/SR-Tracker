@@ -33,7 +33,39 @@ from PySide6.QtWidgets import (
 
 from . import theme
 from .db import Database
-from .settings import Settings, SettingsStore
+from .settings import (
+    FIELD_SCOPES,
+    OVERLAY_FIELD_KEYS,
+    Settings,
+    SettingsStore,
+)
+
+
+#: Per-field reset scopes. "visit" resets on zone change, "session"
+#: persists through the session.
+VISIT_SCOPE = "visit"
+SESSION_SCOPE = "session"
+
+
+def field_scope(settings, key: str) -> str:
+    """Effective reset scope for one overlay field.
+
+    Unknown/new fields and junk values default to "session" (today's
+    behavior). "level" is account-scoped — it has no visit meaning —
+    so it always reads session-wide regardless of its stored entry."""
+    if key == "level":
+        return SESSION_SCOPE
+    raw = None
+    try:
+        raw = (getattr(settings, "overlay_field_scope", None) or {}).get(key)
+    except AttributeError:
+        raw = None
+    return raw if raw in FIELD_SCOPES else SESSION_SCOPE
+
+
+def all_field_scopes(settings) -> dict[str, str]:
+    """Effective scope for every known overlay field."""
+    return {k: field_scope(settings, k) for k in OVERLAY_FIELD_KEYS}
 
 
 
@@ -635,8 +667,8 @@ class OverlayWindow(QWidget):
         old_order = list(
             getattr(self._settings, "overlay_field_order", None) or ())
         old_scale = self._overlay_scale()
-        old_per_zone = bool(getattr(self._settings, "overlay_per_zone",
-                                    False))
+        old_scopes = dict(
+            getattr(self._settings, "overlay_field_scope", None) or {})
         self._settings = fresh
         # Colors first: a rebuild below paints new rows from the cache.
         self._apply_text_color()
@@ -652,10 +684,10 @@ class OverlayWindow(QWidget):
         self._apply_bg()
         self._apply_window_opacity()
         self._apply_field_visibility()
-        if bool(getattr(self._settings, "overlay_per_zone", False)) \
-                != old_per_zone:
-            # Same rows, different source (visit vs session) — repaint
-            # now instead of waiting for the next poll.
+        if dict(getattr(fresh, "overlay_field_scope", None) or {}) \
+                != old_scopes:
+            # Same rows, different sources (visit vs session per field)
+            # — repaint now instead of waiting for the next poll.
             self._refresh()
 
     def _on_pick_locked_text_color(self) -> None:
@@ -1038,17 +1070,22 @@ class OverlayWindow(QWidget):
             s = self._db.summary(sid)
         except Exception:
             return
-        per_zone = bool(getattr(self._settings, "overlay_per_zone", False))
-        visit = s.get("visit") if per_zone else None
+        per_field = {key: field_scope(self._settings, key)
+                     for key in self._rows}
+        visit = s.get("visit")
+        visit_vmap: dict = {}
+        visit_exact: dict = {}
         if visit is not None:
-            # Per-zone mode: every row reads the current visit's stats.
-            # Level is account-scoped (no visit meaning), so it stays
-            # session-wide; the zone row names the visit itself.
+            # The current visit's maps are always built while a visit is
+            # open (pure formatting, no query), so even hidden rows stay
+            # correct and show the right source the moment they're
+            # unhidden. Level is account-scoped (no visit meaning), so
+            # it stays session-wide; the zone row names the visit itself.
             sc_total = visit["sc_picked"] + visit["sc_unpicked"]
             zone_text = (visit.get("display_name")
                          or visit.get("map_name")
                          or s.get("current_zone") or "—")
-            vmap = {
+            visit_vmap = {
                 "kills": _mine_total(visit["my_kills"], visit["kills"]),
                 "sc": _mine_total(visit["sc_picked"], sc_total),
                 "xp": visit["xp"],
@@ -1059,7 +1096,7 @@ class OverlayWindow(QWidget):
                 "xp_hr": visit["xp_hr"],
                 "dps": visit["dps_mine"],
             }
-            exact = {
+            visit_exact = {
                 "kills": _exact_mine_total(visit["my_kills"],
                                            visit["kills"]),
                 "sc": _exact_mine_total(visit["sc_picked"], sc_total),
@@ -1078,60 +1115,67 @@ class OverlayWindow(QWidget):
                 "dps": (f"{visit['dps_mine']:,.1f} yours / "
                         f"{visit['dps']:,.1f} total DPS (this visit)"),
             }
-        else:
-            # Session totals — today's behavior. The two rate rows read
-            # session-wide rates; the extra query runs only when one of
-            # them is actually visible.
-            rates = None
-            if ("xp_hr" in self._rows and bool(
-                    getattr(self._settings, "overlay_show_xp_hr", True))) \
-                    or ("dps" in self._rows and bool(
-                        getattr(self._settings, "overlay_show_dps", True))):
-                try:
-                    rates = self._db.session_rates(sid)
-                except Exception:
-                    rates = None
-            rates = rates or {"xp_hr": 0.0, "dps": 0.0, "dps_mine": 0.0}
-            zone_text = s.get("current_zone") or "—"
-            vmap = {
-                "kills": _mine_total(s["my_kills"], s["kills"]),
-                "sc": _mine_total(s["sc_picked"],
-                                   s["sc_picked"] + s["sc_unpicked"]),
-                "xp": s["xp"],
-                "level": s["level"],
-                "zone": zone_text,
-                "deaths": s["deaths"],
-                "xp_lost": s["xp_lost"],
-                "xp_hr": rates["xp_hr"],
-                "dps": rates["dps_mine"],
-            }
-            # Exact full values behind the compact display text — the main
-            # window already shows full counts, and the overlay tooltip
-            # carries them here so nothing is lost to K/M/B/T.
-            exact = {
-                "kills": _exact_mine_total(s["my_kills"], s["kills"]),
-                "sc": _exact_mine_total(s["sc_picked"],
-                                        s["sc_picked"] + s["sc_unpicked"]),
-                "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
-                else str(s["xp"]),
-                "level": str(s["level"]),
-                "zone": zone_text,
-                "deaths": _exact_number(s["deaths"])
-                if isinstance(s["deaths"], int) else str(s["deaths"]),
-                "xp_lost": _exact_number(s["xp_lost"])
-                if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
-                "xp_hr": f"{rates['xp_hr']:,.1f} XP/hr (session)",
-                "dps": (f"{rates['dps_mine']:,.1f} yours / "
-                        f"{rates['dps']:,.1f} total DPS (session)"),
-            }
+        # Session totals — today's behavior. The two rate rows read
+        # session-wide rates; the extra query runs only when a visible
+        # row actually resolves to the session side.
+        rates = None
+        if any(key in ("xp_hr", "dps") and bool(getattr(
+                self._settings, f"overlay_show_{key}", True))
+                and (visit is None or per_field.get(key) != VISIT_SCOPE)
+                for key in self._rows):
+            try:
+                rates = self._db.session_rates(sid)
+            except Exception:
+                rates = None
+        rates = rates or {"xp_hr": 0.0, "dps": 0.0, "dps_mine": 0.0}
+        zone_text = s.get("current_zone") or "—"
+        sess_vmap = {
+            "kills": _mine_total(s["my_kills"], s["kills"]),
+            "sc": _mine_total(s["sc_picked"],
+                               s["sc_picked"] + s["sc_unpicked"]),
+            "xp": s["xp"],
+            "level": s["level"],
+            "zone": zone_text,
+            "deaths": s["deaths"],
+            "xp_lost": s["xp_lost"],
+            "xp_hr": rates["xp_hr"],
+            "dps": rates["dps_mine"],
+        }
+        # Exact full values behind the compact display text — the main
+        # window already shows full counts, and the overlay tooltip
+        # carries them here so nothing is lost to K/M/B/T.
+        sess_exact = {
+            "kills": _exact_mine_total(s["my_kills"], s["kills"]),
+            "sc": _exact_mine_total(s["sc_picked"],
+                                    s["sc_picked"] + s["sc_unpicked"]),
+            "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
+            else str(s["xp"]),
+            "level": str(s["level"]),
+            "zone": zone_text,
+            "deaths": _exact_number(s["deaths"])
+            if isinstance(s["deaths"], int) else str(s["deaths"]),
+            "xp_lost": _exact_number(s["xp_lost"])
+            if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
+            "xp_hr": f"{rates['xp_hr']:,.1f} XP/hr (session)",
+            "dps": (f"{rates['dps_mine']:,.1f} yours / "
+                    f"{rates['dps']:,.1f} total DPS (session)"),
+        }
         for key, (_lbl, num) in self._rows.items():
+            # Each row reads its own scope: visit-scoped rows read the
+            # current visit, everything else reads session totals (and
+            # everything falls back to session when no visit is open).
             # Full text always: each _FitNumber sizes its minimum width
             # to the content (measured at the scaled size), so the
             # window widens for "Snowy Mountain" instead of eliding to
             # "Snowy Mo...", and all rows stretch to that widest row.
-            text = self._format(key, vmap[key])
+            if visit is not None and visit_vmap \
+                    and per_field.get(key) == VISIT_SCOPE:
+                raw, tip = visit_vmap[key], visit_exact.get(key)
+            else:
+                raw, tip = sess_vmap[key], sess_exact.get(key)
+            text = self._format(key, raw)
             self._last_values[key] = text
-            tip = exact.get(key, text)
+            tip = tip if tip is not None else text
             self._last_tips[key] = tip
             num.set_value(text)
             num.setToolTip(tip)

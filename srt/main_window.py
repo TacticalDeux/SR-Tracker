@@ -32,7 +32,11 @@ from .consumer import EventConsumer
 from .crystal import crystal_pixmap
 from .debug_console import DebugConsole, is_dev_mode
 from . import names as _names
-from .overlay import OverlayWindow
+from .overlay import (
+    OVERLAY_FIELDS,
+    OverlayWindow,
+    all_field_scopes,
+)
 from .settings import Settings, SettingsStore
 from .charts import (
     Point, SeriesChart, SpiderChart, SpiderSeries,
@@ -111,6 +115,8 @@ class _SummaryPanel(QWidget):
             f"color: {theme.CRYSTAL_LIGHT}; letter-spacing: 3px;"
             " font-weight: bold;"
         )
+        # Zone names can run long — wrap instead of clipping off the edge.
+        self._visit_header.setWordWrap(True)
         self._visit_header.hide()
         right.addWidget(self._visit_header)
 
@@ -134,6 +140,7 @@ class _SummaryPanel(QWidget):
             f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px;"
             " font-weight: bold;"
         )
+        self._session_caption.setWordWrap(True)
         self._session_caption.hide()
         right.addWidget(self._session_caption)
 
@@ -143,11 +150,29 @@ class _SummaryPanel(QWidget):
         self._level   = self._make_metric("LEVEL")
         self._deaths  = self._make_metric("DEATHS")
         self._xp_lost = self._make_metric("XP LOST")
+        # Session-side rate rows: shown only when XP/HR or DPS is scoped
+        # to the session (the visit block owns the visit-scoped pair).
+        self._s_xp_hr = self._make_metric("XP/HR")
+        self._s_dps   = self._make_metric("DPS")
 
         for w in (self._kills, self._sc, self._xp, self._level,
-                  self._deaths, self._xp_lost):
+                  self._deaths, self._xp_lost,
+                  self._s_xp_hr, self._s_dps):
             right.addWidget(w)
         right.addStretch(1)
+        # Metric key -> row widget, per side. The summary mirrors the
+        # overlay's per-field scopes: each key shows on exactly one side.
+        self._visit_widgets = {
+            "kills": self._v_kills, "sc": self._v_sc, "xp": self._v_xp,
+            "deaths": self._v_deaths, "xp_lost": self._v_xp_lost,
+            "xp_hr": self._v_xp_hr, "dps": self._v_dps,
+        }
+        self._session_widgets = {
+            "kills": self._kills, "sc": self._sc, "xp": self._xp,
+            "level": self._level, "deaths": self._deaths,
+            "xp_lost": self._xp_lost,
+            "xp_hr": self._s_xp_hr, "dps": self._s_dps,
+        }
 
         self._right_widget = QWidget()
         self._right_widget.setLayout(right)
@@ -181,18 +206,38 @@ class _SummaryPanel(QWidget):
             f"color: {theme.ASH_BRIGHT}; font-weight: bold; letter-spacing: 3px;"
         )
         lbl.setMinimumWidth(180)
+        # Narrow windows squeeze the label column — wrap instead of
+        # clipping the tracked-uppercase name off the edge.
+        lbl.setWordWrap(True)
         row.addWidget(lbl, 0)
         num = QLabel("—")
         num.setObjectName("FieldValue")
-        num.setFont(QFont("Consolas", 28))
+        # 22pt, not 28: at 28 the big session counts ran wider than the
+        # value column and the rows ran taller than the tab, so texts
+        # clipped each other and the bottom rows were cut off entirely.
+        # 22 still reads as the page's instrument voice.
+        num.setFont(QFont("Consolas", 22))
         num.setStyleSheet(f"color: {theme.PARCH_BG}; font-weight: bold;")
         num.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # Long counts ("1,234,567/8,901,234") wrap onto a second line
+        # rather than clipping at the column edge.
+        num.setWordWrap(True)
         row.addWidget(num, 1)
         w._num = num
         w._lbl = lbl
         return w
 
-    def set_summary(self, s: dict | None, per_zone: bool = False) -> None:
+    def set_summary(self, s: dict | None, scopes: dict | None = None,
+                    session_rates: dict | None = None) -> None:
+        """Paint the summary from a db.summary() dict.
+
+        scopes maps overlay field keys to "visit"/"session" (see
+        overlay.field_scope) — each metric shows on exactly one side:
+        visit-scoped keys read the open visit, session-scoped keys read
+        session totals. None means all-session, exactly today's layout.
+        session_rates carries db.session_rates() for the session-side
+        XP/HR + DPS rows; without it those rows read 0.
+        """
         if s is None:
             self._crystal.set_dim(True)
             self._right_widget.hide()
@@ -201,9 +246,20 @@ class _SummaryPanel(QWidget):
         self._crystal.set_dim(False)
         self._empty_holder.hide()
         self._right_widget.show()
-        visit = s.get("visit") if per_zone else None
+        from .overlay import _compact_rate
+
+        def eff(key: str) -> str:
+            # Level is account-scoped: always session-wide. Everything
+            # else follows its stored scope, defaulting to session.
+            if key == "level":
+                return "session"
+            got = (scopes or {}).get(key)
+            return got if got in ("visit", "session") else "session"
+
+        visit = s.get("visit")
+        # --- visit side: populate always, show only visit-scoped rows ---
+        any_visit_row = False
         if visit is not None:
-            from .overlay import _compact_rate
             display = (visit.get("display_name") or visit.get("map_name")
                        or "Current visit")
             header = f"CURRENT VISIT — {display}"
@@ -213,7 +269,6 @@ class _SummaryPanel(QWidget):
             self._visit_header.setToolTip(
                 f"{display} (visit #{visit.get('visit_id')})"
                 + (" — mirage run" if visit.get("is_mirage") else ""))
-            self._visit_header.show()
             sc_total = visit["sc_picked"] + visit["sc_unpicked"]
             self._v_kills._num.setText(
                 _mine_total(visit["my_kills"], visit["kills"]))
@@ -241,23 +296,32 @@ class _SummaryPanel(QWidget):
             self._v_dps._num.setToolTip(
                 f"{visit['dps_mine']:,.1f} yours / "
                 f"{visit['dps']:,.1f} total DPS in this visit")
+            for key, w in self._visit_widgets.items():
+                show = eff(key) == "visit"
+                w.setVisible(show)
+                any_visit_row = any_visit_row or show
+        else:
             for w in self._visit_rows:
-                w.show()
-            self._session_caption.show()
-        elif per_zone:
-            # Per-zone on but no visit open yet — say so, keep session
-            # totals beneath exactly as today.
+                w.hide()
+        # --- visit header: names the open visit while any visit-scoped
+        # field (rows, or the zone row the overlay shows) reads from it ---
+        want_visit = any(eff(k) == "visit"
+                         for k in ("kills", "sc", "xp", "zone", "deaths",
+                                   "xp_lost", "xp_hr", "dps"))
+        if visit is not None and (any_visit_row or eff("zone") == "visit"):
+            self._visit_header.show()
+            header_on = True
+        elif want_visit:
+            # Visit-scoped fields but no visit open yet — say so, keep
+            # session totals beneath exactly as today.
             self._visit_header.setText("CURRENT VISIT — none open yet")
             self._visit_header.setToolTip("Enter a zone to open a visit")
             self._visit_header.show()
-            for w in self._visit_rows:
-                w.hide()
-            self._session_caption.hide()
+            header_on = False
         else:
             self._visit_header.hide()
-            for w in self._visit_rows:
-                w.hide()
-            self._session_caption.hide()
+            header_on = False
+        # --- session side: every non-visit row reads session totals ---
         sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._kills._num.setText(_mine_total(s["my_kills"], s["kills"]))
         self._kills._num.setToolTip(
@@ -273,6 +337,25 @@ class _SummaryPanel(QWidget):
         self._xp_lost._num.setText(f"{s.get('xp_lost', 0):,}")
         self._xp_lost._num.setToolTip(
             f"{s.get('xp_lost', 0):,} XP lost to deaths")
+        rates = session_rates or {"xp_hr": 0.0, "dps": 0.0, "dps_mine": 0.0}
+        self._s_xp_hr._num.setText(f"{_compact_rate(rates['xp_hr'])}/hr")
+        self._s_xp_hr._num.setToolTip(
+            f"{rates['xp_hr']:,.1f} XP/hr (session)")
+        self._s_dps._num.setText(f"{_compact_rate(rates['dps_mine'])} DPS")
+        self._s_dps._num.setToolTip(
+            f"{rates['dps_mine']:,.1f} yours / "
+            f"{rates['dps']:,.1f} total DPS (session)")
+        any_session_row = False
+        for key, w in self._session_widgets.items():
+            # No open visit: visit-scoped rows fall back to session
+            # values here, so nothing ever reads blank.
+            show = eff(key) == "session" or visit is None
+            w.setVisible(show)
+            any_session_row = any_session_row or show
+        # The caption only earns its keep when both sides show — with
+        # all-session scopes the layout below is exactly today's.
+        self._session_caption.setVisible(
+            header_on and any_visit_row and any_session_row)
 
 
 # ---------------------------------------------------------------------------
@@ -449,8 +532,17 @@ class MainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(0, 0, 0, 0)
+        # The metric list grows with per-field visit rows + session rate
+        # rows; a fixed tab cut the bottom rows off with no way to reach
+        # them. A frameless resizable scroll area keeps the exact same
+        # look (same INK_0 containers on the INK_1 pane) and only scrolls
+        # when the content outgrows the tab.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
         self._summary = _SummaryPanel()
-        layout.addWidget(self._summary)
+        scroll.setWidget(self._summary)
+        layout.addWidget(scroll)
         self._tabs.addTab(tab, "Summary")
 
     def _build_sessions_tab(self) -> None:
@@ -776,7 +868,6 @@ class MainWindow(QMainWindow):
         control pushes through the settings store and reloads the
         overlay in place; the overlay's own drawer stays as a second,
         always-synced way to change the same values."""
-        from .overlay import OVERLAY_FIELDS
         tab = QWidget()
         outer = QVBoxLayout(tab)
         outer.setContentsMargins(24, 24, 24, 24)
@@ -815,13 +906,6 @@ class MainWindow(QMainWindow):
         self._ov_orient.currentIndexChanged.connect(
             lambda _i: self._push_overlay_settings())
         form.addRow("Layout:", self._ov_orient)
-
-        self._ov_per_zone = QCheckBox("Per-zone stats")
-        self._ov_per_zone.setToolTip(
-            "Show the current visit's stats instead of session totals")
-        self._ov_per_zone.toggled.connect(
-            lambda _c: self._push_overlay_settings())
-        form.addRow("Mode:", self._ov_per_zone)
 
         op_row = QHBoxLayout()
         self._ov_opacity = QSlider(Qt.Horizontal)
@@ -916,8 +1000,14 @@ class MainWindow(QMainWindow):
             f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
         )
         outer.addWidget(fields_label)
-        # One list owns both toggles and order: checkable rows the user
-        # can drag (or nudge with the arrows) into display order.
+        scope_hint = QLabel("Scope per field: Visit resets on zone change · Session persists")
+        scope_hint.setFont(QFont("Georgia", 9))
+        scope_hint.setStyleSheet(
+            f"color: {theme.ASH_BRIGHT}; font-style: italic;")
+        scope_hint.setWordWrap(True)
+        outer.addWidget(scope_hint)
+        # One list owns visibility, scope and order: rows the user can
+        # drag (or nudge with the arrows) into display order.
         fields_row = QHBoxLayout()
         self._ov_fields = QListWidget()
         self._ov_fields.setDragDropMode(
@@ -1150,10 +1240,6 @@ class MainWindow(QMainWindow):
         oi = self._ov_orient.findData(s.overlay_orientation)
         self._ov_orient.setCurrentIndex(oi if oi >= 0 else 0)
         self._ov_orient.blockSignals(False)
-        self._ov_per_zone.blockSignals(True)
-        self._ov_per_zone.setChecked(bool(getattr(s, "overlay_per_zone",
-                                                  False)))
-        self._ov_per_zone.blockSignals(False)
         self._ov_opacity.blockSignals(True)
         self._ov_opacity.setValue(int(s.overlay_opacity * 100))
         self._ov_opacity.blockSignals(False)
@@ -1189,7 +1275,6 @@ class MainWindow(QMainWindow):
         s = self._settings_store.load()
         s.overlay_orientation = (
             self._ov_orient.currentData() or "vertical")
-        s.overlay_per_zone = self._ov_per_zone.isChecked()
         s.overlay_opacity = self._ov_opacity.value() / 100.0
         s.overlay_locked_opacity = self._ov_locked_opacity.value() / 100.0
         s.overlay_window_opacity = self._ov_window_opacity.value() / 100.0
@@ -1197,13 +1282,22 @@ class MainWindow(QMainWindow):
             self._ov_locked_window_opacity.value() / 100.0)
         s.overlay_scale = self._ov_scale.value() / 100.0
         order = []
+        scopes = dict(getattr(s, "overlay_field_scope", None) or {})
         for i in range(self._ov_fields.count()):
             item = self._ov_fields.item(i)
             key = item.data(Qt.UserRole)
             order.append(key)
+            row_w = self._ov_fields.itemWidget(item)
+            if row_w is None:
+                continue
             setattr(s, f"overlay_show_{key}",
-                    item.checkState() == Qt.Checked)
+                    row_w._chk.isChecked())
+            # Level is account-wide: always parked on session.
+            scopes[key] = ("session" if key == "level"
+                           else "visit" if row_w._scope.isChecked()
+                           else "session")
         s.overlay_field_order = order
+        s.overlay_field_scope = scopes
         self._settings_store.save(s)
         self._settings = s
         self._ov_opacity_val.setText(f"{self._ov_opacity.value()}%")
@@ -1217,7 +1311,7 @@ class MainWindow(QMainWindow):
         if self._overlay is not None and self._overlay.isVisible():
             self._overlay.reload_settings()
         self._refresh_lock_button()
-        # Mode (per-zone) also drives the Summary tab — repaint it now.
+        # Scopes also drive the Summary tab — repaint it now.
         self._refresh_summary()
 
     @staticmethod
@@ -1269,12 +1363,78 @@ class MainWindow(QMainWindow):
         if self._overlay is not None:
             self._overlay.reload_settings()
 
+    @staticmethod
+    def _sync_scope_button(btn: QPushButton, is_visit: bool, key: str) -> None:
+        """Paint a scope toggle: Visit (resets on zone change) or Session
+        (persists). Level is account-wide, so its toggle stays parked on
+        Session and disabled."""
+        btn.blockSignals(True)
+        try:
+            if key == "level":
+                btn.setChecked(False)
+                btn.setText("Session")
+                btn.setToolTip(
+                    "Level is account-wide and always persists")
+                btn.setEnabled(False)
+            else:
+                btn.setChecked(is_visit)
+                btn.setText("Visit" if is_visit else "Session")
+                btn.setToolTip(
+                    "Visit — resets on zone change" if is_visit
+                    else "Session — persists through the session")
+                btn.setEnabled(True)
+        finally:
+            btn.blockSignals(False)
+
+    def _make_ov_field_row(self, key: str, label: str) -> QWidget:
+        """One field row: visibility checkbox, name, compact scope toggle.
+        The scope button is checkable — checked reads Visit, unchecked
+        reads Session — and pinned to the wider label so toggling never
+        reflows the list."""
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(2, 2, 2, 2)
+        h.setSpacing(6)
+        chk = QCheckBox()
+        chk.setToolTip(f"Show {label} on the overlay")
+        chk.toggled.connect(lambda _c: self._push_overlay_settings())
+        h.addWidget(chk)
+        name = QLabel(label)
+        h.addWidget(name, 1)
+        scope = QPushButton()
+        scope.setCheckable(True)
+        scope.setCursor(Qt.PointingHandCursor)
+        if getattr(self, "_ov_scope_btn_w", 0):
+            scope.setFixedWidth(self._ov_scope_btn_w)
+        scope.clicked.connect(self._on_ov_scope_clicked)
+        h.addWidget(scope)
+        row._chk = chk
+        row._name = name
+        row._scope = scope
+        return row
+
+    def _on_ov_scope_clicked(self) -> None:
+        """A scope toggle was flipped: repaint its text and push."""
+        btn = self.sender()
+        if btn is None:
+            return
+        is_visit = btn.isChecked()
+        btn.setText("Visit" if is_visit else "Session")
+        btn.setToolTip(
+            "Visit — resets on zone change" if is_visit
+            else "Session — persists through the session")
+        self._push_overlay_settings()
+
     def _refresh_ov_fields(self, s) -> None:
         """Rebuild the field list when the order changed; always re-apply
-        the checks. Rebuilding only on change keeps the selection (and
-        avoids fighting a drag in progress) on plain check toggles."""
-        from .overlay import OVERLAY_FIELDS
+        the visibility checks and scope toggles. Rebuilding only on
+        change keeps the selection (and avoids fighting a drag in
+        progress) on plain toggles."""
         labels = dict(OVERLAY_FIELDS)
+        if not getattr(self, "_ov_scope_btn_w", 0):
+            self._ov_scope_btn_w = (
+                self._ov_fields.fontMetrics().horizontalAdvance("Session")
+                + 24)
         order = list(getattr(s, "overlay_field_order", None)
                      or [k for k, _ in OVERLAY_FIELDS])
         # Older settings files predate newer fields (xp/hr, DPS) — or
@@ -1288,37 +1448,74 @@ class MainWindow(QMainWindow):
         if current != order:
             self._ov_fields.blockSignals(True)
             try:
+                for i in range(self._ov_fields.count()):
+                    self._ov_fields.removeItemWidget(
+                        self._ov_fields.item(i))
                 self._ov_fields.clear()
                 for key in order:
-                    item = QListWidgetItem(labels.get(key, key))
+                    item = QListWidgetItem()
                     item.setData(Qt.UserRole, key)
                     item.setFlags(Qt.ItemIsEnabled
                                   | Qt.ItemIsSelectable
-                                  | Qt.ItemIsUserCheckable
                                   | Qt.ItemIsDragEnabled)
                     self._ov_fields.addItem(item)
+                    self._ov_fields.setItemWidget(
+                        item, self._make_ov_field_row(
+                            key, labels.get(key, key)))
             finally:
                 self._ov_fields.blockSignals(False)
+        scopes = getattr(s, "overlay_field_scope", None) or {}
         for i in range(self._ov_fields.count()):
             item = self._ov_fields.item(i)
-            self._ov_fields.blockSignals(True)
+            key = item.data(Qt.UserRole)
+            row_w = self._ov_fields.itemWidget(item)
+            if row_w is None:
+                continue
+            chk = row_w._chk
+            chk.blockSignals(True)
             try:
-                item.setCheckState(
-                    Qt.Checked
-                    if getattr(s, f"overlay_show_{item.data(Qt.UserRole)}",
-                               True)
-                    else Qt.Unchecked)
+                chk.setChecked(bool(getattr(
+                    s, f"overlay_show_{key}", True)))
             finally:
-                self._ov_fields.blockSignals(False)
+                chk.blockSignals(False)
+            self._sync_scope_button(
+                row_w._scope, scopes.get(key) == "visit", key)
 
     def _on_ov_field_move(self, delta: int) -> None:
-        """Nudge the selected field up (-1) or down (+1) in the order."""
+        """Nudge the selected field up (-1) or down (+1) in the order.
+
+        Implemented as a content swap between the two rows (never a
+        take/insert, which would orphan the rows' item widgets)."""
         row = self._ov_fields.currentRow()
         dest = row + delta
         if row < 0 or dest < 0 or dest >= self._ov_fields.count():
             return
-        item = self._ov_fields.takeItem(row)
-        self._ov_fields.insertItem(dest, item)
+        labels = dict(OVERLAY_FIELDS)
+        a = self._ov_fields.item(row)
+        b = self._ov_fields.item(dest)
+        wa = self._ov_fields.itemWidget(a)
+        wb = self._ov_fields.itemWidget(b)
+        if wa is None or wb is None:
+            return
+        ka, kb = a.data(Qt.UserRole), b.data(Qt.UserRole)
+        a.setData(Qt.UserRole, kb)
+        b.setData(Qt.UserRole, ka)
+        wa._name.setText(labels.get(kb, kb))
+        wb._name.setText(labels.get(ka, ka))
+        for w1, w2 in ((wa._chk, wb._chk), (wa._scope, wb._scope)):
+            c1, c2 = w1.isChecked(), w2.isChecked()
+            w1.blockSignals(True)
+            w2.blockSignals(True)
+            try:
+                w1.setChecked(c2)
+                w2.setChecked(c1)
+            finally:
+                w1.blockSignals(False)
+                w2.blockSignals(False)
+        self._sync_scope_button(
+            wa._scope, wa._scope.isChecked(), kb)
+        self._sync_scope_button(
+            wb._scope, wb._scope.isChecked(), ka)
         self._ov_fields.setCurrentRow(dest)
         self._push_overlay_settings()
 
@@ -1360,9 +1557,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._set_status(f"(error: {e})")
             return
+        # Session-side XP/HR + DPS rows need session-wide rates, but only
+        # when one of them is actually scoped to the session.
+        scopes = all_field_scopes(self._settings)
+        rates = None
+        if scopes.get("xp_hr") == "session" or scopes.get("dps") == "session":
+            try:
+                rates = self._db.session_rates(sid)
+            except Exception:
+                rates = None
         self._summary.set_summary(
-            s, per_zone=bool(getattr(self._settings, "overlay_per_zone",
-                                     False)))
+            s, scopes=scopes,
+            session_rates=rates)
         sc_total = s["sc_picked"] + s["sc_unpicked"]
         self._set_status(
             f"Session #{sid}  ·  {s['my_kills']} yours / {s['kills']} session total kills"
