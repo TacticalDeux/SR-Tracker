@@ -54,7 +54,6 @@ To inject the DLL into the game (default game process):
 
 ```sh
 # Injection is handled from the UI via Start Tracking.
-
 ```
 
 In the UI, **Start Tracking** does this automatically: finds the game →

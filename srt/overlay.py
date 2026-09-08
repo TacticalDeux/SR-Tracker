@@ -47,7 +47,6 @@ VISIT_SCOPE = "visit"
 SESSION_SCOPE = "session"
 
 #: Channel-linkage warning badge. Shown while tracking
-
 #: runs but the session is not yet channel-linked; clears the moment
 #: linkage lands.
 CHANNEL_BADGE_TEXT = "NOT LINKED — LOG IN OR CHANGE CHANNELS"
