@@ -229,8 +229,32 @@ class SeriesChart(QWidget):
         # graph (instant, themed, clamped) — no Qt popout tooltip.
         self._hover: tuple[str, float] | None = None
         self._hover_pos: QPointF | None = None
+        # Paint caches: hover hit-tests and the paint pass recompute
+        # series/share geometry several times per frame. Both are pure
+        # functions of (data version, widget size, zoom window), so the
+        # first computation per frame is reused until something changes
+        # (the version bumps in set_points/clear below).
+        self._coords_version = 0
+        self._coords_cache: tuple | None = None
+        self._share_cache: tuple | None = None
         self.setMinimumHeight(120)
         self.setMouseTracking(True)
+
+    def _bump_version(self) -> None:
+        self._coords_version += 1
+        self._coords_cache = None
+        self._share_cache = None
+
+    @staticmethod
+    def _points_equal(a: list[Point], b: list[Point]) -> bool:
+        if len(a) != len(b):
+            return False
+        for pa, pb in zip(a, b):
+            if (pa.label != pb.label or pa.value != pb.value
+                    or pa.sublabel != pb.sublabel or pa.fmt != pb.fmt
+                    or pa.color != pb.color):
+                return False
+        return True
 
     def set_points(self, points: list[Point]) -> None:
         points = list(points)
@@ -243,7 +267,16 @@ class SeriesChart(QWidget):
             self._zoom.reset()
             self._hover = None
             self._hover_pos = None
+            self._points = points
+            self._bump_version()
+            self.update()
+            return
+        if self._points_equal(self._points, points):
+            # Same data re-pushed by the refresh tick — skip the
+            # repaint entirely so hover/zoom stay perfectly still.
+            return
         self._points = points
+        self._bump_version()
         self.update()
 
     def reset_zoom(self) -> None:
@@ -483,10 +516,16 @@ class SeriesChart(QWidget):
             self.update()
 
     def set_value_format(self, fmt: str) -> None:
+        if fmt == self._value_format:
+            return
         self._value_format = fmt
         self.update()
 
     def clear(self) -> None:
+        if (not self._points and self._zoom.is_full
+                and self._hover is None and self._hover_pos is None
+                and self._pan_start is None):
+            return
         self._points.clear()
         self._zoom.reset()
         self._pan_start = None
@@ -521,6 +560,10 @@ class SeriesChart(QWidget):
 
         Shared by the line painter and the hover highlight so the dot
         and the box can never disagree about where a point is."""
+        key = (self._coords_version, self.width(), self.height(),
+               round(self._zoom.lo, 6), round(self._zoom.hi, 6))
+        if self._coords_cache is not None and self._coords_cache[0] == key:
+            return self._coords_cache[1]
         n = len(self._points)
         i0, i1 = self._zoom.indices(n)
         pts = self._points[i0:i1 + 1]
@@ -535,7 +578,9 @@ class SeriesChart(QWidget):
                 x = plot.left() + (i / (m - 1) if m > 1 else 0.5) * plot.width()
                 y = plot.bottom() - (pt.value / vmax) * plot.height()
                 coords.append(QPointF(x, y))
-        return pts, coords, plot
+        result = (pts, coords, plot)
+        self._coords_cache = (key, result)
+        return result
 
     def _paint_hover(self, p: QPainter) -> None:
         """Highlight the hovered datum + a themed box clamped inside."""
@@ -692,6 +737,9 @@ class SeriesChart(QWidget):
         _paint_share; geometry here is shared with the hover hit-test so
         the two can never disagree about where a slice is.
         """
+        key = (self._coords_version, self.width(), self.height())
+        if self._share_cache is not None and self._share_cache[0] == key:
+            return self._share_cache[1]
         pts = self._points
         total = sum(max(pt.value, 0.0) for pt in pts)
         margin = 12
@@ -713,7 +761,9 @@ class SeriesChart(QWidget):
                 slices.append((pt, color, 90.0 - acc * 360.0,
                                -frac * 360.0))
                 acc += frac
-        return cx, cy, outer, inner, total, slices
+        result = (cx, cy, outer, inner, total, slices)
+        self._share_cache = (key, result)
+        return result
 
     def _paint_share(self, p: QPainter) -> None:
         cx, cy, outer, inner, total, slices = self._share_geometry()
@@ -905,18 +955,33 @@ class SpiderChart(QWidget):
         self.setMinimumHeight(300)
 
     def set_axes(self, axes: list[str]) -> None:
-        self._axes = list(axes)
+        axes = list(axes)
+        if axes == self._axes:
+            return
+        self._axes = axes
         self.update()
 
     def set_series(self, series: list[SpiderSeries]) -> None:
-        self._series = list(series)
+        series = list(series)
+        if (len(series) == len(self._series) and all(
+                s.label == o.label and s.values == o.values
+                and s.dimmed == o.dimmed
+                and (s.color.rgba() if s.color else None)
+                == (o.color.rgba() if o.color else None)
+                for s, o in zip(series, self._series))):
+            return
+        self._series = series
         self.update()
 
     def set_value_format(self, fmt: str) -> None:
+        if fmt == self._value_format:
+            return
         self._value_format = fmt
         self.update()
 
     def clear(self) -> None:
+        if not self._series:
+            return
         self._series.clear()
         self.update()
 

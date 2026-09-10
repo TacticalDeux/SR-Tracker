@@ -5,7 +5,7 @@ a = Analysis(
     ['sr_tracker.py'],
     pathex=[],
     binaries=[('dll/sr_tracker.dll', 'dll')],
-    datas=[('assets/soul_crystal.png', 'assets')],
+    datas=[('assets/soul_crystal.png', 'assets'), ('data/monsters.json', 'data'), ('data/items.json', 'data')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

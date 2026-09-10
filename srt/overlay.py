@@ -59,8 +59,10 @@ def field_scope(settings, key: str) -> str:
 
     Unknown/new fields and junk values default to "session" (today's
     behavior). "level" is account-scoped — it has no visit meaning —
-    so it always reads session-wide regardless of its stored entry."""
-    if key == "level":
+    so it always reads session-wide regardless of its stored entry.
+    "mighties" is session-scoped for the same reason: the count has
+    no per-visit breakdown, so it always reads session-wide."""
+    if key in ("level", "mighties"):
         return SESSION_SCOPE
     raw = None
     try:
@@ -81,6 +83,7 @@ POLL_MS = 500
 # Field config: (key, display label, monospace number size)
 _FIELDS = (
     ("kills",   "KILLS",         22),
+    ("mighties", "MIGHTIES",     22),
     ("sc",      "SOUL CRYSTALS", 22),
     ("xp",      "EXPERIENCE",    16),
     ("level",   "LEVEL",         22),
@@ -95,6 +98,7 @@ _FIELDS = (
 #: builds its field list from this, so the two never drift apart).
 OVERLAY_FIELDS = (
     ("kills", "Kills"),
+    ("mighties", "Mighties"),
     ("sc", "Soul crystals"),
     ("xp", "Experience"),
     ("level", "Level"),
@@ -1186,6 +1190,7 @@ class OverlayWindow(QWidget):
         zone_text = s.get("current_zone") or "—"
         sess_vmap = {
             "kills": _mine_total(s["my_kills"], s["kills"]),
+            "mighties": s.get("mighty_kills", 0),
             "sc": _mine_total(s["sc_picked"],
                                s["sc_picked"] + s["sc_unpicked"]),
             "xp": s["xp"],
@@ -1201,6 +1206,9 @@ class OverlayWindow(QWidget):
         # carries them here so nothing is lost to K/M/B/T.
         sess_exact = {
             "kills": _exact_mine_total(s["my_kills"], s["kills"]),
+            "mighties": _exact_number(s.get("mighty_kills", 0))
+            if isinstance(s.get("mighty_kills", 0), int)
+            else str(s.get("mighty_kills", 0)),
             "sc": _exact_mine_total(s["sc_picked"],
                                     s["sc_picked"] + s["sc_unpicked"]),
             "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
@@ -1245,7 +1253,7 @@ class OverlayWindow(QWidget):
         # (21.6K/hr, 15.0 DPS). Level and zone always render exactly.
         # kills/sc arrive pre-compacted from _mine_total, so plain
         # strings pass through untouched.
-        if key in ("xp", "xp_lost", "kills", "sc", "deaths") \
+        if key in ("xp", "xp_lost", "kills", "mighties", "sc", "deaths") \
                 and isinstance(value, int):
             return _compact_number(value)
         if key == "xp_hr" and isinstance(value, (int, float)):

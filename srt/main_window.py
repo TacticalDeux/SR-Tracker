@@ -11,20 +11,23 @@ the whole main window; everything else is type and rules.
 """
 from __future__ import annotations
 
+import threading
 import time
 from datetime import datetime
+from types import SimpleNamespace
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
-    QDialog, QDialogButtonBox, QFrame,
+    QDialog, QDialogButtonBox, QFrame, QFileDialog, QGroupBox,
     QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
     QListWidget, QListWidgetItem,
-    QMainWindow, QMessageBox, QPushButton, QScrollArea, QSlider, QStatusBar,
-    QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QMainWindow, QMessageBox, QPushButton, QRadioButton, QScrollArea, QSlider, QStatusBar,
+    QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
+from . import __version__ as _APP_VERSION
 from . import paths as _paths
 from . import theme
 try:
@@ -34,6 +37,14 @@ except ImportError:
 from .consumer import EventConsumer
 from .crystal import crystal_pixmap
 from .debug_console import DebugConsole, is_dev_mode
+from .event_log import (
+    EventLog, ReportBuffer, _PREVIEW_LINES, _REPORT_MAX_BYTES,
+    assemble_log_lines, build_full_report_text, build_report_payload,
+    build_report_text, format_report_size, full_session_size,
+    latest_session_stem, load_report_endpoint, mark_sent,
+    read_full_session_text, send_cooldown_remaining, send_full_report,
+    send_report, session_parts, truncate_report_lines,
+)
 from . import names as _names
 from .overlay import (
     OVERLAY_FIELDS,
@@ -148,6 +159,7 @@ class _SummaryPanel(QWidget):
         right.addWidget(self._session_caption)
 
         self._kills   = self._make_metric("KILLS")
+        self._mighties = self._make_metric("MIGHTIES")
         self._sc      = self._make_metric("SOUL CRYSTALS")
         self._xp      = self._make_metric("EXPERIENCE")
         self._level   = self._make_metric("LEVEL")
@@ -158,9 +170,10 @@ class _SummaryPanel(QWidget):
         self._s_xp_hr = self._make_metric("XP/HR")
         self._s_dps   = self._make_metric("DPS")
 
-        for w in (self._kills, self._sc, self._xp, self._level,
-                  self._deaths, self._xp_lost,
-                  self._s_xp_hr, self._s_dps):
+        for w in (self._kills, self._mighties, self._sc, self._xp,
+                   self._level,
+                   self._deaths, self._xp_lost,
+                   self._s_xp_hr, self._s_dps):
             right.addWidget(w)
         right.addStretch(1)
         # Metric key -> row widget, per side. The summary mirrors the
@@ -171,7 +184,8 @@ class _SummaryPanel(QWidget):
             "xp_hr": self._v_xp_hr, "dps": self._v_dps,
         }
         self._session_widgets = {
-            "kills": self._kills, "sc": self._sc, "xp": self._xp,
+            "kills": self._kills, "mighties": self._mighties,
+            "sc": self._sc, "xp": self._xp,
             "level": self._level, "deaths": self._deaths,
             "xp_lost": self._xp_lost,
             "xp_hr": self._s_xp_hr, "dps": self._s_dps,
@@ -252,9 +266,11 @@ class _SummaryPanel(QWidget):
         from .overlay import _compact_rate
 
         def eff(key: str) -> str:
-            # Level is account-scoped: always session-wide. Everything
-            # else follows its stored scope, defaulting to session.
-            if key == "level":
+            # Level is account-scoped: always session-wide. The notable
+            # count has no per-visit breakdown either, so it stays on
+            # the session side for the same reason. Everything else
+            # follows its stored scope, defaulting to session.
+            if key in ("level", "mighties"):
                 return "session"
             got = (scopes or {}).get(key)
             return got if got in ("visit", "session") else "session"
@@ -329,6 +345,9 @@ class _SummaryPanel(QWidget):
         self._kills._num.setText(_mine_total(s["my_kills"], s["kills"]))
         self._kills._num.setToolTip(
             f"{s['my_kills']} yours / {s['kills']} session total")
+        self._mighties._num.setText(f"{s.get('mighty_kills', 0):,}")
+        self._mighties._num.setToolTip(
+            f"{s.get('mighty_kills', 0):,} notable kills this session")
         self._sc._num.setText(_mine_total(s["sc_picked"], sc_total))
         self._sc._num.setToolTip(f"{s['sc_picked']:,} picked up / {sc_total:,} total")
         self._xp._num.setText(f"{s['xp']:,}")
@@ -385,12 +404,20 @@ class MainWindow(QMainWindow):
         self._names = _names.load()
         self._settings_store = settings_store
         self._settings = settings_store.load()
-        self._consumer = EventConsumer(dll, db, self)
+        self._consumer = EventConsumer(dll, db, self, names=self._names)
         # Stream every event the consumer sees into the debug console
         # (dev mode only). This is the fastest way to verify whether the
         # DLL is producing events at all.
         self._consumer.event_seen.connect(self._on_event_seen)
         self._consumer.status.connect(self._on_consumer_status)
+        # Per-session debug event log (dev mode only — same gate as the
+        # Debug tab, so frozen exes never write it). Opened when tracking
+        # starts, closed on stop; see _toggle_tracking.
+        self._event_log: EventLog | None = None
+        # Always-on, memory-only ring of recent lines for the Report Bug
+        # flow (dev and frozen alike). No disk writes by itself.
+        self._report_buffer = ReportBuffer()
+        self._report_buffer.subscribe(self._consumer)
         self._overlay: OverlayWindow | None = None
         self.setWindowTitle("SR Tracker — Soul's Remnant")
         self._fit_to_screen()
@@ -550,6 +577,12 @@ class MainWindow(QMainWindow):
         self.btn_reset.clicked.connect(self._reset_session)
         lay.addWidget(self.btn_reset)
 
+        # Report Bug sits in the header chrome so it is reachable in
+        # every build (there is no menu bar / Help area in this window).
+        self.btn_report = QPushButton("Report Bug")
+        self.btn_report.clicked.connect(self._open_report_dialog)
+        lay.addWidget(self.btn_report)
+
         return band
 
     def _build_summary_tab(self) -> None:
@@ -638,6 +671,18 @@ class MainWindow(QMainWindow):
         )
         header_row.addWidget(title)
         header_row.addStretch(1)
+        self._kills_preset = QComboBox()
+        self._kills_preset.addItems(["All", "Mine", "Mighties", "Others"])
+        self._kills_preset.setToolTip("Preset view for the kills list")
+        self._kills_preset.currentIndexChanged.connect(
+            lambda _i: self._refresh_kills())
+        header_row.addWidget(self._kills_preset)
+        self._kills_filter = QLineEdit()
+        self._kills_filter.setPlaceholderText("Filter by mob name…")
+        self._kills_filter.setClearButtonEnabled(True)
+        self._kills_filter.setMinimumWidth(220)
+        self._kills_filter.textChanged.connect(lambda _t: self._refresh_kills())
+        header_row.addWidget(self._kills_filter)
         btn = QPushButton("Re-read")
         btn.clicked.connect(self._refresh_kills)
         header_row.addWidget(btn)
@@ -649,14 +694,29 @@ class MainWindow(QMainWindow):
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         layout.addWidget(rule)
 
-        self.tbl_kills = QTableWidget(0, 4)
-        self.tbl_kills.setHorizontalHeaderLabels(["TIME", "ENEMY ID", "MOB", "MINE"])
+        # Latest notable spawn (e.g. a boss-flagged spawn from the spawn
+        # feed). Hidden until the first one lands; refreshed with the
+        # kills table below since both read the same session.
+        self._lbl_notable = QLabel("")
+        self._lbl_notable.setFont(QFont("Georgia", 10))
+        self._lbl_notable.setStyleSheet(
+            f"color: {theme.CRYSTAL_LIGHT}; letter-spacing: 1px;"
+            " font-weight: bold;"
+        )
+        self._lbl_notable.setWordWrap(True)
+        self._lbl_notable.hide()
+        layout.addWidget(self._lbl_notable)
+
+        self.tbl_kills = QTableWidget(0, 5)
+        self.tbl_kills.setHorizontalHeaderLabels(["TIME", "ENEMY ID", "MOB", "MINE", "★"])
         self.tbl_kills.horizontalHeaderItem(3).setToolTip(
             "Whether your account damaged this enemy before it died")
+        self.tbl_kills.horizontalHeaderItem(4).setToolTip(
+            "Whether this kill was a notable one")
         self.tbl_kills.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         _align_headers(self.tbl_kills,
                        [Qt.AlignLeft, Qt.AlignRight, Qt.AlignLeft,
-                        Qt.AlignCenter])
+                        Qt.AlignCenter, Qt.AlignCenter])
         self.tbl_kills.verticalHeader().setVisible(False)
         self.tbl_kills.setShowGrid(False)
         self.tbl_kills.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -680,6 +740,14 @@ class MainWindow(QMainWindow):
         )
         header_row.addWidget(title)
         header_row.addStretch(1)
+        self._drops_preset = QComboBox()
+        self._drops_preset.addItems(
+            ["All", "Mine", "Unclaimed", "Soul Crystals",
+             "Picked up by me", "Gone"])
+        self._drops_preset.setToolTip("Preset view for the drops list")
+        self._drops_preset.currentIndexChanged.connect(
+            lambda _i: self._refresh_drops())
+        header_row.addWidget(self._drops_preset)
         self._drops_filter = QLineEdit()
         self._drops_filter.setPlaceholderText("Filter by item name…")
         self._drops_filter.setClearButtonEnabled(True)
@@ -766,6 +834,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._zones_empty)
         self._tabs.addTab(tab, "Zones")
 
+    # Graphs refresh cadence. The 1s summary tick and the event path
+    # both funnel through _refresh_graphs; these caps keep a large
+    # session from rebuilding its charts ~2x/sec.
+    _GRAPHS_TICK_S = 4.0   # at most one rebuild per 4s while visible
+    _GRAPHS_EVENT_S = 2.0  # at most one rebuild per 2s via event_seen
+
     # (metric key, menu label, value format). The Graphs tab charts
     # per-zone values for whichever of these is selected.
     _GRAPH_METRICS = (
@@ -780,6 +854,7 @@ class MainWindow(QMainWindow):
         ("sc_m",    "Soul cryst. / min", "{:.1f}"),
         ("xp_m",    "Experience / min", "{:.0f}"),
         ("minutes", "Minutes in zone", "{:.1f}"),
+        ("mighty",  "Mighties",        "{:.0f}"),
     )
 
     def _build_graphs_tab(self) -> None:
@@ -798,7 +873,8 @@ class MainWindow(QMainWindow):
         selector_row = QHBoxLayout()
         selector_row.addWidget(_mini_title("SESSION"))
         self.cmb_sessions = QComboBox()
-        self.cmb_sessions.currentIndexChanged.connect(self._refresh_graphs)
+        self.cmb_sessions.currentIndexChanged.connect(
+            self._on_graphs_config_changed)
         self.cmb_sessions.setMinimumWidth(280)
         selector_row.addWidget(self.cmb_sessions, 1)
         btn_details = QPushButton("Details…")
@@ -820,7 +896,8 @@ class MainWindow(QMainWindow):
         for key, label, _fmt in self._GRAPH_METRICS:
             self.cmb_metric.addItem(label, key)
         self.cmb_metric.setCurrentIndex(4)  # Kills / min
-        self.cmb_metric.currentIndexChanged.connect(self._refresh_graphs)
+        self.cmb_metric.currentIndexChanged.connect(
+            self._on_graphs_config_changed)
         self.cmb_metric.setMinimumWidth(200)
         cfg_row.addWidget(self.cmb_metric)
         self.cmb_chart_type = QComboBox()
@@ -830,7 +907,8 @@ class MainWindow(QMainWindow):
         self.cmb_chart_type.addItem("Share", "share")
         self.cmb_chart_type.addItem("Spider", "spider")
         self.cmb_chart_type.setCurrentIndex(0)
-        self.cmb_chart_type.currentIndexChanged.connect(self._refresh_graphs)
+        self.cmb_chart_type.currentIndexChanged.connect(
+            self._on_graphs_config_changed)
         cfg_row.addWidget(self.cmb_chart_type)
         cfg_row.addWidget(_mini_title("ZONE"))
         self.cmb_zone = QComboBox()
@@ -842,7 +920,8 @@ class MainWindow(QMainWindow):
             "(#1, #2, …). Share always splits the whole session by "
             "zone, and spider always compares all zones, highlighting "
             "the picked one.")
-        self.cmb_zone.currentIndexChanged.connect(self._refresh_graphs)
+        self.cmb_zone.currentIndexChanged.connect(
+            self._on_graphs_config_changed)
         cfg_row.addWidget(self.cmb_zone)
         cfg_row.addStretch(1)
         outer.addLayout(cfg_row)
@@ -883,6 +962,19 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(charts_host)
         outer.addWidget(scroll, 1)
+
+        # Graphs refresh state (see _refresh_graphs): the 1s tick and the
+        # event path both funnel through a 4s/2s throttle plus a
+        # dirty-flag, so a big session rebuilds the chart at most every
+        # few seconds instead of ~2x/sec.
+        self._last_graphs_refresh = 0.0
+        self._last_graphs_event_refresh = 0.0
+        self._graphs_dirty = True
+        self._graphs_was_hidden = False
+        self._last_graphs_sig = None
+        self._last_zone_names: list[str] | None = None
+        self._graphs_event_seq = 0
+        self._zone_metrics_cache: tuple | None = None
 
         self._tabs.addTab(tab, "Graphs")
 
@@ -1114,7 +1206,13 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _toggle_tracking(self) -> None:
         if self._consumer.running:
+            _stop_sid = self._consumer.session_id
             self._consumer.stop()
+            self._report_buffer.append_app(
+                f"tracking stopped by user (session #{_stop_sid})")
+            if self._event_log is not None:
+                self._event_log.close()
+                self._event_log = None
             self.btn_toggle.setText("Start")
             self._set_status("Tracking stopped.")
             self._on_consumer_status("tracking stopped by user")
@@ -1127,6 +1225,7 @@ class MainWindow(QMainWindow):
                 msg = ("Injection helper not available (tools/private/ is "
                        "not present) — cannot start tracking")
                 self._on_consumer_status(msg)
+                self._report_buffer.append_app("tracking start failed: injection unavailable")
                 QMessageBox.critical(self, "Injection unavailable", msg + ".")
                 return
             self._on_consumer_status("[1/6] looking for game process...")
@@ -1135,6 +1234,7 @@ class MainWindow(QMainWindow):
             if pid == 0:
                 msg = f"game '{game}' not running — start the game first"
                 self._on_consumer_status(msg)
+                self._report_buffer.append_app("tracking start failed: game not running")
                 QMessageBox.critical(
                     self, "Game not running", msg + "."
                 )
@@ -1151,17 +1251,20 @@ class MainWindow(QMainWindow):
                 except SystemExit as e:
                     msg = f"injection into PID {pid} failed: {e.code}"
                     self._on_consumer_status(msg + " — try running the tracker as administrator")
+                    self._report_buffer.append_app("tracking start failed: injection failed")
                     QMessageBox.critical(self, "Injection failed", msg + ".")
                     return
                 except Exception as e:  # noqa: BLE001 — surface whatever ctypes raises
                     msg = f"injection into PID {pid} failed: {e!r}"
                     self._on_consumer_status(msg)
+                    self._report_buffer.append_app("tracking start failed: injection failed")
                     QMessageBox.critical(self, "Injection failed", msg)
                     return
                 self._on_consumer_status("[4/6] injection done — hooks should be live")
             self._on_consumer_status(f"[5/6] dll.active()={self._dll.active()}, calling install()...")
             if not self._dll.active() and not self._dll.install():
                 self._on_consumer_status("hook install FAILED — is the game running?")
+                self._report_buffer.append_app("tracking start failed: hook install failed")
                 QMessageBox.critical(
                     self,
                     "Could not install hooks",
@@ -1173,6 +1276,16 @@ class MainWindow(QMainWindow):
                 f"[6/6] hooks active={self._dll.active()} — starting consumer..."
             )
             sid = self._consumer.start()
+            self._report_buffer.append_app(f"tracking started (session #{sid})")
+            # File mirror of the event stream, in every build (only the
+            # Debug console widget stays dev-only). Lines are sanitized
+            # via display_event() — never raw — rolled at ~8MB keeping
+            # the newest 5 parts, with the newest 10 sessions pruned.
+            if self._event_log is not None:
+                self._event_log.close()
+                self._event_log = None
+            self._event_log = EventLog.open_session(sid, self)
+            self._event_log.subscribe(self._consumer)
             self.btn_toggle.setText("Stop")
             self._set_status(f"Session #{sid} started.")
             QTimer.singleShot(
@@ -1194,6 +1307,19 @@ class MainWindow(QMainWindow):
             "a channel (or change channels) at least once for the "
             "tracker to start.",
         )
+
+    def _open_report_dialog(self) -> None:
+        c = self._consumer
+        sid = c.session_id if c.session_id is not None else c.last_session_id
+        dlg = _ReportBugDialog(
+            self,
+            lines=self._report_buffer.lines(),
+            log=self._event_log,
+            session_id=sid,
+            events_seen=c.events_seen,
+            app_version=_APP_VERSION,
+        )
+        dlg.exec()
 
     def _set_channel_badge(self, needs: bool) -> None:
         """Drive both channel badges from one flag: the header chip
@@ -1390,8 +1516,10 @@ class MainWindow(QMainWindow):
                 continue
             setattr(s, f"overlay_show_{key}",
                     row_w._chk.isChecked())
-            # Level is account-wide: always parked on session.
-            scopes[key] = ("session" if key == "level"
+            # Level is account-wide: always parked on session. The
+            # notable count has no per-visit breakdown, so it parks
+            # there too.
+            scopes[key] = ("session" if key in ("level", "mighties")
                            else "visit" if row_w._scope.isChecked()
                            else "session")
         s.overlay_field_order = order
@@ -1468,14 +1596,17 @@ class MainWindow(QMainWindow):
         Per-zone, unchecked reads Session — so the pressed crystal
         fill from the theme marks the per-zone side like any other
         toggle. Level is account-wide, so its toggle stays parked on
-        Session and disabled."""
+        Session and disabled; the notable count has no per-visit
+        breakdown, so it parks there too."""
         btn.blockSignals(True)
         try:
-            if key == "level":
+            if key in ("level", "mighties"):
                 btn.setChecked(False)
                 btn.setText("Session")
                 btn.setToolTip(
-                    "Level is account-wide and always persists")
+                    "Level is account-wide and always persists"
+                    if key == "level" else
+                    "Session-wide count and always persists")
                 btn.setEnabled(False)
             else:
                 btn.setChecked(is_visit)
@@ -1747,8 +1878,13 @@ class MainWindow(QMainWindow):
         if sid is None:
             self.tbl_kills.setRowCount(0)
             self._show_empty(self.tbl_kills, self._kills_empty, True)
+            if hasattr(self, "_lbl_notable"):
+                self._lbl_notable.hide()
             return
         rows = self._db.recent_kills(sid, 200, names=self._names)
+        filt = self._kills_filter.text()
+        preset = self._kills_preset.currentText()
+        rows = [r for r in rows if _kill_matches(r, filt, preset)]
         self.tbl_kills.setRowCount(len(rows))
         for i, r in enumerate(rows):
             self.tbl_kills.setItem(i, 0, _cell(r["ts"]))
@@ -1756,7 +1892,40 @@ class MainWindow(QMainWindow):
             self.tbl_kills.setItem(i, 2, _cell(r["name"]))
             self.tbl_kills.setItem(
                 i, 3, _cell("✓" if r["is_mine"] else "—", align=Qt.AlignCenter))
+            self.tbl_kills.setItem(
+                i, 4, _mighty_marker_cell(r))
         self._show_empty(self.tbl_kills, self._kills_empty, len(rows) == 0)
+        self._refresh_notable_spawns(sid)
+
+    def _refresh_notable_spawns(self, sid: int) -> None:
+        # Newest notable spawn paints the banner; boss and oversized
+        # spawns share the distinct label, anything else keeps its own
+        # rarity. Mighty entries may carry a full server announcement
+        # as their stored text — shown verbatim behind the label.
+        # Empty means no banner, never a placeholder row.
+        try:
+            notes = self._db.recent_spawn_notifications(sid, 5)
+        except Exception:
+            notes = []
+        if not notes:
+            self._lbl_notable.hide()
+            return
+        latest = notes[0]
+        text = str(latest.get("name", "?"))
+        if str(latest.get("rarity", "")) in ("boss", "mighty"):
+            self._lbl_notable.setText(
+                f"MIGHTY — {text} · {latest.get('ts', '')}")
+        else:
+            self._lbl_notable.setText(
+                f"{latest.get('name', '?')} ({latest.get('rarity', '')})"
+                f" · {latest.get('ts', '')}")
+        if len(notes) > 1:
+            self._lbl_notable.setToolTip("\n".join(
+                f"{n.get('name', '?')} ({n.get('rarity', '')})"
+                f" · {n.get('ts', '')}" for n in notes))
+        else:
+            self._lbl_notable.setToolTip("")
+        self._lbl_notable.show()
 
     def _refresh_drops(self) -> None:
         sid = self._display_session_id()
@@ -1767,10 +1936,9 @@ class MainWindow(QMainWindow):
         acct = self._db.session_account(sid)
         rows = self._db.recent_drops(sid, 200, names=self._names,
                                      local_account=acct)
-        filt = self._drops_filter.text().strip().lower()
-        if filt:
-            rows = [r for r in rows if filt in _drop_label(r).lower()
-                    or filt in str(r["item_id"] or "")]
+        filt = self._drops_filter.text()
+        preset = self._drops_preset.currentText()
+        rows = [r for r in rows if _drop_matches(r, filt, preset)]
         self.tbl_drops.setRowCount(len(rows))
         for i, r in enumerate(rows):
             self.tbl_drops.setItem(i, 0, _cell(r["ts"]))
@@ -1933,21 +2101,66 @@ class MainWindow(QMainWindow):
         "left_at", effective ISO strings, left_at possibly None for a
         stale open visit) so charts can scope to the time spent in
         that visit."""
+        # Cached per (session, event-seq, time-bucket): the zone_stats +
+        # visit_stats round-trips are the priciest part of a Graphs
+        # rebuild, and re-running them 2x/sec while merely hovering is
+        # pure stutter. New events (bumped in _on_event_seen) invalidate
+        # the cache; the active session also re-resolves every 15s so
+        # its still-open visit keeps measuring against now.
+        try:
+            _active = self._consumer.session_id
+        except (AttributeError, RuntimeError):
+            _active = None
+        _bucket = int(time.monotonic() // 15) if sid == _active else 0
+        _seq = getattr(self, "_graphs_event_seq", 0)
+        _cached = getattr(self, "_zone_metrics_cache", None)
+        if (_cached is not None and _cached[0] == sid
+                and _cached[1] == _seq and _cached[2] == _bucket):
+            return _cached[3]
         now_iso = None
         if sid == self._consumer.session_id:
             now_iso = datetime.now().isoformat(timespec="milliseconds")
+        # Notable sightings scoped per zone in plain Python: one
+        # session-wide fetch, then each visit counts what falls inside
+        # its own window (no extra queries per zone).
+        _mighty_moments: list[tuple] = []
+        try:
+            _mighty_stream = self._db.cumulative_mighty(sid)
+        except Exception:
+            _mighty_stream = []
+        for _ts, _d in _mighty_stream:
+            try:
+                _mighty_moments.append(
+                    (datetime.fromisoformat(_ts), _d))
+            except (TypeError, ValueError):
+                continue
         out = []
         for z in self._db.zone_stats(sid):
             left = z["left_at"] or now_iso
             secs = _zone_seconds(z["entered_at"], left)
             minutes = (secs / 60.0) if secs else 0.0
             vs = self._db.visit_stats(sid, z["id"])
+            try:
+                _w0 = datetime.fromisoformat(z["entered_at"])
+            except (TypeError, ValueError):
+                _w0 = None
+            try:
+                _w1 = (datetime.fromisoformat(left)
+                       if left else datetime.now())
+            except (TypeError, ValueError):
+                _w1 = datetime.now()
+            _mighty_n = 0
+            if _w0 is not None:
+                for _t, _d in _mighty_moments:
+                    if _w0 <= _t <= _w1:
+                        _mighty_n += _d
             out.append({
                 "display": z["display_name"],
                 "map_name": z["map_name"],
                 "entered_at": z["entered_at"],
                 "left_at": left,
                 "kills": z["kills"],
+                "mighty": int(_mighty_n),
                 "drops": z["drops"],
                 "sc": z["soul_crystals"],
                 "xp": z["xp"],
@@ -1969,6 +2182,7 @@ class MainWindow(QMainWindow):
             if repeats[m["map_name"]] > 1:
                 seen[m["map_name"]] = seen.get(m["map_name"], 0) + 1
                 m["display"] = f"{m['display']} #{seen[m['map_name']]}"
+        self._zone_metrics_cache = (sid, _seq, _bucket, out)
         return out
 
     def _visit_window(self, m: dict) -> tuple[datetime, datetime] | None:
@@ -1995,6 +2209,7 @@ class MainWindow(QMainWindow):
         "xp": "xp", "xp_m": "xp",
         "damage": "damage", "dps": "damage",
         "minutes": "minutes",
+        "mighty": "mighty",
     }
 
     # Metric key -> per-bin value behind it. "minutes" is cumulative
@@ -2035,6 +2250,11 @@ class MainWindow(QMainWindow):
                 for k in ("kills", "xp", "drops", "sc"):
                     stamps += [ts for ts, _d
                                in self._db.cumulative_events(sid, k)]
+                if len(stamps) > 50000:
+                    # Span detection only needs the extremes; stride the
+                    # list instead of parsing 50k+ timestamps.
+                    _stride = len(stamps) // 25000 + 1
+                    stamps = stamps[::stride]
                 moments = sorted({_parse(ts) for ts in stamps} - {None})
                 if len(moments) < 2:
                     return []
@@ -2050,7 +2270,14 @@ class MainWindow(QMainWindow):
             ) for b in range(n)]
 
         events = []
-        for ts, delta in self._db.cumulative_events(sid, kind):
+        if kind == "mighty":
+            # Notable sightings stream from their own read path; the
+            # binning/cumulative/share treatment below reads unchanged
+            # since the shape matches the other count streams.
+            stream = self._db.cumulative_mighty(sid)
+        else:
+            stream = self._db.cumulative_events(sid, kind)
+        for ts, delta in stream:
             t = _parse(ts)
             if t is None:
                 continue
@@ -2059,6 +2286,16 @@ class MainWindow(QMainWindow):
             events.append((t, delta))
         if not events:
             return []
+        if len(events) > 50000:
+            # Guard for huge sessions: chunk-decimate before the
+            # parse/sort/bin work. Totals are preserved exactly (each
+            # chunk keeps its summed delta); only intra-chunk time
+            # resolution is lost, which the <=24-bin chart can't show
+            # anyway.
+            _stride = len(events) // 25000 + 1
+            events = [(events[i][0],
+                       sum(d for _t, d in events[i:i + _stride]))
+                      for i in range(0, len(events), _stride)]
         if start is None:
             events.sort(key=lambda e: e[0])
             start, end = events[0][0], events[-1][0]
@@ -2093,6 +2330,12 @@ class MainWindow(QMainWindow):
     def _sync_zone_combo(self, metrics: list[dict]) -> None:
         """Rebuild the zone picker for the current session, keeping the
         selection when the same zone is still there."""
+        names = ["All zones"] + [m["display"] for m in metrics]
+        if names == self._last_zone_names:
+            # Same zone list as last time (the common tick case) — the
+            # combo already shows it, so skip the clear/repopulate that
+            # used to run on every refresh.
+            return
         cur_text = self.cmb_zone.currentText()
         self.cmb_zone.blockSignals(True)
         self.cmb_zone.clear()
@@ -2102,6 +2345,7 @@ class MainWindow(QMainWindow):
         idx = self.cmb_zone.findText(cur_text)
         self.cmb_zone.setCurrentIndex(idx if idx >= 0 else 0)
         self.cmb_zone.blockSignals(False)
+        self._last_zone_names = names
 
     @staticmethod
     def _cumulative_points(points: list[Point]) -> list[Point]:
@@ -2128,7 +2372,12 @@ class MainWindow(QMainWindow):
                 for m in self._zone_metrics(sid)
                 if m.get(base, 0.0) > 0]
 
-    def _refresh_graphs(self) -> None:
+    def _on_graphs_config_changed(self, _idx=None) -> None:
+        """User changed the session/metric/chart-type/zone selector."""
+        self._graphs_dirty = True
+        self._refresh_graphs(force=True)
+
+    def _refresh_graphs(self, force: bool = False) -> None:
         """The selected stat, charted in the selected style and scope.
 
         Line/cumulative/bars chart the stat over time (per-bin gains,
@@ -2138,12 +2387,42 @@ class MainWindow(QMainWindow):
         the time spent on that zone". Share and spider are the
         exceptions: both always cover every zone (share splits the
         session total, spider compares zones on one radar web) and
-        spider dims all but the picked zone (if any)."""
+        spider dims all but the picked zone (if any).
+
+        Throttle: the 1s tick and the event path both call here, so a
+        rebuild runs at most every _GRAPHS_TICK_S (4s) when visible —
+        and not at all while the tab is hidden (the next tick after
+        it becomes visible rebuilds immediately). A dirty-flag keyed
+        on session/metric/chart-type/zone plus the event counter
+        skips the heavy fetch entirely when nothing changed, so
+        hovering/zooming a big session costs no DB work.
+        """
+        try:
+            _visible = (self._tabs.currentWidget()
+                        is getattr(self, "_tab_graphs", None))
+        except RuntimeError:
+            _visible = False
+        if not _visible:
+            # Hidden: defer. The tick right after the tab becomes
+            # visible sees _graphs_was_hidden and rebuilds at once.
+            self._graphs_dirty = True
+            self._graphs_was_hidden = True
+            return
+        _became_visible = self._graphs_was_hidden
+        self._graphs_was_hidden = False
+        _now = time.monotonic()
+        if (not force and not _became_visible
+                and _now - self._last_graphs_refresh < self._GRAPHS_TICK_S):
+            self._graphs_dirty = True
+            return
         sid = self.cmb_sessions.currentData()
         if sid is None:
             self.chart_main.clear()
             self.chart_spider.clear()
             self._graphs_totals.setText("")
+            self._last_graphs_refresh = _now
+            self._last_graphs_sig = None
+            self._graphs_dirty = False
             return
         sid = int(sid)
         key = self.cmb_metric.currentData() or "kills"
@@ -2153,6 +2432,21 @@ class MainWindow(QMainWindow):
         metrics = self._zone_metrics(int(sid))
         self._sync_zone_combo(metrics)
         zone_idx = self.cmb_zone.currentData()  # None == all zones
+        try:
+            _active = self._consumer.session_id
+        except (AttributeError, RuntimeError):
+            _active = None
+        _bucket = (int(_now // 15)
+                   if sid == _active and _active is not None else 0)
+        _sig = (sid, key, mode, zone_idx,
+                getattr(self, "_graphs_event_seq", 0), _bucket)
+        if not force and _sig == self._last_graphs_sig:
+            self._graphs_dirty = False
+            return
+        if (not force and not _became_visible
+                and _now - self._last_graphs_refresh < self._GRAPHS_TICK_S):
+            self._graphs_dirty = True
+            return
         window = (self._visit_window(metrics[zone_idx])
                   if zone_idx is not None else None)
         scope = (metrics[zone_idx]["display"]
@@ -2171,23 +2465,23 @@ class MainWindow(QMainWindow):
         # would be one 100% slice — so the picker steps aside for it.
         self.cmb_zone.setEnabled(mode != "share")
 
+        # Coalesce the repaint storm: set_mode/set_value_format/
+        # set_points each queue an update(), so freeze painting while
+        # the points are built and pushed, then repaint exactly once.
+        # The points are computed first so no paint ever reads a
+        # half-pushed state.
+        _share_pts: list | None = None
+        _line_pts: list | None = None
+        _spider_series: list | None = None
         if mode == "share":
-            self._graphs_section_title.setText(
-                f"{key.upper()}  SHARE  BY  ZONE")
-            self.chart_main.set_mode("share")
-            self.chart_main.set_value_format(fmt)
-            self.chart_main.set_points(
-                self._zone_share(sid,
-                                 self._BASE_QUANTITY.get(key, "kills")))
+            _share_pts = self._zone_share(
+                sid, self._BASE_QUANTITY.get(key, "kills"))
         elif mode == "spider":
-            self._graphs_section_title.setText("ZONES  COMPARED  (SPIDER)")
             biggest = sorted(range(len(metrics)),
                              key=lambda i: (metrics[i]["kills"],
                                             metrics[i]["xp"]),
                              reverse=True)[:8]
-            self.chart_spider.set_axes(list(self._SPIDER_AXES))
-            self.chart_spider.set_value_format("{:.0f}")
-            self.chart_spider.set_series([
+            _spider_series = [
                 SpiderSeries(
                     label=metrics[i]["display"],
                     values=[metrics[i]["kills"], metrics[i]["drops"],
@@ -2197,40 +2491,69 @@ class MainWindow(QMainWindow):
                     dimmed=(zone_idx is not None and i != zone_idx),
                 )
                 for j, i in enumerate(biggest)
-            ])
+            ]
         elif mode in ("line", "cumulative", "bars"):
+            _line_pts = self._time_series(sid, key, window)
             if mode == "cumulative" and key != "minutes":
+                _line_pts = self._cumulative_points(_line_pts)
+        self.chart_main.setUpdatesEnabled(False)
+        self.chart_spider.setUpdatesEnabled(False)
+        try:
+            if mode == "share":
                 self._graphs_section_title.setText(
-                    f"{scope.upper()}  OVER  TIME  (RUNNING TOTAL)")
-            else:
+                    f"{key.upper()}  SHARE  BY  ZONE")
+                self.chart_main.set_mode("share")
+                self.chart_main.set_value_format(fmt)
+                self.chart_main.set_points(_share_pts or [])
+            elif mode == "spider":
                 self._graphs_section_title.setText(
-                    f"{scope.upper()}  OVER  TIME")
-            # "minutes" is already an elapsed-time curve, so cumulative
-            # shows it as-is; everything else accumulates per-bin gains.
-            self.chart_main.set_mode("line" if mode == "cumulative"
-                                     else mode)
-            self.chart_main.set_value_format(fmt)
-            pts = self._time_series(sid, key, window)
-            if mode == "cumulative" and key != "minutes":
-                pts = self._cumulative_points(pts)
-            self.chart_main.set_points(pts)
+                    "ZONES  COMPARED  (SPIDER)")
+                self.chart_spider.set_axes(list(self._SPIDER_AXES))
+                self.chart_spider.set_value_format("{:.0f}")
+                self.chart_spider.set_series(_spider_series or [])
+            elif mode in ("line", "cumulative", "bars"):
+                if mode == "cumulative" and key != "minutes":
+                    self._graphs_section_title.setText(
+                        f"{scope.upper()}  OVER  TIME  (RUNNING TOTAL)")
+                else:
+                    self._graphs_section_title.setText(
+                        f"{scope.upper()}  OVER  TIME")
+                # "minutes" is already an elapsed-time curve, so
+                # cumulative shows it as-is; everything else
+                # accumulates per-bin gains.
+                self.chart_main.set_mode("line" if mode == "cumulative"
+                                         else mode)
+                self.chart_main.set_value_format(fmt)
+                self.chart_main.set_points(_line_pts or [])
+        finally:
+            self.chart_main.setUpdatesEnabled(True)
+            self.chart_spider.setUpdatesEnabled(True)
+            self.chart_main.update()
+            self.chart_spider.update()
+        self._last_graphs_refresh = _now
+        self._last_graphs_sig = _sig
+        self._graphs_dirty = False
 
         if zone_idx is not None:
             m = metrics[zone_idx]
             self._graphs_totals.setText(
-                f"{m['display']}: {m['kills']} kills  ·  {m['sc']} SC  ·  "
+                f"{m['display']}: {m['kills']} kills"
+                f"  ·  {m.get('mighty', 0)} mighties"
+                f"  ·  {m['sc']} SC  ·  "
                 f"{m['xp']:,} XP  ·  {m['drops']} drops  ·  "
                 f"{m['minutes']:.1f} min"
             )
             return
         tot_k = sum(m["kills"] for m in metrics)
+        tot_mighty = sum(m.get("mighty", 0) for m in metrics)
         tot_d = sum(m["drops"] for m in metrics)
         tot_s = sum(m["sc"] for m in metrics)
         tot_x = sum(m["xp"] for m in metrics)
         tot_m = sum(m["minutes"] for m in metrics)
         kpm = f"{(tot_k / tot_m):.2f}" if tot_m > 0 else "—"
         self._graphs_totals.setText(
-            f"{tot_k} kills  ·  {tot_s} SC  ·  {tot_x:,} XP  ·  "
+            f"{tot_k} kills  ·  {tot_mighty} mighties  ·  {tot_s} SC  ·  "
+            f"{tot_x:,} XP  ·  "
             f"{tot_d} drops  ·  {kpm} KPM  ·  {_fmt_duration(tot_m * 60)}"
         )
 
@@ -2270,12 +2593,26 @@ class MainWindow(QMainWindow):
         """
         if hasattr(self, "_debug") and self._debug is not None:
             self._debug.append_event(raw)
-        # Refresh whichever table is on screen, throttled: a combat
-        # burst (damage + deaths + drops per kill) used to rebuild the
-        # visible 200-row table on every single event, saturating the
-        # GUI thread until the app looked frozen and the Debug console
-        # looked stalled. The 1s tick fills in whatever we skip here.
+        # Every event dirties the Graphs caches (the zone-metrics cache
+        # keys off this counter) — the actual rebuild stays throttled.
+        self._graphs_event_seq = getattr(self, "_graphs_event_seq", 0) + 1
+        self._graphs_dirty = True
         now = time.monotonic()
+        try:
+            _on_graphs = (self._tabs.currentWidget()
+                          is getattr(self, "_tab_graphs", None))
+        except RuntimeError:
+            _on_graphs = False
+        if _on_graphs:
+            # Graphs rebuilds are the heaviest refresh in the window
+            # (full cumulative fetch + binning), so the event path
+            # allows one per _GRAPHS_EVENT_S (2s) — the tick catches up
+            # with anything skipped.
+            if now - self._last_graphs_event_refresh >= self._GRAPHS_EVENT_S:
+                self._last_graphs_event_refresh = now
+                self._refresh_graphs()
+            self._update_counter_label()
+            return
         if now - self._last_tab_refresh >= 0.5:
             self._last_tab_refresh = now
             self._refresh_current_tab()
@@ -2412,11 +2749,396 @@ class MainWindow(QMainWindow):
                 self._overlay.close()
             if self._consumer.running:
                 self._consumer.stop()
+            if self._event_log is not None:
+                self._event_log.close()
+                self._event_log = None
             if self._dll.active():
                 self._dll.uninstall()
         finally:
             super().closeEvent(e)
             QApplication.instance().quit()
+
+
+class _ReportBugDialog(QDialog):
+    """Report Bug dialog: optional comment, log-source choice, a
+    read-only tail preview, and Send / Copy / Save actions.
+
+    Send posts the report off the UI thread with a short timeout; any
+    failure (offline, unconfigured, rejected) degrades to Copy/Save
+    with a plain message. The app ships no secret: reports go to a
+    public proxy, and nothing sensitive is shown here.
+    """
+
+    _send_done = Signal(bool, str)
+
+    def __init__(self, parent, *, lines, session_id, events_seen,
+                 app_version, log=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Report Bug")
+        self.setObjectName("ReportBugDialog")
+        self.setMinimumSize(QSize(680, 560))
+        self._lines = list(lines)
+        self._log = log
+        # File source resolved from disk, not from the live object above:
+        # the sink is torn down on stop while its files remain.
+        self._file_log = None
+        self._session_id = session_id
+        self._events_seen = events_seen
+        self._app_version = app_version
+        self._sending = False
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(10)
+
+        info = QLabel(
+            "What is included: recent app events (sanitized — key material"
+            " and network addresses are stripped), status lines, session"
+            " info (session id, app version, event counts), and account IDs"
+            " as seen in-game. Pick comment-only to leave the log out."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        layout.addWidget(QLabel("What happened? (optional)"))
+        self._edit_comment = QTextEdit()
+        self._edit_comment.setPlaceholderText("Describe what went wrong…")
+        self._edit_comment.setFixedHeight(80)
+        layout.addWidget(self._edit_comment)
+
+        self._radio_file = QRadioButton("")
+        self._radio_file.toggled.connect(self._refresh_preview)
+        self._radio_ring = QRadioButton("Comment + recent activity")
+        self._radio_ring.setToolTip("Your comment with recent activity.")
+        self._radio_ring.toggled.connect(self._refresh_preview)
+        self._radio_comment_only = QRadioButton("Comment only")
+        self._radio_comment_only.setToolTip("Your comment, no log lines.")
+        self._refresh_file_option(update_checked=True)
+        group = QGroupBox("What to send")
+        group_layout = QVBoxLayout(group)
+        group_layout.addWidget(self._radio_file)
+        group_layout.addWidget(self._radio_ring)
+        group_layout.addWidget(self._radio_comment_only)
+        layout.addWidget(group)
+        # Dialog-scoped states only: checked row tint, muted disabled
+        # rows, distinct Send moments. Uses theme tokens; the rest of
+        # the dialog keeps its native look.
+        self.setStyleSheet(
+            "#ReportBugDialog QRadioButton { padding: 4px 8px; spacing: 8px; }"
+            f"#ReportBugDialog QRadioButton:checked {{ background-color: {theme.INK_2};"
+            f" border: 1px solid {theme.CRYSTAL}; border-radius: 2px; color: {theme.PARCH_BG}; }}"
+            f"#ReportBugDialog QRadioButton:disabled {{ color: {theme.ASH_BRIGHT};"
+            " background: transparent; border: 1px solid transparent; }"
+            "#ReportBugDialog QRadioButton:checked:disabled {"
+            f" background-color: {theme.INK_1}; border-color: {theme.INK_BORDER_2};"
+            f" color: {theme.ASH_BRIGHT}; }}"
+            '#ReportBugSend[sendState="cooldown"] {'
+            f" color: {theme.RUNE}; border-color: {theme.RUNE_FAINT}; }}"
+            '#ReportBugSend[sendState="unconfigured"] {'
+            f" color: {theme.ASH_BRIGHT}; border-color: {theme.INK_BORDER}; }}"
+            f"#ReportBugSend:disabled {{ color: {theme.ASH_BRIGHT};"
+            f" background-color: {theme.INK_1}; border-color: {theme.INK_BORDER}; }}"
+        )
+
+        layout.addWidget(QLabel("Preview (most recent lines):"))
+        self._preview = QTextEdit()
+        self._preview.setReadOnly(True)
+        self._preview.setFont(QFont("Consolas", 9))
+        layout.addWidget(self._preview, 1)
+
+        self._lbl_status = QLabel("")
+        self._lbl_status.setWordWrap(True)
+        layout.addWidget(self._lbl_status)
+
+        row = QHBoxLayout()
+        self._btn_send = QPushButton("Send")
+        self._btn_send.setObjectName("ReportBugSend")
+        self._btn_send.clicked.connect(self._on_send)
+        row.addWidget(self._btn_send)
+        btn_copy = QPushButton("Copy full report")
+        btn_copy.clicked.connect(self._on_copy)
+        row.addWidget(btn_copy)
+        btn_save = QPushButton("Save to file…")
+        btn_save.clicked.connect(self._on_save)
+        row.addWidget(btn_save)
+        row.addStretch(1)
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(self.accept)
+        row.addWidget(btn_close)
+        layout.addLayout(row)
+
+        self._send_done.connect(self._on_send_done)
+        try:
+            _has_url = bool(load_report_endpoint())
+        except Exception:
+            _has_url = True
+        try:
+            _cooling = send_cooldown_remaining() > 0
+        except Exception:
+            _cooling = False
+        if not _has_url:
+            self._refresh_send_visual("unconfigured")
+        elif _cooling:
+            self._refresh_send_visual("cooldown")
+        else:
+            self._refresh_send_visual("idle")
+        self._refresh_preview()
+
+    # ------------------------------------------------------------------
+    def _refresh_send_visual(self, state: str, note: str = "") -> None:
+        """Visual-only Send moments: label + tint + tooltip per state.
+
+        Does not decide whether sending is allowed; _on_send keeps
+        that logic. States: idle / sending / cooldown / unconfigured.
+        """
+        self._btn_send.setProperty("sendState", state)
+        if state == "sending":
+            self._btn_send.setText("Sending…")
+            self._btn_send.setToolTip("Sending your report…")
+        elif state == "cooldown":
+            self._btn_send.setText("Send — wait a moment")
+            self._btn_send.setToolTip(
+                note or "Sent recently — wait a moment, or use Copy/Save."
+            )
+        elif state == "unconfigured":
+            self._btn_send.setText("Send (not set up)")
+            self._btn_send.setToolTip(
+                "Upload is not set up — use Copy or Save instead."
+            )
+        else:
+            self._btn_send.setText("Send")
+            self._btn_send.setToolTip("Send your report.")
+        # Re-apply dynamic-property styling without a full polish.
+        self._btn_send.style().unpolish(self._btn_send)
+        self._btn_send.style().polish(self._btn_send)
+
+    def showEvent(self, event) -> None:
+        """Re-resolve the file choice on every open, so files written
+        after construction (e.g. a session stopped while open) show up."""
+        super().showEvent(event)
+        self._refresh_file_option(update_checked=False)
+        self._refresh_preview()
+
+    def _refresh_file_option(self, *, update_checked: bool) -> None:
+        """Point the full-file choice at the latest session on disk.
+
+        The live sink's stem wins while tracking runs; otherwise the
+        newest files on disk do (the just-finished session after a
+        stop). Only genuinely no session files keeps it disabled.
+        """
+        live_stem = None
+        if self._log is not None:
+            try:
+                live_stem = self._log.stem
+            except AttributeError:
+                live_stem = None
+        try:
+            latest = latest_session_stem()
+        except Exception:
+            latest = None
+        stems = []
+        if live_stem is not None:
+            stems.append(live_stem)
+        if latest is not None and all(s != latest for s in stems):
+            stems.append(latest)
+        chosen = None
+        for stem in stems:
+            try:
+                if session_parts(stem):
+                    chosen = stem
+                    break
+            except Exception:
+                continue
+        if chosen is not None and chosen == live_stem:
+            self._file_log = self._log
+        elif chosen is not None:
+            self._file_log = SimpleNamespace(stem=chosen,
+                                             total_lines=None)
+        else:
+            self._file_log = None
+        available = chosen is not None
+        btn = self._radio_file
+        blocked = [b.blockSignals(True) for b in
+                   (btn, self._radio_ring, self._radio_comment_only)]
+        try:
+            btn.setText(self._file_label())
+            btn.setEnabled(available)
+            btn.setToolTip(
+                "Full session file with your comment."
+                if available
+                else "Not available — no tracking session yet."
+            )
+            if update_checked:
+                btn.setChecked(available)
+                self._radio_ring.setChecked(not available)
+            elif not available and btn.isChecked():
+                btn.setChecked(False)
+                self._radio_ring.setChecked(True)
+        finally:
+            for b, was in zip((btn, self._radio_ring,
+                               self._radio_comment_only), blocked):
+                b.blockSignals(was)
+
+    def _file_label(self) -> str:
+        """Caption for the full-file choice, with the real size on disk."""
+        if self._file_log is None:
+            return "Comment + full session file — no tracking session yet"
+        size, _ = full_session_size(self._file_log)
+        try:
+            tag = (f", session {int(self._session_id)}"
+                   if self._session_id is not None else "")
+        except (TypeError, ValueError):
+            tag = ""
+        return (f"Comment + full session file"
+                f" ({format_report_size(size)}{tag})")
+
+    def _log_mode(self) -> str:
+        if self._radio_file.isChecked():
+            return "file"
+        if self._radio_ring.isChecked():
+            return "ring"
+        return "none"
+
+    def _assembled(self) -> tuple:
+        """(lines, total, source) for the current choice.
+
+        The session file is preferred; the ring covers reporting
+        without a tracking session.
+        """
+        if self._log_mode() == "file" and self._file_log is not None:
+            return assemble_log_lines(
+                log=self._file_log, fallback_lines=self._lines,
+                max_bytes=_REPORT_MAX_BYTES,
+            )
+        lines = list(self._lines)
+        return lines, len(lines), "recent activity"
+
+    def _report_text(self) -> str:
+        if self._log_mode() == "file" and self._file_log is not None:
+            text, parts = read_full_session_text(self._file_log)
+            total = getattr(self._file_log, "total_lines", None)
+            if total is None:
+                total = len(text.splitlines()) if text else 0
+            return build_full_report_text(
+                comment=self._edit_comment.toPlainText(),
+                log_text=text,
+                app_version=self._app_version,
+                session_id=self._session_id,
+                events_seen=self._events_seen,
+                total_lines=total,
+                source="session file",
+                part_count=parts,
+            )
+        lines, total, source = self._assembled()
+        return build_report_text(
+            comment=self._edit_comment.toPlainText(),
+            include_log=self._log_mode() != "none",
+            lines=lines,
+            app_version=self._app_version,
+            session_id=self._session_id,
+            events_seen=self._events_seen,
+            total_lines=total,
+            source=source,
+        )
+
+    def _refresh_preview(self) -> None:
+        if self._log_mode() == "none":
+            self._preview.setPlainText("(log not included — comment only)")
+            return
+        lines, _, _ = self._assembled()
+        kept, _ = truncate_report_lines(lines)
+        self._preview.setPlainText("\n".join(kept[-_PREVIEW_LINES:]))
+
+    def _on_copy(self) -> None:
+        QApplication.clipboard().setText(self._report_text())
+        self._lbl_status.setText("Full report copied to the clipboard.")
+
+    def _on_save(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save bug report", "bug-report.txt",
+            "Text files (*.txt);;All files (*)",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(self._report_text())
+        except OSError as e:
+            self._lbl_status.setText(f"Could not save the file ({e}).")
+            return
+        self._lbl_status.setText(f"Saved to {path}.")
+
+    def _on_send(self) -> None:
+        if self._sending:
+            return
+        url = load_report_endpoint()
+        if not url:
+            self._refresh_send_visual("unconfigured")
+            self._lbl_status.setText(
+                "Upload is not configured on this machine —"
+                " use Copy or Save instead."
+            )
+            return
+        wait = send_cooldown_remaining()
+        if wait > 0:
+            self._refresh_send_visual("cooldown")
+            self._lbl_status.setText(
+                f"Please wait {int(wait)}s before sending again —"
+                " or use Copy/Save."
+            )
+            return
+        if self._log_mode() == "file" and self._file_log is not None:
+            lines, _, _ = self._assembled()
+            metadata = build_report_payload(
+                comment=self._edit_comment.toPlainText(),
+                include_log=True,
+                lines=lines,
+                app_version=self._app_version,
+                session_id=self._session_id,
+                events_seen=self._events_seen,
+            )
+            text, _ = read_full_session_text(self._file_log)
+            job = ("full", metadata, text.encode("utf-8", "replace"))
+        else:
+            lines, _, _ = self._assembled()
+            payload = build_report_payload(
+                comment=self._edit_comment.toPlainText(),
+                include_log=self._log_mode() != "none",
+                lines=lines,
+                app_version=self._app_version,
+                session_id=self._session_id,
+                events_seen=self._events_seen,
+            )
+            job = ("json", payload)
+        self._sending = True
+        self._btn_send.setEnabled(False)
+        self._refresh_send_visual("sending")
+        self._lbl_status.setText("Sending…")
+        threading.Thread(
+            target=self._send_worker, args=(job, url),
+            daemon=True, name="ReportUpload",
+        ).start()
+
+    def _send_worker(self, job: tuple, url: str) -> None:
+        try:
+            if job[0] == "full":
+                _, metadata, file_bytes = job
+                ok, msg = send_full_report(metadata, file_bytes, url)
+            else:
+                ok, msg = send_report(job[1], url)
+        except Exception:  # noqa: BLE001 — never let the worker die silent
+            ok, msg = False, "Upload failed."
+        self._send_done.emit(ok, msg)
+
+    def _on_send_done(self, ok: bool, msg: str) -> None:
+        self._sending = False
+        self._btn_send.setEnabled(True)
+        self._refresh_send_visual("idle")
+        if ok:
+            mark_sent()
+            self._lbl_status.setText(msg)
+        else:
+            self._lbl_status.setText(f"{msg} You can Copy or Save instead.")
 
 
 def _cell(text: str, *, align: Qt.AlignmentFlag = Qt.AlignLeft) -> QTableWidgetItem:
@@ -2450,8 +3172,7 @@ def _empty_note(text: str) -> QLabel:
     return lbl
 
 
-# Wire sentinel for "drop has no owner yet". The DLL emits it as an
-# unsigned 32-bit value, so it arrives in Python as 4294967295.
+# Marker for a drop with no owner yet.
 _UNCLAIMED = 0xFFFFFFFF
 
 
@@ -2478,7 +3199,7 @@ def _drop_label(r: dict) -> str:
 
 
 def _owner_label(belongs_to: int | None, local_account: int | None) -> str:
-    """Human-readable drop owner: You, Unclaimed, #id, or —."""
+    """Human-readable drop owner."""
     if belongs_to is None:
         return "—"
     if local_account is not None and belongs_to == local_account:
@@ -2489,8 +3210,7 @@ def _owner_label(belongs_to: int | None, local_account: int | None) -> str:
 
 
 def _drop_status(r: dict, local_account: int | None) -> str:
-    """Lifecycle state of a drop row: who picked it up, or whether it
-    vanished unclaimed (expiry/destroy) — else still on the ground."""
+    """Lifecycle state of a drop row."""
     picker = r.get("picked_up_by")
     if picker is not None:
         if local_account is not None and picker == local_account:
@@ -2499,6 +3219,50 @@ def _drop_status(r: dict, local_account: int | None) -> str:
     if r.get("destroyed"):
         return "Gone"
     return "On ground"
+
+
+def _mighty_marker_cell(r: dict) -> QTableWidgetItem:
+    """Centered marker cell for notable kills, blank otherwise."""
+    return _cell("★" if r.get("is_mighty") else "", align=Qt.AlignCenter)
+
+
+def _kill_matches(r: dict, filt: str, preset: str) -> bool:
+    """One shared check for the kills list views.
+
+    The text filter and the preset combine (both must pass)."""
+    filt = (filt or "").strip().lower()
+    if filt and filt not in str(r.get("name", "")).lower() \
+            and filt not in str(r.get("enemy_id", "")) \
+            and filt not in str(r.get("mob_id") or ""):
+        return False
+    if preset == "Mine":
+        return bool(r.get("is_mine"))
+    if preset == "Mighties":
+        return bool(r.get("is_mighty"))
+    if preset == "Others":
+        return not bool(r.get("is_mine"))
+    return True
+
+
+def _drop_matches(r: dict, filt: str, preset: str) -> bool:
+    """One shared check for the drops list views.
+
+    The text filter and the preset combine (both must pass)."""
+    filt = (filt or "").strip().lower()
+    if filt and filt not in _drop_label(r).lower() \
+            and filt not in str(r["item_id"] or ""):
+        return False
+    if preset == "Mine":
+        return bool(r.get("mine"))
+    if preset == "Unclaimed":
+        return r.get("belongs_to") == _UNCLAIMED
+    if preset == "Soul Crystals":
+        return r.get("item_id") == 0
+    if preset == "Picked up by me":
+        return bool(r.get("picked_by_me"))
+    if preset == "Gone":
+        return bool(r.get("destroyed"))
+    return True
 
 
 def _zone_seconds(entered_at: str | None, left_at: str | None) -> float | None:
@@ -2652,6 +3416,8 @@ class _SessionDetailDialog(QDialog):
         form.addRow("Account:", QLabel(str(acct) if acct is not None else "unknown"))
         form.addRow("Kills:",
                     QLabel(f"{s['my_kills']} yours / {s['kills']} session total"))
+        form.addRow("Mighties:",
+                    QLabel(f"{s.get('mighty_kills', 0)} notable kills"))
         form.addRow("Drops:",
                     QLabel(f"{s['my_drops']} yours / {s['drops']} session total"))
         form.addRow("Soul crystals:",
@@ -2708,22 +3474,61 @@ class _SessionDetailDialog(QDialog):
         layout.addWidget(zones)
 
         layout.addWidget(_section_label("KILLS"))
-        kills = _ro_table(3, ["TIME", "MOB", "MINE"],
-                          [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignCenter])
-        for r in db.recent_kills(session_id, 200, names=names):
-            i = kills.rowCount()
-            kills.insertRow(i)
-            kills.setItem(i, 0, _cell(r["ts"]))
-            kills.setItem(i, 1, _cell(r["name"]))
-            kills.setItem(i, 2, _cell("✓" if r["is_mine"] else "—",
-                                       align=Qt.AlignCenter))
-        kills.setMinimumHeight(140)
-        kills.setMaximumHeight(300)
-        layout.addWidget(kills)
+        kills_filt_row = QHBoxLayout()
+        kills_filt_row.addStretch(1)
+        self._kills_preset = QComboBox()
+        self._kills_preset.addItems(["All", "Mine", "Mighties", "Others"])
+        self._kills_preset.setToolTip("Preset view for the kills list")
+        self._kills_preset.currentIndexChanged.connect(
+            lambda _i: self._populate_kills())
+        kills_filt_row.addWidget(self._kills_preset)
+        self._kills_filter = QLineEdit()
+        self._kills_filter.setPlaceholderText("Filter by mob name…")
+        self._kills_filter.setClearButtonEnabled(True)
+        self._kills_filter.setMinimumWidth(220)
+        self._kills_filter.textChanged.connect(
+            lambda _t: self._populate_kills())
+        kills_filt_row.addWidget(self._kills_filter)
+        layout.addLayout(kills_filt_row)
+        self._kills_table = _ro_table(4, ["TIME", "MOB", "MINE", "★"],
+                                       [Qt.AlignLeft, Qt.AlignLeft,
+                                        Qt.AlignCenter, Qt.AlignCenter])
+        self._kills_table.setMinimumHeight(140)
+        self._kills_table.setMaximumHeight(300)
+        layout.addWidget(self._kills_table)
+        self._kills_rows = db.recent_kills(session_id, 200, names=names)
+        self._populate_kills()
+
+        try:
+            _notes = db.recent_spawn_notifications(session_id, 50)
+        except Exception:
+            _notes = []
+        _mighties = [n for n in _notes
+                     if str(n.get("rarity", "")) == "mighty"]
+        if _mighties:
+            layout.addWidget(_section_label("MIGHTIES"))
+            mighty_table = _ro_table(2, ["TIME", "NOTICE"],
+                                     [Qt.AlignLeft, Qt.AlignLeft])
+            for n in _mighties:
+                i = mighty_table.rowCount()
+                mighty_table.insertRow(i)
+                mighty_table.setItem(i, 0, _cell(n.get("ts", "")))
+                mighty_table.setItem(i, 1, _cell(str(n.get("name", "?"))))
+            mighty_table.setMinimumHeight(60)
+            mighty_table.setMaximumHeight(200)
+            layout.addWidget(mighty_table)
 
         layout.addWidget(_section_label("DROPS"))
         filt_row = QHBoxLayout()
         filt_row.addStretch(1)
+        self._drops_preset = QComboBox()
+        self._drops_preset.addItems(
+            ["All", "Mine", "Unclaimed", "Soul Crystals",
+             "Picked up by me", "Gone"])
+        self._drops_preset.setToolTip("Preset view for the drops list")
+        self._drops_preset.currentIndexChanged.connect(
+            lambda _i: self._populate_drops())
+        filt_row.addWidget(self._drops_preset)
         self._drops_filter = QLineEdit()
         self._drops_filter.setPlaceholderText("Filter by item name…")
         self._drops_filter.setClearButtonEnabled(True)
@@ -2750,13 +3555,27 @@ class _SessionDetailDialog(QDialog):
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
 
+    def _populate_kills(self) -> None:
+        """Fill the dialog's kills table, honoring the name filter."""
+        filt = self._kills_filter.text()
+        preset = self._kills_preset.currentText()
+        rows = [r for r in self._kills_rows
+                if _kill_matches(r, filt, preset)]
+        t = self._kills_table
+        t.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            t.setItem(i, 0, _cell(r["ts"]))
+            t.setItem(i, 1, _cell(r["name"]))
+            t.setItem(i, 2, _cell("✓" if r["is_mine"] else "—",
+                                   align=Qt.AlignCenter))
+            t.setItem(i, 3, _mighty_marker_cell(r))
+
     def _populate_drops(self) -> None:
         """Fill the dialog's drops table, honoring the name filter."""
-        filt = self._drops_filter.text().strip().lower()
-        rows = self._drops_rows
-        if filt:
-            rows = [r for r in rows if filt in _drop_label(r).lower()
-                    or filt in str(r["item_id"] or "")]
+        filt = self._drops_filter.text()
+        preset = self._drops_preset.currentText()
+        rows = [r for r in self._drops_rows
+                if _drop_matches(r, filt, preset)]
         t = self._drops_table
         t.setRowCount(len(rows))
         for i, r in enumerate(rows):

@@ -1,0 +1,12 @@
+name = "sr-tracker-report-proxy"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sr-tracker-reports"
+database_id = "77ee9e36-7109-48db-a8d2-b0c1671b08d8"
+
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "sr-tracker-report-logs"

@@ -1,6 +1,13 @@
 build/
 dist/
 data/
+# Per-session debug event logs (srt/event_log.py) — never committed.
+debug-*.log
+# Dev-local Report Bug upload settings (srt/report_config.py template) — never committed.
+srt/report_config.py
+# Local Worker dev secrets (never committed).
+tools/report-proxy/.dev.vars
+tools/report-proxy/.wrangler/
 __pycache__/
 *.pyc
 *.pyo

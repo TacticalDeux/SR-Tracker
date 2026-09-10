@@ -10,7 +10,7 @@ real time.
 
 Each line passes through `display_event` before display, which
 reduces handshake/connection records to a short shape. Gameplay
-debugging (counts, drop ids, xp amounts, death tolls) is unaffected.
+debugging is unaffected.
 """
 from __future__ import annotations
 
@@ -31,8 +31,7 @@ from . import theme
 
 _MAX_LINES = 5000  # cap the log so the text widget stays responsive
 
-# Numbered packet types map to a generic descriptive name; the
-# "session setup" handshake has its own type.
+# Unresolved event types map to a generic descriptive name.
 _OP_TYPE_RE = re.compile(r"^op\s*(\d+)$", re.IGNORECASE)
 
 # Payload keys omitted from every event type.
@@ -45,11 +44,10 @@ _OMIT_FIELDS = frozenset({
 def display_event(raw: str) -> str:
     """Return the display form of a raw event JSON string.
 
-    - any numbered packet type -> {"type": "packet_parsed", "status": "parsed"}
-    - session_setup itself is reduced to {"type": "session_setup", "status": "parsed"}
-    - net_connect keeps the socket flow signal without the peer address
-    - any other event has _OMIT_FIELDS keys stripped; gameplay fields
-      (ids, counts, xp amounts, death tolls) pass through untouched
+    - unresolved event types are reduced to a generic parsed marker
+    - session_setup itself is reduced to a generic parsed marker
+    - net_connect keeps the flow signal without the peer address
+    - any other event has _OMIT_FIELDS keys stripped
     Non-JSON input is returned unchanged (the caller tags it [bad-json]).
     """
     try:
@@ -139,8 +137,7 @@ class DebugConsole(QWidget):
     def append_event(self, raw: str) -> None:
         """Called by the consumer for every event seen.
 
-        The line passes through `display_event` first; gameplay flow
-        (counts, drop ids, xp, deaths) stays fully visible.
+        The line passes through `display_event` first.
         """
         try:
             data = json.loads(raw)

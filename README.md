@@ -66,8 +66,7 @@ If nothing is being tracked a short while after starting, a popup asks
 you to log into a channel (or change channels) at least once. Until then,
 a red badge stays on the main window and overlay; nothing is recorded.
 
-Deaths are recorded from the game's death screen with the exact toll
-(XP / money / items lost); pickups resolve per drop (yours vs others).
+Deaths are recorded with their losses; pickups resolve per drop.
 
 ## Building a standalone exe
 

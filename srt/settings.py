@@ -19,7 +19,7 @@ from . import paths
 #: Overlay fields that can choose a reset scope. Kept in sync with
 #: overlay.OVERLAY_FIELDS (this module stays Qt-free, so the key list
 #: lives here and overlay.py mirrors it).
-OVERLAY_FIELD_KEYS = ("kills", "sc", "xp", "level", "zone",
+OVERLAY_FIELD_KEYS = ("kills", "mighties", "sc", "xp", "level", "zone",
                       "deaths", "xp_lost", "xp_hr", "dps")
 
 #: Valid per-field scopes: "visit" resets on zone change, "session"
@@ -48,6 +48,7 @@ class Settings:
     # 1.0 == designed size; the scale slider writes 0.7 .. 1.5.
     overlay_scale: float = 1.0
     overlay_show_kills: bool = True
+    overlay_show_mighties: bool = True
     overlay_show_sc: bool = True
     overlay_show_xp: bool = True
     overlay_show_level: bool = True
@@ -68,8 +69,9 @@ class Settings:
     # are ignored and missing known keys append at the end, so older
     # files and future fields both degrade gracefully.
     overlay_field_order: list[str] = field(
-        default_factory=lambda: ["kills", "sc", "xp", "level", "zone",
-                                  "deaths", "xp_lost", "xp_hr", "dps"])
+        default_factory=lambda: ["kills", "mighties", "sc", "xp", "level",
+                                   "zone", "deaths", "xp_lost", "xp_hr",
+                                   "dps"])
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False
