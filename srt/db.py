@@ -140,6 +140,15 @@ SCHEMA = [
     """CREATE INDEX IF NOT EXISTS idx_damage_session_enemy ON damage(session_id, enemy_id)""",
     """CREATE INDEX IF NOT EXISTS idx_deaths_session_ts ON deaths(session_id, timestamp)""",
     """CREATE INDEX IF NOT EXISTS idx_drops_session_drop ON drops(session_id, drop_id)""",
+    # Batch-1 covering indexes: same tables/columns, no schema change.
+    # These turn the per-zone / per-session correlated subqueries
+    # (zone_stats view, past_sessions, summary) into index-only scans.
+    """CREATE INDEX IF NOT EXISTS idx_kills_session_mine_ts ON kills(session_id, is_mine, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_drops_session_item_ts ON drops(session_id, item_id, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_xp_session_gain_ts ON xp_events(session_id, xp_gained, timestamp)""",
+    """CREATE INDEX IF NOT EXISTS idx_zone_visits_session_entered ON zone_visits(session_id, entered_at)""",
+    """CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session_id, event_type)""",
+    """CREATE INDEX IF NOT EXISTS idx_spawn_session_rarity ON spawn_notifications(session_id, rarity)""",
 ]
 
 # Tables wiped by reset_session (everything per-session, but not the session row).
@@ -179,15 +188,70 @@ def _i64(value: int | None) -> int | None:
     return value
 
 
+def _ratio(total: int | None, required: int | None) -> float | None:
+    """total/required as a 0..1 fraction; None when either side is
+    missing, required is not positive, or the outcome leaves 0..1."""
+    try:
+        if total is None or required is None or required <= 0:
+            return None
+        pct = float(total) / float(required)
+    except (TypeError, ValueError, ArithmeticError):
+        return None
+    if not 0.0 <= pct <= 1.0:
+        return None
+    return pct
+
+
 class Database:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(path), check_same_thread=False, timeout=5.0)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
+        # Batch-1 read/write tuning: no semantics change.
+        # busy_timeout avoids "database is locked" flakes when the UI
+        # reads while the consumer writes; cache/temp_store keep the
+        # hot working set in memory.
+        self._conn.execute("PRAGMA busy_timeout=5000")
+        self._conn.execute("PRAGMA cache_size=-64000")
+        self._conn.execute("PRAGMA temp_store=MEMORY")
         self._conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
+        self._batch_depth = 0
         self._migrate()
+
+    def begin_batch(self) -> None:
+        """Defer commits until matching end_batch (nestable, thread-safe)."""
+        with self._lock:
+            if self._batch_depth == 0:
+                self._conn.execute("BEGIN")
+            self._batch_depth += 1
+
+    def end_batch(self) -> None:
+        """Commit a batch started with begin_batch. Always commits exactly once."""
+        with self._lock:
+            if self._batch_depth <= 0:
+                return
+            self._batch_depth -= 1
+            if self._batch_depth == 0:
+                self._conn.commit()  # batch flush: keep direct commit
+
+    def abort_batch(self) -> None:
+        """Drop any deferred writes and leave batching inactive."""
+        with self._lock:
+            try:
+                if self._batch_depth > 0:
+                    self._conn.rollback()
+            except Exception:
+                pass
+            self._batch_depth = 0
+
+    def _maybe_commit(self) -> None:
+        """Commit unless inside begin_batch/end_batch (then defer)."""
+        with self._lock:
+            if self._batch_depth > 0:
+                return
+            self._conn.commit()
 
     def _migrate(self) -> None:
         with self._lock:
@@ -226,6 +290,10 @@ class Database:
             self._ensure_column("xp_events", "level", "INTEGER")
             self._ensure_column("xp_events", "is_level_up", "INTEGER")
             self._ensure_column("xp_events", "bonus_party", "INTEGER")
+            # Running level totals ride on gain rows when the feed
+            # carries them; old rows and older feeds leave blanks.
+            self._ensure_column("xp_events", "required_xp", "INTEGER")
+            self._ensure_column("xp_events", "total_xp", "INTEGER")
             self._ensure_column("zone_visits", "display_name", "TEXT")
             self._ensure_column("zone_visits", "is_mirage", "INTEGER NOT NULL DEFAULT 0")
             # Old builds created zone_visits with a NOT NULL `timestamp`
@@ -241,7 +309,7 @@ class Database:
             cur.execute("DROP VIEW IF EXISTS zone_stats")
             for s in SCHEMA:
                 cur.execute(s)
-            self._conn.commit()
+            self._maybe_commit()
 
     def _ensure_column(self, table: str, column: str, decl: str) -> None:
         cur = self._conn.execute(f"PRAGMA table_info({table})")
@@ -296,7 +364,7 @@ class Database:
                 "INSERT INTO sessions (started) VALUES (?)",
                 (datetime.now().isoformat(timespec="seconds"),),
             )
-            self._conn.commit()
+            self._maybe_commit()
             return cur.lastrowid
 
     def end_session(self, session_id: int) -> None:
@@ -313,7 +381,7 @@ class Database:
                 "WHERE session_id = ? AND left_at IS NULL",
                 (ts, session_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def reset_session(self, session_id: int) -> None:
         """Wipe all event rows for a session, keep the session itself."""
@@ -326,7 +394,7 @@ class Database:
                     f"DELETE FROM {table} WHERE session_id = ?",
                     (session_id,),
                 )
-            self._conn.commit()
+            self._maybe_commit()
 
     def insert_kill(self, session_id: int, enemy_id: int, mob_id: int | None,
                     ts: str, is_mine: bool = False,
@@ -337,7 +405,7 @@ class Database:
                 "VALUES (?,?,?,?,?,?)",
                 (session_id, enemy_id, mob_id, int(is_mine), int(is_mighty), ts),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def insert_damage(self, session_id: int, enemy_id: int, attacker: int,
                        damage: int, ts: str) -> None:
@@ -347,7 +415,7 @@ class Database:
                 "VALUES (?,?,?,?,?)",
                 (session_id, _i64(enemy_id), _i64(attacker), _i64(damage), ts),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def damaged_by(self, session_id: int, enemy_id: int, account_id: int) -> bool:
         """True if the given attacker damaged the given enemy this session."""
@@ -368,7 +436,7 @@ class Database:
                 "WHERE id = ?",
                 (account_id, session_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def session_account(self, session_id: int) -> int | None:
         with self._lock:
@@ -388,7 +456,7 @@ class Database:
                 "AND d.enemy_id = kills.enemy_id AND d.attacker = ?)",
                 (session_id, account_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def wipe(self) -> None:
         """Delete every row in every table, sessions included. Schema stays."""
@@ -402,7 +470,7 @@ class Database:
                 "('sessions','drops','xp_events','spawn_notifications',"
                 "'zone_visits','events','damage','deaths')"
             )
-            self._conn.commit()
+            self._maybe_commit()
             self._conn.execute("VACUUM")
 
     def insert_drop(self, session_id: int, drop_id: int, item_id: int | None,
@@ -415,7 +483,7 @@ class Database:
                 (session_id, _i64(drop_id), _i64(item_id), _i64(mob_id),
                  _i64(amount), _i64(belongs_to), ts),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def insert_death(self, session_id: int, exp_lost: int, money_lost: int,
                      items_lost: int, ts: str) -> None:
@@ -426,7 +494,7 @@ class Database:
                 " VALUES (?,?,?,?,?)",
                 (session_id, _i64(exp_lost), _i64(money_lost), _i64(items_lost), ts),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def mark_drop_pickup(self, session_id: int, drop_id: int,
                          picker: int | None, ts: str) -> None:
@@ -440,7 +508,7 @@ class Database:
                                ORDER BY id DESC LIMIT 1)""",
                 (picker, ts, session_id, drop_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def mark_drop_destroyed(self, session_id: int, drop_id: int) -> None:
         """Flag a drop as gone without being picked up."""
@@ -453,7 +521,7 @@ class Database:
                                ORDER BY id DESC LIMIT 1)""",
                 (session_id, drop_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def deaths_for_session(self, session_id: int) -> list[dict]:
         """Every recorded death in a session, oldest first."""
@@ -470,7 +538,9 @@ class Database:
             ]
 
     def insert_xp(self, session_id: int, xp: int, level: int | None,
-                   is_level_up: bool, ts: str) -> None:
+                   is_level_up: bool, ts: str,
+                   required_xp: int | None = None,
+                   total_xp: int | None = None) -> None:
         # Level is validated to the legit range; out-of-range values
         # are stored without a level instead. XP value is kept as-is.
         if level is not None:
@@ -482,10 +552,11 @@ class Database:
                 level = None
         with self._lock:
             self._conn.execute(
-                "INSERT INTO xp_events (session_id, xp_gained, level, is_level_up, timestamp) VALUES (?,?,?,?,?)",
-                (session_id, _i64(xp), _i64(level), int(is_level_up), ts),
+                "INSERT INTO xp_events (session_id, xp_gained, level, is_level_up, timestamp, required_xp, total_xp) VALUES (?,?,?,?,?,?,?)",
+                (session_id, _i64(xp), _i64(level), int(is_level_up), ts,
+                 _i64(required_xp), _i64(total_xp)),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def insert_spawn_notification(self, session_id: int, name: str, rarity: str, ts: str) -> None:
         with self._lock:
@@ -493,7 +564,7 @@ class Database:
                 "INSERT INTO spawn_notifications (session_id, name, rarity, timestamp) VALUES (?,?,?,?)",
                 (session_id, name, rarity, ts),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def recent_spawn_notifications(self, session_id: int, limit: int = 50) -> list[dict]:
         """Most recent spawn notifications for a session, newest first."""
@@ -525,7 +596,7 @@ class Database:
                 "UPDATE sessions SET current_zone = ? WHERE id = ?",
                 (map_name, session_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def mark_current_visit_mirage(self, session_id: int, ts: str) -> None:
         """Flag the currently open zone visit as a mirage run. Targets
@@ -538,7 +609,7 @@ class Database:
                                ORDER BY id DESC LIMIT 1)""",
                 (session_id,),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def close_open_zones(self, session_id: int, ts: str) -> None:
         """Stamp left_at on any still-open zone visits (called on session end)."""
@@ -548,7 +619,7 @@ class Database:
                 "WHERE session_id = ? AND left_at IS NULL",
                 (ts, session_id),
             )
-            self._conn.commit()
+            self._maybe_commit()
 
     def open_visit_id(self, session_id: int) -> int | None:
         """Id of the latest still-open visit, or None when all closed."""
@@ -565,7 +636,7 @@ class Database:
         """Aggregates scoped to one zone visit's time window.
 
         Returns kills, my_kills, drops, my_drops, sc_picked, sc_unpicked,
-        xp, deaths, xp_lost, damage_mine, damage_total plus elapsed_s
+        xp, damage_mine, damage_total plus elapsed_s
         (entered_at to left_at, or to now while open), dps, dps_mine
         and xp_hr. None for an unknown visit."""
         with self._lock:
@@ -610,11 +681,6 @@ class Database:
             xp = one(
                 "SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events "
                 f"WHERE session_id = ? AND {w}", (session_id,) + win)
-            deaths = one(f"SELECT COUNT(*) FROM deaths WHERE session_id = ? AND {w}",
-                         (session_id,) + win)
-            xp_lost = one(
-                "SELECT COALESCE(SUM(exp_lost), 0) FROM deaths "
-                f"WHERE session_id = ? AND {w}", (session_id,) + win)
             damage_total = one(
                 "SELECT COALESCE(SUM(damage), 0) FROM damage "
                 f"WHERE session_id = ? AND {w}", (session_id,) + win)
@@ -632,7 +698,7 @@ class Database:
                 "kills": kills, "my_kills": my_kills,
                 "drops": drops, "my_drops": my_drops,
                 "sc_picked": sc_picked, "sc_unpicked": sc_unpicked,
-                "xp": xp, "deaths": deaths, "xp_lost": xp_lost,
+                "xp": xp,
                 "damage_mine": damage_mine, "damage_total": damage_total,
                 "elapsed_s": elapsed_s,
                 "dps": (damage_total / elapsed_s) if elapsed_s > 0 else 0.0,
@@ -706,6 +772,33 @@ class Database:
             xp = cur.fetchone()[0] or 0
             cur.execute("SELECT COALESCE(MAX(CASE WHEN level BETWEEN 1 AND 100 THEN level ELSE 0 END), 0) FROM xp_events WHERE session_id = ?", (session_id,))
             level = cur.fetchone()[0] or 0
+            # Latest running level totals; blank when the feed never
+            # carried them.
+            cur.execute(
+                "SELECT required_xp, total_xp FROM xp_events "
+                "WHERE session_id = ? AND required_xp IS NOT NULL "
+                "AND total_xp IS NOT NULL ORDER BY id DESC LIMIT 1",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            xp_required = row[0] if row else None
+            xp_total = row[1] if row else None
+            xp_pct = _ratio(xp_total, xp_required)
+            # Projected rate from session totals.
+            cur.execute("SELECT started, ended FROM sessions WHERE id = ?", (session_id,))
+            srow = cur.fetchone()
+            elapsed_s = _span_seconds(srow[0] if srow else None, srow[1] if srow else None)
+            hrs = elapsed_s / 3600.0
+            xp_hr = (xp / hrs) if hrs > 0 else None
+            if xp_required is None or xp_total is None or xp_required <= 0 \
+                    or xp_hr is None or xp_hr <= 0:
+                xp_pct_hr = None
+            else:
+                remaining = xp_required - xp_total
+                if remaining <= 0:
+                    xp_pct_hr = None
+                else:
+                    xp_pct_hr = xp_hr / float(remaining)
             cur.execute("SELECT COUNT(*) FROM drops WHERE session_id = ?", (session_id,))
             drops = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM kills WHERE session_id = ? AND is_mine = 1",
@@ -772,6 +865,10 @@ class Database:
                 "sc_unpicked": sc_pick["unpicked"],
                 "xp": int(xp),
                 "level": int(level),
+                "xp_required": xp_required,
+                "xp_total": xp_total,
+                "xp_pct": xp_pct,
+                "xp_pct_hr": xp_pct_hr,
                 "drops": drops,
                 "my_drops": my_drops,
                 "my_pickups": my_pickups,
@@ -873,6 +970,36 @@ class Database:
                 "xp": r[8] or 0,
                 "level": r[9] or 0, "drops": r[10], "my_drops": r[11] or 0,
             } for r in cur.fetchall()]
+
+    def session_meta(self, session_id: int) -> dict | None:
+        """One past_sessions-style row for a session id, or None."""
+        with self._lock:
+            cur = self._conn.execute(
+                """SELECT s.id, s.started, s.ended, s.current_zone,
+                          (SELECT COUNT(*) FROM kills WHERE session_id = s.id) AS kills,
+                          (SELECT COUNT(*) FROM kills WHERE session_id = s.id AND is_mine = 1) AS my_kills,
+                          (SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops WHERE session_id = s.id AND item_id = 0) AS sc,
+                          (SELECT COALESCE(SUM(COALESCE(amount, 1)), 0) FROM drops WHERE session_id = s.id
+                           AND item_id = 0 AND belongs_to = s.local_account_id) AS my_sc,
+                          (SELECT COALESCE(SUM(xp_gained), 0) FROM xp_events WHERE session_id = s.id) AS xp,
+                           (SELECT COALESCE(MAX(CASE WHEN level BETWEEN 1 AND 100 THEN level ELSE 0 END), 0) FROM xp_events WHERE session_id = s.id) AS lvl,
+                          (SELECT COUNT(*) FROM drops WHERE session_id = s.id) AS drops,
+                          (SELECT COUNT(*) FROM drops WHERE session_id = s.id
+                           AND belongs_to = s.local_account_id) AS my_drops
+                   FROM sessions s
+                   WHERE s.id = ?""",
+                (session_id,),
+            )
+            r = cur.fetchone()
+            if r is None:
+                return None
+            return {
+                "id": r[0], "started": r[1], "ended": r[2], "current_zone": r[3],
+                "kills": r[4], "my_kills": r[5] or 0,
+                "soul_crystals": r[6] or 0, "my_soul_crystals": r[7] or 0,
+                "xp": r[8] or 0,
+                "level": r[9] or 0, "drops": r[10], "my_drops": r[11] or 0,
+            }
 
     def session_zone_timeline(self, session_id: int) -> list[dict]:
         """Zone visits for a session, with start/end timestamps."""

@@ -11,6 +11,7 @@ the section; there is no log file.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections import deque
@@ -41,11 +42,52 @@ _SIGHT_WINDOW_S = 10.0
 # Notable-spawn outlier tuning. Per monster we remember the most recent
 # spawn strengths (window), need a minimum number of sightings before
 # judging, and flag a spawn whose strength reads at least this multiple
-# of the running middle. Oversized spawns arrive only after a short warmup,
-# so a small baseline is already reliable given the size of the gap.
+# of the running middle. Oversized spawns arrive only after minutes of
+# grinding, so by then the baseline is dozens deep and reliable.
 _HP_WINDOW = 50
 _HP_MIN_SAMPLES = 3
 _HP_OUTLIER_MULT = 3
+
+# Notice dedupe: no matter how many arms agree on one arrival, it earns
+# a single row per window (grinding gaps run to minutes, so one
+# arrival never legitimately repeats inside it).
+_NOTICE_DEDUPE_S = 60.0
+# Burst guard: any notice at all suppresses a further row inside this
+# short window, so a twin whose text cannot be matched to its sibling
+# still cannot double-row.
+_NOTICE_BURST_S = 10.0
+# Retro-mark reach: how far back an id-less announcement may look for
+# the spawn it names, and how many recent spawns are remembered.
+_RETRO_MARK_S = 10.0
+_RECENT_SPAWNS = 256
+# Cap on arrivals held for retroactive judging (same-visit only;
+# a new visit drops them with the baseline).
+_PENDING_JUDGE = 256
+
+
+def _normalize_notice_token(name: str) -> str:
+    # Keying helper so twin reports of one arrival share a dedupe
+    # key: strips the fixed surrounding template words from a full
+    # sentence down to its subject token, and lowercases a plain
+    # label to the same form. Falls back to the full text when no
+    # subject survives.
+    text = (name or "").strip()
+    if not text:
+        return ""
+    low = text.lower()
+    if "mighty" not in low:
+        return low
+    cleaned = re.sub(r"[^a-z0-9 ]+", " ", low)
+    stop = {
+        "a", "an", "the", "mighty", "has", "have", "had", "is", "are",
+        "was", "were", "be", "been", "appeared", "appears",
+        "appearing", "spawned", "spawn", "arrived", "arrives",
+        "arrival", "emerged", "here", "now", "wild",
+    }
+    kept = [t for t in cleaned.split() if t and t not in stop]
+    if kept:
+        return " ".join(kept)
+    return low
 
 
 _GAMEPLAY_TYPES = frozenset({
@@ -107,13 +149,25 @@ class EventConsumer(QObject):
         self._link_session = False
         self._mob_of_enemy: dict[int, int] = {}
         # Recent spawn strengths per monster, oldest first. Compared
-        # against when a new spawn arrives to spot outliers; reset per
-        # session in start() so one grind never leaks into the next.
+        # against when a new spawn arrives to spot outliers; scoped
+        # to the visit (a new arrival resets them) and the session.
         self._hp_by_mob: dict[int, deque] = {}
-        # Notable enemy instances seen this session. Fed at spawn time by
+        # Notable enemy instances seen this visit. Fed at spawn time by
         # the paths that record a notice, consumed on the matching death
-        # so the kill row carries the flag. Reset per session in start().
+        # so the kill row carries the flag. Reset per visit and session.
         self._notable_enemy_ids: set[int] = set()
+        # Arrivals held for retroactive judging: judged too early to
+        # call at the time, re-judged once their baseline firms up.
+        # Same-visit only; a new arrival drops them with the baseline.
+        self._pending_judge: deque = deque(maxlen=_PENDING_JUDGE)
+        # Last notice wall-time (monotonic) for the short cross-key
+        # burst guard, a per-key log of last-write times for the long
+        # dedupe window, and a bounded log of recent spawns for id-less
+        # announcements to reach back over. The clock runs across
+        # visits; the log does not. Both reset per session in start().
+        self._last_notice_at = 0.0
+        self._notice_at_by_key: dict[tuple[str, str], float] = {}
+        self._recent_spawns: deque = deque(maxlen=_RECENT_SPAWNS)
         # Recent portal sightings as (monotonic-ts, text, cost), oldest
         # first. A free non-housing sighting shortly before a same-zone
         # arrival marks the new visit as a mirage run.
@@ -208,8 +262,9 @@ class EventConsumer(QObject):
         self._link_player = False
         self._link_session = False
         self._mob_of_enemy = {}
-        self._hp_by_mob = {}
-        self._notable_enemy_ids = set()
+        self._reset_visit_state()
+        self._last_notice_at = 0.0
+        self._notice_at_by_key = {}
         self._portal_sights = deque(maxlen=16)
         self._current_zone = None
         self._current_visit_id = None
@@ -249,31 +304,68 @@ class EventConsumer(QObject):
 
     # --- internals ---
     def _loop(self) -> None:
-        # 5ms idle sleep is short enough for ~200 events/sec but cheap when
-        # the buffer is empty.
+        # Batch-1: drain everything available per wakeup inside one DB
+        # batch (single commit), then adaptive sleep — 1ms when busy,
+        # backing off to ~20ms when idle. Same events, fewer commits
+        # and wakeups.
         self.status.emit("consumer thread running")
+        _idle = 0
         while self._running:
             try:
-                if self._dll.has_event():
-                    raw = self._dll.next_event()
-                    if raw is not None:
-                        self._handle(raw)
-                    else:
-                        # has_event was true but no record came out: the
-                        # reader resynced (fell behind / corrupt / torn).
-                        # Surface it — previously silent, which looked
-                        # exactly like "tracking just stopped".
-                        pop = getattr(self._dll, "pop_resync", None)
-                        reason = pop() if callable(pop) else None
-                        if reason:
-                            self._events_dropped += 1
-                            self.status.emit(f"buffer resync: {reason}")
-                        time.sleep(0.005)
+                _did_work = False
+                self._db.begin_batch()
+                try:
+                    # Cap per-wakeup so a burst never starves stop().
+                    for _ in range(500):
+                        if not self._running:
+                            break
+                        if not self._dll.has_event():
+                            break
+                        raw = self._dll.next_event()
+                        if raw is not None:
+                            self._handle(raw)
+                            _did_work = True
+                        else:
+                            # has_event was true but no record came out:
+                            # the reader resynced (fell behind / corrupt /
+                            # torn). Surface it — previously silent, which
+                            # looked exactly like "tracking just stopped".
+                            pop = getattr(self._dll, "pop_resync", None)
+                            reason = pop() if callable(pop) else None
+                            if reason:
+                                self._events_dropped += 1
+                                self.status.emit(f"buffer resync: {reason}")
+                            _did_work = True
+                except Exception:
+                    # Drop the half-filled batch before it can commit;
+                    # the outer handler reports and keeps polling.
+                    try:
+                        self._db.abort_batch()
+                    except Exception:
+                        pass
+                    raise
+                finally:
+                    self._db.end_batch()
+                if _did_work:
+                    _idle = 0
+                    time.sleep(0.001)
                 else:
-                    time.sleep(0.005)
+                    _idle = min(_idle + 1, 20)
+                    # 1ms -> ~20ms backoff when idle.
+                    time.sleep(0.001 if _idle < 3 else 0.02)
             except Exception as e:
                 # Never let a single bad frame kill the consumer, but make
                 # it visible in the debug console instead of failing silent.
+                # Roll back any open batch before closing it so a failed
+                # drain never commits a partial batch.
+                try:
+                    self._db.abort_batch()
+                except Exception:
+                    pass
+                try:
+                    self._db.end_batch()
+                except Exception:
+                    pass
                 self.status.emit(f"consumer error: {e!r}")
                 time.sleep(0.1)
 
@@ -288,6 +380,92 @@ class EventConsumer(QObject):
             if name:
                 return name
         return f"Mob#{mob_id}"
+
+    def _record_notice(self, sid: int, name: str, rarity: str, ts: str,
+                       enemy_id: int | None = None) -> None:
+        # Single choke point for notable notices. Twins from the two
+        # arms share a per-key window on the stripped subject token,
+        # so one arrival never yields two rows either direction; a
+        # short any-key burst guard covers twins whose sentence form
+        # cannot be matched. Distinct arrivals outside both windows
+        # earn their own rows. A known instance id always attaches,
+        # so a dup-skipped arm still marks the later kill.
+        now = time.monotonic()
+        key = (_normalize_notice_token(name), rarity)
+        known = self._notice_at_by_key.get(key, 0.0)
+        for k, t in list(self._notice_at_by_key.items()):
+            if now - t >= _NOTICE_DEDUPE_S:
+                del self._notice_at_by_key[k]
+        if (now - known >= _NOTICE_DEDUPE_S
+                and now - self._last_notice_at >= _NOTICE_BURST_S):
+            self._db.insert_spawn_notification(sid, name, rarity, ts)
+            self._notice_at_by_key[key] = now
+            self._last_notice_at = now
+        if enemy_id:
+            self._notable_enemy_ids.add(enemy_id)
+
+    def _reset_visit_state(self) -> None:
+        # A new visit is a new scaling context: strength baselines,
+        # notable ids, the announcement reach-back log, unjudged
+        # arrivals, and spawn-to-type links never carry over. The
+        # notice clocks keep running across visits; harmless when
+        # everything is already empty.
+        self._hp_by_mob = {}
+        self._mob_of_enemy = {}
+        self._notable_enemy_ids = set()
+        self._recent_spawns = deque(maxlen=_RECENT_SPAWNS)
+        self._pending_judge = deque(maxlen=_PENDING_JUDGE)
+
+    def _judge_pending(self, sid: int, mob_id: int) -> None:
+        # A baseline just firmed up: re-judge this visit's arrivals
+        # that came too early to call at the time, under the now-firm
+        # middle. Trippers record through the choke with their
+        # original arrival time so graphs bin them where they
+        # happened; everything evaluated here leaves pending, so
+        # full-baseline arrivals are never revisited and each early
+        # arrival is judged exactly once.
+        hist = self._hp_by_mob.get(mob_id)
+        if not hist or len(hist) < _HP_MIN_SAMPLES:
+            return
+        try:
+            mid = median(hist)
+        except Exception:
+            mid = 0
+        due = [e for e in self._pending_judge if e[0] == mob_id]
+        if not due:
+            return
+        if mid <= 0:
+            return
+        if not (self._link_player and self._link_session):
+            return
+        self._pending_judge = deque(
+            (e for e in self._pending_judge if e[0] != mob_id),
+            maxlen=_PENDING_JUDGE)
+        for _, eid, ehp, ets in due:
+            if ehp >= _HP_OUTLIER_MULT * mid:
+                self._record_notice(
+                    sid, self._display_monster(mob_id),
+                    "mighty", ets, eid)
+
+    def _retro_mark(self) -> None:
+        # An announcement names an arrival without carrying its id.
+        # Reach back over recent spawns and attach any that read as
+        # outliers under the same rule the spawn-time check uses, so
+        # id-less arrivals still mark their kill. Bounded and rare
+        # (only on a matching announcement), so the scan stays cheap.
+        now = time.monotonic()
+        for tse, eid, mid, ehp in list(self._recent_spawns):
+            if now - tse > _RETRO_MARK_S:
+                continue
+            hist = self._hp_by_mob.get(mid)
+            if not hist or len(hist) < _HP_MIN_SAMPLES:
+                continue
+            try:
+                mid_hp = median(hist)
+            except Exception:
+                continue
+            if mid_hp > 0 and ehp >= _HP_OUTLIER_MULT * mid_hp:
+                self._notable_enemy_ids.add(eid)
 
     def _handle(self, raw: str) -> None:
         # Stream the raw event out for the debug console. We do this
@@ -318,6 +496,11 @@ class EventConsumer(QObject):
             self._last_gameplay_at = time.monotonic()
         ts = datetime.now().isoformat(timespec="milliseconds")
 
+        if etype == "zone_change":
+            # Every arrival opens a new scaling context, linked or
+            # not; persistence below stays gated as usual.
+            self._reset_visit_state()
+
         if etype == "enemy_spawn":
             # Remember which mob type each unique enemy instance is, so
             # the later death row can carry a displayable monster name.
@@ -346,12 +529,9 @@ class EventConsumer(QObject):
             except (TypeError, ValueError):
                 boss_flag = 0
             if boss_flag and self._link_player and self._link_session:
-                self._db.insert_spawn_notification(
-                    sid, self._display_monster(mob_id), "boss", ts)
-                # Remember for kill attribution below; the display lane
-                # shows both kinds under one label so they share one set.
-                if spawn_enemy_id:
-                    self._notable_enemy_ids.add(spawn_enemy_id)
+                self._record_notice(
+                    sid, self._display_monster(mob_id), "boss", ts,
+                    spawn_enemy_id or None)
             elif hp > 0 and self._link_player and self._link_session:
                 # Outlier check against the running baseline for this
                 # monster, judged before folding the new reading in so
@@ -367,17 +547,30 @@ class EventConsumer(QObject):
                     except Exception:
                         mid = 0
                     if mid > 0 and hp >= _HP_OUTLIER_MULT * mid:
-                        self._db.insert_spawn_notification(
+                        self._record_notice(
                             sid, self._display_monster(mob_id),
-                            "mighty", ts)
-                        if spawn_enemy_id:
-                            self._notable_enemy_ids.add(spawn_enemy_id)
+                            "mighty", ts, spawn_enemy_id or None)
+                elif spawn_enemy_id:
+                    # Too early to call against: hold for the baseline
+                    # to firm up, then judge retroactively with the
+                    # arrival time.
+                    self._pending_judge.append(
+                        (mob_id, spawn_enemy_id, hp, ts))
             if hp > 0:
                 hist = self._hp_by_mob.get(mob_id)
                 if hist is None:
                     hist = deque(maxlen=_HP_WINDOW)
                     self._hp_by_mob[mob_id] = hist
                 hist.append(hp)
+                if len(hist) == _HP_MIN_SAMPLES:
+                    # The baseline just firmed up: judge anything
+                    # that arrived too early to be judged at the time.
+                    self._judge_pending(sid, mob_id)
+            if hp > 0 and spawn_enemy_id:
+                # Remembered for id-less announcements, which reach
+                # back over this log to find the spawn they name.
+                self._recent_spawns.append(
+                    (time.monotonic(), spawn_enemy_id, mob_id, hp))
         elif etype == "local_account":
             # Identity for this client. Used to tell local events
             # apart from the rest.
@@ -415,7 +608,11 @@ class EventConsumer(QObject):
             # A prior notable sighting marks the kill row; the id is
             # then dropped so the set stays small and repeats read
             # as normal.
-            enemy_id = int(data.get("enemy_id", 0))
+            enemy_id = None
+            try:
+                enemy_id = int(data.get("enemy_id", 0))
+            except (TypeError, ValueError):
+                return
             mob_id = self._mob_of_enemy.get(enemy_id)
             is_mighty = enemy_id in self._notable_enemy_ids
             if is_mighty:
@@ -425,16 +622,29 @@ class EventConsumer(QObject):
                 and self._db.damaged_by(sid, enemy_id, self._local_account_id)
             )
             self._db.insert_kill(sid, enemy_id, mob_id, ts, is_mine=mine,
-                                 is_mighty=is_mighty)
+                                  is_mighty=is_mighty)
+            # The id served its only read above; drop it so the map
+            # stays small no matter how long the session runs.
+            self._mob_of_enemy.pop(enemy_id, None)
         elif etype == "drop_creation":
             # Drop ownership is resolved at query time.
+            try:
+                drop_id = int(data.get("drop_id", 0))
+                item_id = (int(data.get("item_id"))
+                           if "item_id" in data else None)
+                amount = (int(data.get("amount", 1))
+                          if "amount" in data else None)
+                belongs_to = (int(data.get("belongs_to", 0))
+                              if "belongs_to" in data else None)
+            except (TypeError, ValueError):
+                return
             self._db.insert_drop(
                 sid,
-                int(data.get("drop_id", 0)),
-                int(data.get("item_id", 0)) if "item_id" in data else None,
+                drop_id,
+                item_id,
                 None,
-                int(data.get("amount", 1)) if "amount" in data else None,
-                int(data.get("belongs_to", 0)) if "belongs_to" in data else None,
+                amount,
+                belongs_to,
                 ts,
             )
         elif etype == "pickup":
@@ -473,6 +683,12 @@ class EventConsumer(QObject):
             try:
                 raw_gain = int(data.get("exp_gained", 0))
                 level = int(data.get("level", 0)) if "level" in data else None
+                # Running totals ride along when the feed carries them;
+                # older feeds simply omit them and rows store blanks.
+                required_xp = (int(data["required_xp"])
+                               if "required_xp" in data else None)
+                total_xp = (int(data["total_xp"])
+                            if "total_xp" in data else None)
             except (TypeError, ValueError):
                 return
             if raw_gain >= 2**63:
@@ -489,7 +705,8 @@ class EventConsumer(QObject):
             if (level is not None and self._local_account_id is not None
                     and level == self._local_account_id):
                 level = None
-            self._db.insert_xp(sid, raw_gain, level, False, ts)
+            self._db.insert_xp(sid, raw_gain, level, False, ts,
+                               required_xp, total_xp)
         elif etype == "level_up":
             try:
                 level_up = int(data.get("level", 0))
@@ -545,12 +762,8 @@ class EventConsumer(QObject):
             self._current_zone = new_map
             self._current_visit_id = self._db.open_visit_id(sid)
         elif etype == "spawn_notification":
-            self._db.insert_spawn_notification(
-                sid,
-                str(data.get("name", "")),
-                "boss",
-                ts,
-            )
+            self._record_notice(
+                sid, str(data.get("name", "")), "boss", ts)
         elif etype == "center_message":
             # A mid-screen server announcement. When it names an
             # oversized arrival, keep the announcement text itself —
@@ -561,8 +774,8 @@ class EventConsumer(QObject):
             except (TypeError, ValueError):
                 return
             if text and "mighty" in text.lower():
-                self._db.insert_spawn_notification(
-                    sid, text, "mighty", ts)
+                self._record_notice(sid, text, "mighty", ts)
+                self._retro_mark()
         elif etype in (
             # Bridge/session flow signals: nothing to persist.
             "key_rotation",

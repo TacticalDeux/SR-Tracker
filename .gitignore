@@ -1,19 +1,17 @@
 build/
 dist/
 data/
-# Per-session debug event logs (srt/event_log.py) — never committed.
+# Per-session debug event logs.
 debug-*.log
-# Dev-local Report Bug upload settings (srt/report_config.py template) — never committed.
+# Dev-local Report Bug upload settings.
 srt/report_config.py
-# Local Worker dev secrets (never committed).
-tools/report-proxy/.dev.vars
-tools/report-proxy/.wrangler/
 __pycache__/
 *.pyc
 *.pyo
 nul
 backup
-# Private-submodule contents: these patterns only match when the
+# Deployable copy of the report worker project, worked on locally.
+issues/
 # submodule is NOT initialized (a real directory instead of a gitlink),
 # so files dropped there by mistake can't be committed to the public
 # history. They never match the mounted submodules themselves.

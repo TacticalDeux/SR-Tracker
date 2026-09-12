@@ -11,6 +11,7 @@ the whole main window; everything else is type and rules.
 """
 from __future__ import annotations
 
+import html
 import threading
 import time
 from datetime import datetime
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem,
     QMainWindow, QMessageBox, QPushButton, QRadioButton, QScrollArea, QSlider, QStatusBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+    QSizePolicy, QSpinBox,
 )
 
 from . import __version__ as _APP_VERSION
@@ -124,6 +126,9 @@ class _SummaryPanel(QWidget):
         # under their own caption; with per-zone off all of this hides
         # and the layout below is exactly today's.
         self._visit_header = QLabel("")
+        # Zone names come from game data: render as plain text so a
+        # crafted name can never act as markup here.
+        self._visit_header.setTextFormat(Qt.PlainText)
         self._visit_header.setFont(QFont("Georgia", 11))
         self._visit_header.setStyleSheet(
             f"color: {theme.CRYSTAL_LIGHT}; letter-spacing: 3px;"
@@ -137,12 +142,9 @@ class _SummaryPanel(QWidget):
         self._v_kills   = self._make_metric("PER-ZONE KILLS")
         self._v_sc      = self._make_metric("PER-ZONE SOUL CRYSTALS")
         self._v_xp      = self._make_metric("PER-ZONE EXPERIENCE")
-        self._v_deaths  = self._make_metric("PER-ZONE DEATHS")
-        self._v_xp_lost = self._make_metric("PER-ZONE XP LOST")
         self._v_xp_hr   = self._make_metric("PER-ZONE XP/HR")
         self._v_dps     = self._make_metric("PER-ZONE DPS")
         self._visit_rows = (self._v_kills, self._v_sc, self._v_xp,
-                            self._v_deaths, self._v_xp_lost,
                             self._v_xp_hr, self._v_dps)
         for w in self._visit_rows:
             w.hide()
@@ -180,7 +182,6 @@ class _SummaryPanel(QWidget):
         # overlay's per-field scopes: each key shows on exactly one side.
         self._visit_widgets = {
             "kills": self._v_kills, "sc": self._v_sc, "xp": self._v_xp,
-            "deaths": self._v_deaths, "xp_lost": self._v_xp_lost,
             "xp_hr": self._v_xp_hr, "dps": self._v_dps,
         }
         self._session_widgets = {
@@ -266,12 +267,15 @@ class _SummaryPanel(QWidget):
         from .overlay import _compact_rate
 
         def eff(key: str) -> str:
-            # Level is account-scoped: always session-wide. The notable
-            # count has no per-visit breakdown either, so it stays on
-            # the session side for the same reason. Everything else
-            # follows its stored scope, defaulting to session.
-            if key in ("level", "mighties"):
+            # Fixed-home gauges bypass their stored scope: the notable
+            # count and the level gauges stay on the session side, as
+            # do the loss counters; the zone row always names the open
+            # visit. Everything else follows its stored scope,
+            # defaulting to session.
+            if key in ("level", "mighties", "deaths", "xp_lost"):
                 return "session"
+            if key == "zone":
+                return "visit"
             got = (scopes or {}).get(key)
             return got if got in ("visit", "session") else "session"
 
@@ -286,7 +290,7 @@ class _SummaryPanel(QWidget):
                 header += "  ◈ MIRAGE"
             self._visit_header.setText(header)
             self._visit_header.setToolTip(
-                f"{display} (zone #{visit.get('visit_id')})"
+                f"{html.escape(display)} (zone #{visit.get('visit_id')})"
                 + (" — mirage run" if visit.get("is_mirage") else ""))
             sc_total = visit["sc_picked"] + visit["sc_unpicked"]
             self._v_kills._num.setText(
@@ -300,12 +304,6 @@ class _SummaryPanel(QWidget):
             self._v_xp._num.setText(f"{visit['xp']:,}")
             self._v_xp._num.setToolTip(
                 f"{visit['xp']:,} XP in this zone")
-            self._v_deaths._num.setText(str(visit.get("deaths", 0)))
-            self._v_deaths._num.setToolTip(
-                f"{visit.get('deaths', 0)} deaths in this zone")
-            self._v_xp_lost._num.setText(f"{visit.get('xp_lost', 0):,}")
-            self._v_xp_lost._num.setToolTip(
-                f"{visit.get('xp_lost', 0):,} XP lost to deaths in this zone")
             self._v_xp_hr._num.setText(
                 f"{_compact_rate(visit['xp_hr'])}/hr")
             self._v_xp_hr._num.setToolTip(
@@ -325,8 +323,8 @@ class _SummaryPanel(QWidget):
         # --- visit header: names the open visit while any visit-scoped
         # field (rows, or the zone row the overlay shows) reads from it ---
         want_visit = any(eff(k) == "visit"
-                         for k in ("kills", "sc", "xp", "zone", "deaths",
-                                   "xp_lost", "xp_hr", "dps"))
+                         for k in ("kills", "sc", "xp", "zone",
+                                   "xp_hr", "dps"))
         if visit is not None and (any_visit_row or eff("zone") == "visit"):
             self._visit_header.show()
             header_on = True
@@ -487,6 +485,16 @@ class MainWindow(QMainWindow):
         # table at most twice per second on the event path — the 1s
         # tick above catches up with anything skipped.
         self._last_tab_refresh = 0.0
+        # Batch-1: debounce rapid filter keystrokes so each keypress
+        # doesn't trigger a full DB fetch + table rebuild.
+        self._kills_debounce = QTimer(self)
+        self._kills_debounce.setSingleShot(True)
+        self._kills_debounce.setInterval(250)
+        self._kills_debounce.timeout.connect(self._refresh_kills)
+        self._drops_debounce = QTimer(self)
+        self._drops_debounce.setSingleShot(True)
+        self._drops_debounce.setInterval(250)
+        self._drops_debounce.timeout.connect(self._refresh_drops)
         # Silence watchdog state for _on_tick: warn once per idle stretch
         # when tracking runs but no events arrive, with enough detail
         # (event-buffer head, game process state) to tell a quiet game
@@ -681,7 +689,7 @@ class MainWindow(QMainWindow):
         self._kills_filter.setPlaceholderText("Filter by mob name…")
         self._kills_filter.setClearButtonEnabled(True)
         self._kills_filter.setMinimumWidth(220)
-        self._kills_filter.textChanged.connect(lambda _t: self._refresh_kills())
+        self._kills_filter.textChanged.connect(lambda _t: self._kills_debounce.start())
         header_row.addWidget(self._kills_filter)
         btn = QPushButton("Re-read")
         btn.clicked.connect(self._refresh_kills)
@@ -693,19 +701,6 @@ class MainWindow(QMainWindow):
         rule.setFixedHeight(1)
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         layout.addWidget(rule)
-
-        # Latest notable spawn (e.g. a boss-flagged spawn from the spawn
-        # feed). Hidden until the first one lands; refreshed with the
-        # kills table below since both read the same session.
-        self._lbl_notable = QLabel("")
-        self._lbl_notable.setFont(QFont("Georgia", 10))
-        self._lbl_notable.setStyleSheet(
-            f"color: {theme.CRYSTAL_LIGHT}; letter-spacing: 1px;"
-            " font-weight: bold;"
-        )
-        self._lbl_notable.setWordWrap(True)
-        self._lbl_notable.hide()
-        layout.addWidget(self._lbl_notable)
 
         self.tbl_kills = QTableWidget(0, 5)
         self.tbl_kills.setHorizontalHeaderLabels(["TIME", "ENEMY ID", "MOB", "MINE", "★"])
@@ -752,7 +747,7 @@ class MainWindow(QMainWindow):
         self._drops_filter.setPlaceholderText("Filter by item name…")
         self._drops_filter.setClearButtonEnabled(True)
         self._drops_filter.setMinimumWidth(220)
-        self._drops_filter.textChanged.connect(lambda _t: self._refresh_drops())
+        self._drops_filter.textChanged.connect(lambda _t: self._drops_debounce.start())
         header_row.addWidget(self._drops_filter)
         btn = QPushButton("Re-read")
         btn.clicked.connect(self._refresh_drops)
@@ -934,6 +929,9 @@ class MainWindow(QMainWindow):
 
         # Session totals strip: what the session amounted to overall.
         self._graphs_totals = QLabel("")
+        # Zone names come from game data: render as plain text so a
+        # crafted name can never act as markup here.
+        self._graphs_totals.setTextFormat(Qt.PlainText)
         self._graphs_totals.setFont(QFont("Consolas", 10))
         self._graphs_totals.setStyleSheet(f"color: {theme.ASH_BRIGHT};")
         self._graphs_totals.setWordWrap(True)
@@ -950,6 +948,8 @@ class MainWindow(QMainWindow):
         charts_lay.setSpacing(20)
 
         self._graphs_section_title = _mini_title("PER-ZONE  IN  THIS  SESSION")
+        # Zone-scoped titles interpolate game data below: plain text.
+        self._graphs_section_title.setTextFormat(Qt.PlainText)
         charts_lay.addWidget(self._graphs_section_title)
         self.chart_main = SeriesChart(mode="line")
         self.chart_main.setMinimumHeight(300)
@@ -1099,6 +1099,70 @@ class MainWindow(QMainWindow):
         self._ov_scale_val.setMinimumWidth(48)
         scale_tab_row.addWidget(self._ov_scale_val)
         form.addRow("Scale:", scale_tab_row)
+
+        numbers_row = QHBoxLayout()
+        self._ov_numbers_scale = QSlider(Qt.Horizontal)
+        self._ov_numbers_scale.setRange(50, 200)
+        self._ov_numbers_scale.setToolTip("Scales the overlay stats numbers")
+        self._ov_numbers_scale.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        numbers_row.addWidget(self._ov_numbers_scale, 1)
+        self._ov_numbers_scale_val = QLabel("")
+        self._ov_numbers_scale_val.setFont(QFont("Consolas", 10))
+        self._ov_numbers_scale_val.setMinimumWidth(48)
+        numbers_row.addWidget(self._ov_numbers_scale_val)
+        form.addRow("Numbers scale:", numbers_row)
+
+        title_row = QHBoxLayout()
+        self._ov_title_scale = QSlider(Qt.Horizontal)
+        self._ov_title_scale.setRange(50, 200)
+        self._ov_title_scale.setToolTip("Scales the overlay title")
+        self._ov_title_scale.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        title_row.addWidget(self._ov_title_scale, 1)
+        self._ov_title_scale_val = QLabel("")
+        self._ov_title_scale_val.setFont(QFont("Consolas", 10))
+        self._ov_title_scale_val.setMinimumWidth(48)
+        title_row.addWidget(self._ov_title_scale_val)
+        form.addRow("Title scale:", title_row)
+
+        labels_row = QHBoxLayout()
+        self._ov_labels_scale = QSlider(Qt.Horizontal)
+        self._ov_labels_scale.setRange(50, 200)
+        self._ov_labels_scale.setToolTip("Scales the overlay stats titles")
+        self._ov_labels_scale.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        labels_row.addWidget(self._ov_labels_scale, 1)
+        self._ov_labels_scale_val = QLabel("")
+        self._ov_labels_scale_val.setFont(QFont("Consolas", 10))
+        self._ov_labels_scale_val.setMinimumWidth(48)
+        labels_row.addWidget(self._ov_labels_scale_val)
+        form.addRow("Stats titles scale:", labels_row)
+
+        self._ov_anchor = QComboBox()
+        self._ov_anchor.addItem("Top left", "top-left")
+        self._ov_anchor.addItem("Top right", "top-right")
+        self._ov_anchor.addItem("Bottom left", "bottom-left")
+        self._ov_anchor.addItem("Bottom right", "bottom-right")
+        self._ov_anchor.currentIndexChanged.connect(
+            lambda _i: self._push_overlay_settings())
+        form.addRow("Position:", self._ov_anchor)
+
+        offset_row = QHBoxLayout()
+        self._ov_x = QSpinBox()
+        self._ov_x.setRange(0, 2000)
+        self._ov_x.setToolTip("Offset inward from the corner (x)")
+        self._ov_x.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        offset_row.addWidget(self._ov_x, 1)
+        self._ov_y = QSpinBox()
+        self._ov_y.setRange(0, 2000)
+        self._ov_y.setToolTip("Offset inward from the corner (y)")
+        self._ov_y.valueChanged.connect(
+            lambda _v: self._push_overlay_settings())
+        offset_row.addWidget(self._ov_y, 1)
+        offset_row.addStretch(1)
+        form.addRow("Offsets (x, y):", offset_row)
 
         color_row = QHBoxLayout()
         self._ov_color_btn = QPushButton()
@@ -1489,6 +1553,35 @@ class MainWindow(QMainWindow):
         self._ov_scale.setValue(int(round(s.overlay_scale * 100)))
         self._ov_scale.blockSignals(False)
         self._ov_scale_val.setText(f"{int(round(s.overlay_scale * 100))}%")
+        for _slider, _val, _key in (
+                (self._ov_numbers_scale, self._ov_numbers_scale_val,
+                 "overlay_numbers_scale"),
+                (self._ov_title_scale, self._ov_title_scale_val,
+                 "overlay_title_scale"),
+                (self._ov_labels_scale, self._ov_labels_scale_val,
+                 "overlay_labels_scale")):
+            _slider.blockSignals(True)
+            _slider.setValue(
+                int(round(float(getattr(s, _key, 1.0)) * 100)))
+            _slider.blockSignals(False)
+            _val.setText(
+                f"{int(round(float(getattr(s, _key, 1.0)) * 100))}%")
+        self._ov_anchor.blockSignals(True)
+        ai = self._ov_anchor.findData(getattr(s, "overlay_anchor", "top-left"))
+        self._ov_anchor.setCurrentIndex(ai if ai >= 0 else 0)
+        self._ov_anchor.blockSignals(False)
+        self._ov_x.blockSignals(True)
+        try:
+            self._ov_x.setValue(int(getattr(s, "overlay_x", 0)))
+        except (TypeError, ValueError):
+            self._ov_x.setValue(0)
+        self._ov_x.blockSignals(False)
+        self._ov_y.blockSignals(True)
+        try:
+            self._ov_y.setValue(int(getattr(s, "overlay_y", 0)))
+        except (TypeError, ValueError):
+            self._ov_y.setValue(0)
+        self._ov_y.blockSignals(False)
         self._sync_ov_color_button(s.overlay_text_color)
         self._sync_ov_locked_color_button(s.overlay_locked_text_color)
         self._refresh_ov_fields(s)
@@ -1505,6 +1598,22 @@ class MainWindow(QMainWindow):
         s.overlay_locked_window_opacity = (
             self._ov_locked_window_opacity.value() / 100.0)
         s.overlay_scale = self._ov_scale.value() / 100.0
+        for _slider, _key in (
+                (self._ov_numbers_scale, "overlay_numbers_scale"),
+                (self._ov_title_scale, "overlay_title_scale"),
+                (self._ov_labels_scale, "overlay_labels_scale")):
+            try:
+                setattr(s, _key, min(
+                    2.0, max(0.5, _slider.value() / 100.0)))
+            except (TypeError, ValueError):
+                setattr(s, _key, 1.0)
+        s.overlay_anchor = (
+            self._ov_anchor.currentData() or "top-left")
+        if s.overlay_anchor not in ("top-left", "top-right",
+                                    "bottom-left", "bottom-right"):
+            s.overlay_anchor = "top-left"
+        s.overlay_x = int(self._ov_x.value())
+        s.overlay_y = int(self._ov_y.value())
         order = []
         scopes = dict(getattr(s, "overlay_field_scope", None) or {})
         for i in range(self._ov_fields.count()):
@@ -1516,12 +1625,18 @@ class MainWindow(QMainWindow):
                 continue
             setattr(s, f"overlay_show_{key}",
                     row_w._chk.isChecked())
-            # Level is account-wide: always parked on session. The
-            # notable count has no per-visit breakdown, so it parks
-            # there too.
-            scopes[key] = ("session" if key in ("level", "mighties")
-                           else "visit" if row_w._scope.isChecked()
-                           else "session")
+            # Fixed-home gauges bypass the toggle: the account gauge,
+            # the notable count and the level gauges always persist,
+            # as do the loss counters; the zone row always names the
+            # open visit.
+            if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
+                       "deaths", "xp_lost"):
+                scopes[key] = "session"
+            elif key == "zone":
+                scopes[key] = "visit"
+            else:
+                scopes[key] = ("visit" if row_w._scope.isChecked()
+                               else "session")
         s.overlay_field_order = order
         s.overlay_field_scope = scopes
         self._settings_store.save(s)
@@ -1534,6 +1649,9 @@ class MainWindow(QMainWindow):
         self._ov_locked_window_opacity_val.setText(
             f"{self._ov_locked_window_opacity.value()}%")
         self._ov_scale_val.setText(f"{self._ov_scale.value()}%")
+        self._ov_numbers_scale_val.setText(f"{self._ov_numbers_scale.value()}%")
+        self._ov_title_scale_val.setText(f"{self._ov_title_scale.value()}%")
+        self._ov_labels_scale_val.setText(f"{self._ov_labels_scale.value()}%")
         if self._overlay is not None and self._overlay.isVisible():
             self._overlay.reload_settings()
         self._refresh_lock_button()
@@ -1595,18 +1713,26 @@ class MainWindow(QMainWindow):
         Session (persists). The button is checkable — checked reads
         Per-zone, unchecked reads Session — so the pressed crystal
         fill from the theme marks the per-zone side like any other
-        toggle. Level is account-wide, so its toggle stays parked on
-        Session and disabled; the notable count has no per-visit
-        breakdown, so it parks there too."""
+        toggle. Fixed-home gauges stay parked and disabled: the
+        account gauge, the notable count, the level gauges and the
+        loss counters on Session; the zone row on Per-zone."""
         btn.blockSignals(True)
         try:
-            if key in ("level", "mighties"):
+            if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
+                       "deaths", "xp_lost"):
                 btn.setChecked(False)
                 btn.setText("Session")
                 btn.setToolTip(
                     "Level is account-wide and always persists"
                     if key == "level" else
-                    "Session-wide count and always persists")
+                    "Session-wide count and always persists"
+                    if key in ("mighties", "deaths", "xp_lost") else
+                    "Session-wide gauge and always persists")
+                btn.setEnabled(False)
+            elif key == "zone":
+                btn.setChecked(True)
+                btn.setText("Per-zone")
+                btn.setToolTip("Always names the open visit")
                 btn.setEnabled(False)
             else:
                 btn.setChecked(is_visit)
@@ -1878,54 +2004,30 @@ class MainWindow(QMainWindow):
         if sid is None:
             self.tbl_kills.setRowCount(0)
             self._show_empty(self.tbl_kills, self._kills_empty, True)
-            if hasattr(self, "_lbl_notable"):
-                self._lbl_notable.hide()
             return
         rows = self._db.recent_kills(sid, 200, names=self._names)
         filt = self._kills_filter.text()
         preset = self._kills_preset.currentText()
         rows = [r for r in rows if _kill_matches(r, filt, preset)]
-        self.tbl_kills.setRowCount(len(rows))
-        for i, r in enumerate(rows):
-            self.tbl_kills.setItem(i, 0, _cell(r["ts"]))
-            self.tbl_kills.setItem(i, 1, _cell(str(r["enemy_id"]), align=Qt.AlignRight))
-            self.tbl_kills.setItem(i, 2, _cell(r["name"]))
-            self.tbl_kills.setItem(
-                i, 3, _cell("✓" if r["is_mine"] else "—", align=Qt.AlignCenter))
-            self.tbl_kills.setItem(
-                i, 4, _mighty_marker_cell(r))
-        self._show_empty(self.tbl_kills, self._kills_empty, len(rows) == 0)
-        self._refresh_notable_spawns(sid)
-
-    def _refresh_notable_spawns(self, sid: int) -> None:
-        # Newest notable spawn paints the banner; boss and oversized
-        # spawns share the distinct label, anything else keeps its own
-        # rarity. Mighty entries may carry a full server announcement
-        # as their stored text — shown verbatim behind the label.
-        # Empty means no banner, never a placeholder row.
+        # Batch-1: freeze paints + sorting during bulk fill so a 200-row
+        # rebuild costs one repaint, not 1000+ per-cell updates.
+        self.tbl_kills.setUpdatesEnabled(False)
+        _sorting = self.tbl_kills.isSortingEnabled()
+        self.tbl_kills.setSortingEnabled(False)
         try:
-            notes = self._db.recent_spawn_notifications(sid, 5)
-        except Exception:
-            notes = []
-        if not notes:
-            self._lbl_notable.hide()
-            return
-        latest = notes[0]
-        text = str(latest.get("name", "?"))
-        if str(latest.get("rarity", "")) in ("boss", "mighty"):
-            self._lbl_notable.setText(
-                f"MIGHTY — {text} · {latest.get('ts', '')}")
-        else:
-            self._lbl_notable.setText(
-                f"{latest.get('name', '?')} ({latest.get('rarity', '')})"
-                f" · {latest.get('ts', '')}")
-        if len(notes) > 1:
-            self._lbl_notable.setToolTip("\n".join(
-                f"{n.get('name', '?')} ({n.get('rarity', '')})"
-                f" · {n.get('ts', '')}" for n in notes))
-        else:
-            self._lbl_notable.setToolTip("")
-        self._lbl_notable.show()
+            self.tbl_kills.setRowCount(len(rows))
+            for i, r in enumerate(rows):
+                self.tbl_kills.setItem(i, 0, _cell(r["ts"]))
+                self.tbl_kills.setItem(i, 1, _cell(str(r["enemy_id"]), align=Qt.AlignRight))
+                self.tbl_kills.setItem(i, 2, _cell(r["name"]))
+                self.tbl_kills.setItem(
+                    i, 3, _cell("✓" if r["is_mine"] else "—", align=Qt.AlignCenter))
+                self.tbl_kills.setItem(
+                    i, 4, _mighty_marker_cell(r))
+        finally:
+            self.tbl_kills.setSortingEnabled(_sorting)
+            self.tbl_kills.setUpdatesEnabled(True)
+        self._show_empty(self.tbl_kills, self._kills_empty, len(rows) == 0)
 
     def _refresh_drops(self) -> None:
         sid = self._display_session_id()
@@ -1939,14 +2041,21 @@ class MainWindow(QMainWindow):
         filt = self._drops_filter.text()
         preset = self._drops_preset.currentText()
         rows = [r for r in rows if _drop_matches(r, filt, preset)]
-        self.tbl_drops.setRowCount(len(rows))
-        for i, r in enumerate(rows):
-            self.tbl_drops.setItem(i, 0, _cell(r["ts"]))
-            self.tbl_drops.setItem(i, 1, _cell(f"#{r['drop_id']}", align=Qt.AlignRight))
-            self.tbl_drops.setItem(i, 2, _cell(_drop_label(r)))
-            self.tbl_drops.setItem(i, 3, _cell(str(r["amount"] or ""), align=Qt.AlignRight))
-            self.tbl_drops.setItem(i, 4, _cell(_owner_label(r["belongs_to"], acct)))
-            self.tbl_drops.setItem(i, 5, _cell(_drop_status(r, acct)))
+        self.tbl_drops.setUpdatesEnabled(False)
+        _sorting = self.tbl_drops.isSortingEnabled()
+        self.tbl_drops.setSortingEnabled(False)
+        try:
+            self.tbl_drops.setRowCount(len(rows))
+            for i, r in enumerate(rows):
+                self.tbl_drops.setItem(i, 0, _cell(r["ts"]))
+                self.tbl_drops.setItem(i, 1, _cell(f"#{r['drop_id']}", align=Qt.AlignRight))
+                self.tbl_drops.setItem(i, 2, _cell(_drop_label(r)))
+                self.tbl_drops.setItem(i, 3, _cell(str(r["amount"] or ""), align=Qt.AlignRight))
+                self.tbl_drops.setItem(i, 4, _cell(_owner_label(r["belongs_to"], acct)))
+                self.tbl_drops.setItem(i, 5, _cell(_drop_status(r, acct)))
+        finally:
+            self.tbl_drops.setSortingEnabled(_sorting)
+            self.tbl_drops.setUpdatesEnabled(True)
         self._show_empty(self.tbl_drops, self._drops_empty, len(rows) == 0)
 
     def _open_session_detail(self, item: QTableWidgetItem) -> None:
@@ -2625,6 +2734,15 @@ class MainWindow(QMainWindow):
             self._set_status(msg)
 
     def _on_tick(self) -> None:
+        # Batch-1: skip expensive table rebuilds while minimized/hidden.
+        # The watchdog still runs so silence warnings aren't delayed.
+        try:
+            _hidden = self.isMinimized() or not self.isVisible()
+        except RuntimeError:
+            _hidden = False
+        if _hidden:
+            self._watch_for_silence()
+            return
         self._refresh_summary()
         self._refresh_current_tab()
         self._watch_for_silence()
@@ -2848,6 +2966,7 @@ class _ReportBugDialog(QDialog):
 
         self._lbl_status = QLabel("")
         self._lbl_status.setWordWrap(True)
+        self._lbl_status.setTextFormat(Qt.PlainText)
         layout.addWidget(self._lbl_status)
 
         row = QHBoxLayout()
@@ -3384,33 +3503,37 @@ class _SessionDetailDialog(QDialog):
     def __init__(self, db, names, session_id: int, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Session #{session_id}")
-        # The old dialog laid every section straight on the window with
-        # a minimum size smaller than the content — long sessions
-        # overflowed, widgets overlapped, and Close could end up
-        # off-screen. All content now lives in a scroll area; Close
-        # stays pinned outside it so it can never be cut off.
-        self.resize(820, 700)
+        # One tab per section instead of a scrolling stack, so each
+        # table owns its space and Close stays pinned outside the tabs.
+        self.resize(860, 720)
+        self.setMinimumSize(720, 520)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        body = QWidget()
-        layout = QVBoxLayout(body)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        tabs = QTabWidget(self)
+
+        def _page(title: str) -> QVBoxLayout:
+            # A tab page with the same air the stacked sections had.
+            page = QWidget()
+            lay = QVBoxLayout(page)
+            lay.setContentsMargins(12, 12, 12, 12)
+            lay.setSpacing(12)
+            tabs.addTab(page, title)
+            return lay
+
+        summary_lay = _page("Summary")
+        kills_lay = _page("Kills")
+        drops_lay = _page("Drops")
+        mighty_lay = _page("Mighties")
+        zones_lay = _page("Zones")
 
         s = db.summary(session_id)
         acct = db.session_account(session_id)
-        meta = next(
-            (r for r in db.past_sessions(10000) if r["id"] == session_id),
-            None,
-        )
+        meta = db.session_meta(session_id)
         started = meta["started"] if meta else "—"
         ended = meta["ended"] if meta and meta["ended"] else "ongoing"
 
-        layout.addWidget(_section_label(f"SESSION  #{session_id}"))
+        summary_lay.addWidget(_section_label(f"SESSION  #{session_id}"))
         form = QFormLayout()
         form.addRow("Period:", QLabel(f"{started}  →  {ended}"))
         form.addRow("Account:", QLabel(str(acct) if acct is not None else "unknown"))
@@ -3438,9 +3561,10 @@ class _SessionDetailDialog(QDialog):
                     QLabel(f"{kpm} KPM  ·  {_fmt_rate(s['soul_crystals'], hrs)} SC  ·  "
                            f"{_fmt_rate(s['xp'], hrs)} XP  ·  "
                            f"{_fmt_rate(s['drops'], hrs)} drops"))
-        layout.addLayout(form)
+        summary_lay.addLayout(form)
+        summary_lay.addStretch(1)
 
-        layout.addWidget(_section_label("ZONES"))
+        zones_lay.addWidget(_section_label("ZONES"))
         zones = _ro_table(7, ["ZONE", "ENTERED", "LEFT", "TIME", "KILLS",
                               "DROPS", "XP"],
                           [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignLeft,
@@ -3467,13 +3591,13 @@ class _SessionDetailDialog(QDialog):
             zones.setItem(i, 5, _cell(
                 _mine_total(z["my_drops"], z["drops"]), align=Qt.AlignRight))
             zones.setItem(i, 6, _cell(f"{z['xp']:,}", align=Qt.AlignRight))
-        # Capped: a long zone list scrolls inside the table instead of
-        # stretching the dialog past the screen.
+        # The table stretches to own the tab; a long zone list
+        # scrolls inside it instead of stretching the dialog.
         zones.setMinimumHeight(140)
-        zones.setMaximumHeight(300)
-        layout.addWidget(zones)
+        zones.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        zones_lay.addWidget(zones, 1)
 
-        layout.addWidget(_section_label("KILLS"))
+        kills_lay.addWidget(_section_label("KILLS"))
         kills_filt_row = QHBoxLayout()
         kills_filt_row.addStretch(1)
         self._kills_preset = QComboBox()
@@ -3489,13 +3613,14 @@ class _SessionDetailDialog(QDialog):
         self._kills_filter.textChanged.connect(
             lambda _t: self._populate_kills())
         kills_filt_row.addWidget(self._kills_filter)
-        layout.addLayout(kills_filt_row)
+        kills_lay.addLayout(kills_filt_row)
         self._kills_table = _ro_table(4, ["TIME", "MOB", "MINE", "★"],
                                        [Qt.AlignLeft, Qt.AlignLeft,
                                         Qt.AlignCenter, Qt.AlignCenter])
         self._kills_table.setMinimumHeight(140)
-        self._kills_table.setMaximumHeight(300)
-        layout.addWidget(self._kills_table)
+        self._kills_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding)
+        kills_lay.addWidget(self._kills_table, 1)
         self._kills_rows = db.recent_kills(session_id, 200, names=names)
         self._populate_kills()
 
@@ -3505,8 +3630,8 @@ class _SessionDetailDialog(QDialog):
             _notes = []
         _mighties = [n for n in _notes
                      if str(n.get("rarity", "")) == "mighty"]
+        mighty_lay.addWidget(_section_label("MIGHTIES"))
         if _mighties:
-            layout.addWidget(_section_label("MIGHTIES"))
             mighty_table = _ro_table(2, ["TIME", "NOTICE"],
                                      [Qt.AlignLeft, Qt.AlignLeft])
             for n in _mighties:
@@ -3515,10 +3640,16 @@ class _SessionDetailDialog(QDialog):
                 mighty_table.setItem(i, 0, _cell(n.get("ts", "")))
                 mighty_table.setItem(i, 1, _cell(str(n.get("name", "?"))))
             mighty_table.setMinimumHeight(60)
-            mighty_table.setMaximumHeight(200)
-            layout.addWidget(mighty_table)
+            mighty_table.setSizePolicy(
+                QSizePolicy.Expanding, QSizePolicy.Expanding)
+            mighty_lay.addWidget(mighty_table, 1)
+        else:
+            _no_mighty = _empty_note("No mighty notices recorded.")
+            _no_mighty.setVisible(True)
+            mighty_lay.addWidget(_no_mighty)
+            mighty_lay.addStretch(1)
 
-        layout.addWidget(_section_label("DROPS"))
+        drops_lay.addWidget(_section_label("DROPS"))
         filt_row = QHBoxLayout()
         filt_row.addStretch(1)
         self._drops_preset = QComboBox()
@@ -3536,21 +3667,21 @@ class _SessionDetailDialog(QDialog):
         self._drops_filter.textChanged.connect(
             lambda _t: self._populate_drops())
         filt_row.addWidget(self._drops_filter)
-        layout.addLayout(filt_row)
+        drops_lay.addLayout(filt_row)
         self._drops_table = _ro_table(
             5, ["TIME", "ITEM", "QTY", "OWNER", "STATUS"],
             [Qt.AlignLeft, Qt.AlignLeft, Qt.AlignRight, Qt.AlignLeft,
              Qt.AlignLeft])
         self._drops_table.setMinimumHeight(140)
-        self._drops_table.setMaximumHeight(300)
-        layout.addWidget(self._drops_table)
+        self._drops_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding)
+        drops_lay.addWidget(self._drops_table, 1)
         self._drops_rows = db.recent_drops(session_id, 200, names=names,
                                            local_account=acct)
         self._drops_acct = acct
         self._populate_drops()
 
-        scroll.setWidget(body)
-        outer.addWidget(scroll, 1)
+        outer.addWidget(tabs, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)

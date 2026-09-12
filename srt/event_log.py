@@ -9,6 +9,7 @@ routine used by the Report Bug dialog.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -21,7 +22,67 @@ from typing import Any
 from PySide6.QtCore import QObject
 
 from . import paths as _paths
-from .debug_console import display_event
+from .debug_console import display_event as _base_display_event
+
+
+# Event types the log sink knows how to show. Anything else is
+# reduced to a generic marker below, so unfamiliar traffic never
+# reaches disk or the report buffer in raw form.
+_KNOWN_EVENT_TYPES = frozenset({
+    "local_account",
+    "enemy_spawn",
+    "spawn_notification",
+    "center_message",
+    "damage_dealt",
+    "enemy_death",
+    "drop_creation",
+    "drop_destroyed",
+    "pickup",
+    "pickup_denied",
+    "player_death",
+    "exp_update",
+    "level_up",
+    "mirage_exit",
+    "portal_sight",
+    "zone_change",
+    "character_spawn",
+    "session_setup",
+    "heartbeat",
+    "dll_heartbeat",
+    "dll_warning",
+    "key_rotation",
+    "net_seen",
+    "net_connect",
+    "net_close",
+    "shm_open",
+    "hook_install",
+    "hook_patched",
+    "hook_eat",
+    "packet_parsed",
+})
+
+_OP_TYPE_RE = re.compile(r"^op\s*(\d+)$", re.IGNORECASE)
+
+
+def display_event(raw: str) -> str:
+    """Display form of a raw event JSON string, deny by default.
+
+    Known types keep the shared sanitizer's exact output; unknown
+    types reduce to a generic marker so their values never pass
+    through. Non-JSON input is returned unchanged.
+    """
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return raw
+    if not isinstance(data, dict):
+        return json.dumps({"type": "packet_parsed", "status": "parsed"})
+    etype = data.get("type", "unknown")
+    if isinstance(etype, str) and _OP_TYPE_RE.match(etype.strip()):
+        return _base_display_event(raw)
+    if etype in _KNOWN_EVENT_TYPES:
+        return _base_display_event(raw)
+    return json.dumps({"type": "packet_parsed", "status": "parsed"})
 
 
 _LOG_PREFIX = "debug-"

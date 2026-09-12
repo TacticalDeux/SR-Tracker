@@ -23,6 +23,7 @@ Behavior:
     re-fits whenever values, visibility, or orientation change.
 """
 from __future__ import annotations
+from html import escape as _escape
 from typing import Callable
 from PySide6.QtCore import QPoint, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication
@@ -35,6 +36,7 @@ from . import theme
 from .db import Database
 from .settings import (
     FIELD_SCOPES,
+    OVERLAY_ANCHORS,
     OVERLAY_FIELD_KEYS,
     Settings,
     SettingsStore,
@@ -58,12 +60,15 @@ def field_scope(settings, key: str) -> str:
     """Effective reset scope for one overlay field.
 
     Unknown/new fields and junk values default to "session" (today's
-    behavior). "level" is account-scoped — it has no visit meaning —
-    so it always reads session-wide regardless of its stored entry.
-    "mighties" is session-scoped for the same reason: the count has
-    no per-visit breakdown, so it always reads session-wide."""
-    if key in ("level", "mighties"):
+    behavior). Account- and session-wide gauges always read
+    session-wide regardless of their stored entries; the zone row
+    always names the open visit, regardless of its stored entry.
+    """
+    if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
+               "deaths", "xp_lost"):
         return SESSION_SCOPE
+    if key == "zone":
+        return VISIT_SCOPE
     raw = None
     try:
         raw = (getattr(settings, "overlay_field_scope", None) or {}).get(key)
@@ -91,6 +96,8 @@ _FIELDS = (
     ("deaths",  "DEATHS",        22),
     ("xp_lost", "XP LOST",       16),
     ("xp_hr",   "XP/HR",         16),
+    ("xp_pct",  "XP%",           16),
+    ("xp_pct_hr", "XP%/HR",      16),
     ("dps",     "DPS",           16),
 )
 
@@ -106,6 +113,8 @@ OVERLAY_FIELDS = (
     ("deaths", "Deaths"),
     ("xp_lost", "XP lost"),
     ("xp_hr", "XP/hr"),
+    ("xp_pct", "XP%"),
+    ("xp_pct_hr", "XP%/hr"),
     ("dps", "DPS"),
 )
 
@@ -139,6 +148,118 @@ def _valid_color(value: str, fallback: str) -> str:
 _ORIENTATIONS = ("vertical", "horizontal")
 
 
+def _granular_scale(settings, key: str) -> float:
+    """One per-class text multiplier, clamped to its valid range."""
+    try:
+        return min(2.0, max(0.5, float(getattr(settings, key, 1.0))))
+    except (TypeError, ValueError):
+        return 1.0
+
+
+def numbers_scale_of(settings) -> float:
+    """Variable-values multiplier (the metric numbers)."""
+    return _granular_scale(settings, "overlay_numbers_scale")
+
+
+def title_scale_of(settings) -> float:
+    """Header-title multiplier."""
+    return _granular_scale(settings, "overlay_title_scale")
+
+
+def labels_scale_of(settings) -> float:
+    """Field-label multiplier (the stats titles)."""
+    return _granular_scale(settings, "overlay_labels_scale")
+
+
+def anchor_of(settings) -> str:
+    """Placement preset, falling back to the default corner."""
+    anchor = getattr(settings, "overlay_anchor", "top-left")
+    return anchor if anchor in OVERLAY_ANCHORS else "top-left"
+
+
+def offsets_of(settings) -> tuple[int, int]:
+    """Inward pixel offsets from the anchor corner."""
+    try:
+        ox = int(getattr(settings, "overlay_x", 0))
+    except (TypeError, ValueError):
+        ox = 0
+    try:
+        oy = int(getattr(settings, "overlay_y", 0))
+    except (TypeError, ValueError):
+        oy = 0
+    return ox, oy
+
+
+def scaled_text_size(base: int, content_scale: float, class_scale: float) -> int:
+    """Scaled text size for a designed base size.
+
+    The content scale sets the base; each class scale moves only its
+    own target on top of it."""
+    return max(6, int(round(base * content_scale * class_scale)))
+
+
+def anchor_rect_for(avail: tuple[int, int, int, int],
+                    full: tuple[int, int, int, int]
+                    ) -> tuple[int, int, int, int]:
+    """Usable rect for anchor math from an available/full pair.
+
+    The available rect normally wins (it keeps the window clear of
+    the taskbar), but an empty or out-of-bounds available rect is
+    stale or misleading — the full rect is the honest fallback."""
+    ax, ay, aw, ah = avail
+    fx, fy, fw, fh = full
+    if aw <= 0 or ah <= 0:
+        return full
+    if ax < fx or ay < fy or ax + aw > fx + fw or ay + ah > fy + fh:
+        return full
+    return avail
+
+
+def anchor_position(anchor: str, x_off: int, y_off: int,
+                    avail_x: int, avail_y: int,
+                    avail_w: int, avail_h: int,
+                    win_w: int, win_h: int) -> tuple[int, int]:
+    """Window origin for an anchor preset plus inward offsets.
+
+    Offsets are measured inward from the chosen corner: x grows
+    rightward, y grows downward."""
+    if anchor not in OVERLAY_ANCHORS:
+        anchor = "top-left"
+    try:
+        x_off = int(x_off)
+    except (TypeError, ValueError):
+        x_off = 0
+    try:
+        y_off = int(y_off)
+    except (TypeError, ValueError):
+        y_off = 0
+    if anchor == "top-right":
+        return avail_x + avail_w - win_w - x_off, avail_y + y_off
+    if anchor == "bottom-left":
+        return avail_x + x_off, avail_y + avail_h - win_h - y_off
+    if anchor == "bottom-right":
+        return (avail_x + avail_w - win_w - x_off,
+                avail_y + avail_h - win_h - y_off)
+    return avail_x + x_off, avail_y + y_off
+
+
+def offsets_from_position(anchor: str, pos_x: int, pos_y: int,
+                          avail_x: int, avail_y: int,
+                          avail_w: int, avail_h: int,
+                          win_w: int, win_h: int) -> tuple[int, int]:
+    """Inverse of anchor_position: inward offsets for an origin."""
+    if anchor not in OVERLAY_ANCHORS:
+        anchor = "top-left"
+    if anchor == "top-right":
+        return avail_x + avail_w - win_w - pos_x, pos_y - avail_y
+    if anchor == "bottom-left":
+        return pos_x - avail_x, avail_y + avail_h - win_h - pos_y
+    if anchor == "bottom-right":
+        return (avail_x + avail_w - win_w - pos_x,
+                avail_y + avail_h - win_h - pos_y)
+    return pos_x - avail_x, pos_y - avail_y
+
+
 def _contrast_text(hex_color: str) -> str:
     """Dark or light foreground that reads on the given background."""
     c = QColor(hex_color)
@@ -168,6 +289,25 @@ def _compact_number(value: int) -> str:
 def _exact_number(value: int) -> str:
     """Full exact count with commas for tooltips (1,234,567)."""
     return f"{value:,}"
+
+
+def _exact_xp_pct(s: dict) -> str:
+    """Full running totals behind the compact XP% gauge
+    (1,234 / 5,678 (21.7%)); blank until the feed carries them."""
+    total, required, pct = s.get("xp_total"), s.get("xp_required"), s.get("xp_pct")
+    if not isinstance(total, int) or not isinstance(required, int) \
+            or not isinstance(pct, (int, float)):
+        return "—"
+    return f"{total:,} / {required:,} ({pct:.1%})"
+
+
+def _exact_xp_pct_hr(s: dict) -> str:
+    """Exact rate behind the XP%/HR gauge; blank until the feed
+    carries running totals and the session has measurable time."""
+    pct_hr = s.get("xp_pct_hr")
+    if not isinstance(pct_hr, (int, float)):
+        return "—"
+    return f"{pct_hr:+.1%} per hour toward next level"
 
 
 def _compact_rate(value: float) -> str:
@@ -245,6 +385,9 @@ class _FitNumber(QLabel):
     def __init__(self, number_size: int, align=Qt.AlignRight | Qt.AlignVCenter,
                  parent=None):
         super().__init__(parent)
+        # Values can carry game data (zone names): render as plain
+        # text so a crafted name can never act as markup here.
+        self.setTextFormat(Qt.PlainText)
         self._base_size = number_size
         self._floor = 0
         self._dim = False
@@ -596,13 +739,54 @@ class OverlayWindow(QWidget):
         # get smaller instead of clipping inside a full-size minimum.
         self.setMinimumSize(*self._scaled_minimum(self._overlay_scale()))
         self._last_hint = None
-        self.move(self._settings.overlay_pos_x, self._settings.overlay_pos_y)
+        self._apply_anchor_position()
         self._apply_bg()
         self._apply_window_opacity()
         self._apply_field_visibility()
         self._clamp_to_screen()
+        self._watch_screens()
         if self._settings.overlay_locked:
             self._apply_lock_state(True)
+
+    def _watch_screens(self) -> None:
+        """Follow geometry changes so anchoring stays honest.
+
+        Taskbar show/hide, display add/remove and resolution switches
+        all move the usable rect; each watched signal re-seats the
+        card through the same anchor math as a settings change."""
+        app = QGuiApplication.instance()
+        if app is None:
+            return
+        if not getattr(self, "_app_signals_watched", False):
+            try:
+                app.screenAdded.connect(
+                    lambda *_a: (self._watch_screens(),
+                                 self._on_screen_geometry()))
+                app.screenRemoved.connect(
+                    lambda *_a: self._on_screen_geometry())
+                app.primaryScreenChanged.connect(
+                    lambda *_a: self._on_screen_geometry())
+            except (AttributeError, RuntimeError, TypeError):
+                pass
+            self._app_signals_watched = True
+        watched = getattr(self, "_screens_watched", None)
+        if watched is None:
+            watched = set()
+            self._screens_watched = watched
+        try:
+            screens = app.screens()
+        except (AttributeError, RuntimeError):
+            return
+        for scr in screens:
+            if id(scr) in watched:
+                continue
+            try:
+                scr.availableGeometryChanged.connect(
+                    self._on_screen_geometry)
+                scr.geometryChanged.connect(self._on_screen_geometry)
+            except (AttributeError, RuntimeError, TypeError):
+                continue
+            watched.add(id(scr))
 
     def _is_horizontal(self) -> bool:
         return self._settings.overlay_orientation == "horizontal"
@@ -635,12 +819,13 @@ class OverlayWindow(QWidget):
         box_lay.setContentsMargins(0, 0, 0, 0)
 
         scale = self._overlay_scale()
+        nscale = numbers_scale_of(self._settings)
         ordered = ordered_fields(self._settings)
         for i, (key, label_text, num_size) in enumerate(ordered):
             row = QWidget()
             if horizontal:
                 lbl = _FitLabel(label_text, Qt.AlignCenter)
-                num = _FitNumber(max(6, int(round(num_size * scale))),
+                num = _FitNumber(scaled_text_size(num_size, scale, nscale),
                                  Qt.AlignCenter)
                 rl = QVBoxLayout(row)
                 rl.setContentsMargins(0, 0, 0, 0)
@@ -656,7 +841,7 @@ class OverlayWindow(QWidget):
             else:
                 lbl = _FitLabel(label_text,
                                 Qt.AlignVCenter | Qt.AlignLeft)
-                num = _FitNumber(max(6, int(round(num_size * scale))))
+                num = _FitNumber(scaled_text_size(num_size, scale, nscale))
                 rl = QHBoxLayout(row)
                 rl.setContentsMargins(0, 0, 0, 0)
                 rl.setSpacing(10)
@@ -717,18 +902,31 @@ class OverlayWindow(QWidget):
         old_order = list(
             getattr(self._settings, "overlay_field_order", None) or ())
         old_scale = self._overlay_scale()
+        old_granular = (numbers_scale_of(self._settings),
+                        title_scale_of(self._settings),
+                        labels_scale_of(self._settings))
+        old_anchor = anchor_of(self._settings)
+        old_offsets = offsets_of(self._settings)
         old_scopes = dict(
             getattr(self._settings, "overlay_field_scope", None) or {})
         self._settings = fresh
         # Colors first: a rebuild below paints new rows from the cache.
         self._apply_text_color()
-        if abs(self._overlay_scale() - old_scale) > 1e-9:
+        fresh_granular = (numbers_scale_of(fresh),
+                          title_scale_of(fresh),
+                          labels_scale_of(fresh))
+        if abs(self._overlay_scale() - old_scale) > 1e-9 or any(
+                abs(a - b) > 1e-9 for a, b in zip(fresh_granular,
+                                                  old_granular)):
             # Scale moves padding + labels + numbers; the rebuild inside
             # covers orientation/order changes too.
             self._apply_scale()
         elif orientation_changed or (
                 list(fresh.overlay_field_order or ()) != old_order):
             self._build_fields_box()
+        if anchor_of(fresh) != old_anchor or offsets_of(fresh) != old_offsets:
+            self._apply_anchor_position()
+            self._clamp_to_screen()
         self._sync_controls()
         self._apply_lock_state(self._settings.overlay_locked)
         self._apply_bg()
@@ -842,16 +1040,75 @@ class OverlayWindow(QWidget):
                 self.resize(want)
             self._clamp_to_screen()
 
-    def _clamp_to_screen(self) -> None:
-        """Pull a saved position back on-screen if a monitor was
-        unplugged or the resolution changed since it was saved — a
-        locked overlay you can't see is an overlay you can't unlock."""
-        screen = QGuiApplication.screenAt(self.pos()) or QGuiApplication.primaryScreen()
+    def _anchor_screen(self):
+        """Screen the anchor math measures against.
+
+        The screen holding the window's center wins (a dragged card
+        stays on the monitor it was dropped on); otherwise the screen
+        under the cursor position, else the primary one."""
+        center = self.frameGeometry().center()
+        screen = QGuiApplication.screenAt(center)
+        if screen is None:
+            screen = QGuiApplication.screenAt(self.pos())
+        return screen or QGuiApplication.primaryScreen()
+
+    def _apply_anchor_position(self) -> None:
+        """Place the window from the anchor preset plus inward offsets.
+
+        Measured against the usable rect of the holding screen: x runs
+        rightward, y runs downward, both counted inward from the chosen
+        corner. The usable rect normally clears the taskbar; when it
+        is stale or misleading the full rect is used instead (see
+        anchor_rect_for)."""
+        screen = self._anchor_screen()
         if screen is None:
             return
         avail = screen.availableGeometry()
-        x = min(max(self.x(), avail.x()), avail.x() + avail.width() - self.width())
-        y = min(max(self.y(), avail.y()), avail.y() + avail.height() - self.height())
+        full = screen.geometry()
+        rx, ry, rw, rh = anchor_rect_for(
+            (avail.x(), avail.y(), avail.width(), avail.height()),
+            (full.x(), full.y(), full.width(), full.height()))
+        ox, oy = offsets_of(self._settings)
+        x, y = anchor_position(
+            anchor_of(self._settings), ox, oy,
+            rx, ry, rw, rh,
+            self.width() or self.minimumWidth(),
+            self.height() or self.minimumHeight())
+        self.move(x, y)
+
+    def _on_screen_geometry(self, *_args) -> None:
+        """Re-seat the card after a geometry change.
+
+        The usable rect moves when the taskbar hides/shows (e.g. a
+        fullscreen game), when displays are added/removed, or when the
+        resolution changes — without this the anchored card would sit
+        a taskbar-height off or strand off-screen. Drags stay intact:
+        the offsets are stored anchor-relative, so re-anchoring lands
+        back where the card was dropped."""
+        self._apply_anchor_position()
+        self._clamp_to_screen()
+
+    def _clamp_to_screen(self) -> None:
+        """Pull a saved position back on-screen if a monitor was
+        unplugged or the resolution changed since it was saved — a
+        locked overlay you can't see is an overlay you can't unlock.
+
+        Clamps against the full rect (not the usable one) so the guard
+        never fights the anchor insets near the taskbar; it only
+        catches genuinely off-screen positions.
+
+        Residual limits, stated honestly: Qt reports usable-rect
+        changes asynchronously, so during some exclusive-fullscreen
+        transitions the card can sit one taskbar-height off until the
+        change signal lands and re-seats it. Mixed-DPI setups snap to
+        the holding screen's rect, which can shift the card by a few
+        scaled pixels across monitors."""
+        screen = self._anchor_screen()
+        if screen is None:
+            return
+        full = screen.geometry()
+        x = min(max(self.x(), full.x()), full.x() + full.width() - self.width())
+        y = min(max(self.y(), full.y()), full.y() + full.height() - self.height())
         if (x, y) != (self.x(), self.y()):
             self.move(x, y)
 
@@ -1017,14 +1274,17 @@ class OverlayWindow(QWidget):
             return 1.0
 
     def _scale_rules(self) -> str:
-        """Inline ID rules carrying the content scale.
+        """Inline ID rules carrying the per-class scales.
 
-        Labels and the header handle size themselves in QSS, so scaling
-        needs rules that win by order at equal specificity. Numbers skip
-        this — _FitNumber takes its size as a constructor arg at rebuild."""
-        label_px = max(6, int(round(9 * self._overlay_scale())))
+        Labels and the header handle size themselves in QSS, so each
+        class needs a rule that wins by order at equal specificity.
+        Numbers skip this — _FitNumber takes its size as a constructor
+        arg at rebuild."""
+        master = self._overlay_scale()
+        label_px = scaled_text_size(9, master, labels_scale_of(self._settings))
+        handle_px = scaled_text_size(9, master, title_scale_of(self._settings))
         return (f"\n#OverlayLabel {{ font-size: {label_px}px; }}\n"
-                f"#OverlayHandle {{ font-size: {label_px}px; }}\n")
+                f"#OverlayHandle {{ font-size: {handle_px}px; }}\n")
 
     @staticmethod
     def _scaled_margins(scale: float) -> tuple[int, int]:
@@ -1138,8 +1398,8 @@ class OverlayWindow(QWidget):
             # The current visit's maps are always built while a visit is
             # open (pure formatting, no query), so even hidden rows stay
             # correct and show the right source the moment they're
-            # unhidden. Level is account-scoped (no visit meaning), so
-            # it stays session-wide; the zone row names the visit itself.
+            # unhidden. Session-wide gauges and the zone row keep their
+            # fixed homes here regardless of stored scopes.
             sc_total = visit["sc_picked"] + visit["sc_unpicked"]
             zone_text = (visit.get("display_name")
                          or visit.get("map_name")
@@ -1150,8 +1410,6 @@ class OverlayWindow(QWidget):
                 "xp": visit["xp"],
                 "level": s["level"],
                 "zone": zone_text,
-                "deaths": visit["deaths"],
-                "xp_lost": visit["xp_lost"],
                 "xp_hr": visit["xp_hr"],
                 "dps": visit["dps_mine"],
             }
@@ -1162,14 +1420,8 @@ class OverlayWindow(QWidget):
                 "xp": _exact_number(visit["xp"])
                 if isinstance(visit["xp"], int) else str(visit["xp"]),
                 "level": str(s["level"]),
-                "zone": zone_text + (" — mirage run" if visit.get(
+                "zone": _escape(zone_text) + (" — mirage run" if visit.get(
                     "is_mirage") else ""),
-                "deaths": _exact_number(visit["deaths"])
-                if isinstance(visit["deaths"], int)
-                else str(visit["deaths"]),
-                "xp_lost": _exact_number(visit["xp_lost"])
-                if isinstance(visit["xp_lost"], int)
-                else str(visit["xp_lost"]),
                 "xp_hr": f"{visit['xp_hr']:,.1f} XP/hr per-zone (this zone)",
                 "dps": (f"{visit['dps_mine']:,.1f} yours / "
                         f"{visit['dps']:,.1f} total DPS per-zone (this zone)"),
@@ -1187,7 +1439,6 @@ class OverlayWindow(QWidget):
             except Exception:
                 rates = None
         rates = rates or {"xp_hr": 0.0, "dps": 0.0, "dps_mine": 0.0}
-        zone_text = s.get("current_zone") or "—"
         sess_vmap = {
             "kills": _mine_total(s["my_kills"], s["kills"]),
             "mighties": s.get("mighty_kills", 0),
@@ -1195,10 +1446,11 @@ class OverlayWindow(QWidget):
                                s["sc_picked"] + s["sc_unpicked"]),
             "xp": s["xp"],
             "level": s["level"],
-            "zone": zone_text,
             "deaths": s["deaths"],
             "xp_lost": s["xp_lost"],
             "xp_hr": rates["xp_hr"],
+            "xp_pct": s.get("xp_pct"),
+            "xp_pct_hr": s.get("xp_pct_hr"),
             "dps": rates["dps_mine"],
         }
         # Exact full values behind the compact display text — the main
@@ -1214,28 +1466,32 @@ class OverlayWindow(QWidget):
             "xp": _exact_number(s["xp"]) if isinstance(s["xp"], int)
             else str(s["xp"]),
             "level": str(s["level"]),
-            "zone": zone_text,
             "deaths": _exact_number(s["deaths"])
             if isinstance(s["deaths"], int) else str(s["deaths"]),
             "xp_lost": _exact_number(s["xp_lost"])
             if isinstance(s["xp_lost"], int) else str(s["xp_lost"]),
             "xp_hr": f"{rates['xp_hr']:,.1f} XP/hr (session)",
+            "xp_pct": _exact_xp_pct(s),
+            "xp_pct_hr": _exact_xp_pct_hr(s),
             "dps": (f"{rates['dps_mine']:,.1f} yours / "
                     f"{rates['dps']:,.1f} total DPS (session)"),
         }
         for key, (_lbl, num) in self._rows.items():
-            # Each row reads its own scope: visit-scoped rows read the
-            # current visit, everything else reads session totals (and
-            # everything falls back to session when no visit is open).
+            # Each row reads its fixed home: visit-only rows read the
+            # open visit (blank when none is open), session-only rows
+            # read session totals, and the rest follow their stored
+            # scope (falling back to session when no visit is open).
             # Full text always: each _FitNumber sizes its minimum width
             # to the content (measured at the scaled size), so the
             # window widens for "Snowy Mountain" instead of eliding to
             # "Snowy Mo...", and all rows stretch to that widest row.
             if visit is not None and visit_vmap \
                     and per_field.get(key) == VISIT_SCOPE:
-                raw, tip = visit_vmap[key], visit_exact.get(key)
+                raw = visit_vmap.get(key, "—")
+                tip = visit_exact.get(key)
             else:
-                raw, tip = sess_vmap[key], sess_exact.get(key)
+                raw = sess_vmap.get(key, "—")
+                tip = sess_exact.get(key)
             text = self._format(key, raw)
             self._last_values[key] = text
             tip = tip if tip is not None else text
@@ -1258,6 +1514,14 @@ class OverlayWindow(QWidget):
             return _compact_number(value)
         if key == "xp_hr" and isinstance(value, (int, float)):
             return f"{_compact_rate(value)}/hr"
+        if key == "xp_pct":
+            # Session-wide level gauge; blank until the feed carries
+            # running totals.
+            return f"{value:.1%}" if isinstance(value, (int, float)) else "—"
+        if key == "xp_pct_hr":
+            # Session-wide level pace; blank until running totals land
+            # and the session has measurable time.
+            return f"{value:+.1%}/hr" if isinstance(value, (int, float)) else "—"
         if key == "dps" and isinstance(value, (int, float)):
             return f"{_compact_rate(value)} DPS"
         return str(value)
@@ -1279,6 +1543,20 @@ class OverlayWindow(QWidget):
     def mouseReleaseEvent(self, e) -> None:
         if self._drag_active:
             self._settings.overlay_pos_x, self._settings.overlay_pos_y = self.x(), self.y()
+            # Keep the anchor offsets in step so a later anchor
+            # placement lands where the card was dropped.
+            screen = self._anchor_screen()
+            if screen is not None:
+                avail = screen.availableGeometry()
+                full = screen.geometry()
+                rx, ry, rw, rh = anchor_rect_for(
+                    (avail.x(), avail.y(), avail.width(), avail.height()),
+                    (full.x(), full.y(), full.width(), full.height()))
+                ox, oy = offsets_from_position(
+                    anchor_of(self._settings), self.x(), self.y(),
+                    rx, ry, rw, rh,
+                    self.width(), self.height())
+                self._settings.overlay_x, self._settings.overlay_y = ox, oy
             self._save_settings()
         self._drag_active = False
         self._drag_pos = None

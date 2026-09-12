@@ -20,11 +20,16 @@ from . import paths
 #: overlay.OVERLAY_FIELDS (this module stays Qt-free, so the key list
 #: lives here and overlay.py mirrors it).
 OVERLAY_FIELD_KEYS = ("kills", "mighties", "sc", "xp", "level", "zone",
-                      "deaths", "xp_lost", "xp_hr", "dps")
+                      "deaths", "xp_lost", "xp_hr", "xp_pct", "xp_pct_hr",
+                      "dps")
 
 #: Valid per-field scopes: "visit" resets on zone change, "session"
 #: persists through the session.
 FIELD_SCOPES = ("visit", "session")
+
+#: Window placement presets for the overlay (corner of the available
+#: geometry the offsets are measured inward from).
+OVERLAY_ANCHORS = ("top-left", "top-right", "bottom-left", "bottom-right")
 
 
 @dataclass
@@ -44,9 +49,19 @@ class Settings:
     # overlay_locked_text_color paints the numbers while locked (labels
     # stay at overlay_text_color); matches the old hardcoded dim gray.
     overlay_locked_text_color: str = "#3a3a48"
-    # Content scale for the overlay stats (numbers, labels, handle).
+    # Content scale for the overlay (card padding, minimums, and the
+    # base every text class multiplies at render time).
     # 1.0 == designed size; the scale slider writes 0.7 .. 1.5.
     overlay_scale: float = 1.0
+    # Per-class text scales, each moving only its own target at render
+    # time (1.0 == designed size; each tab slider writes 0.5 .. 2.0).
+    overlay_numbers_scale: float = 1.0
+    overlay_title_scale: float = 1.0
+    overlay_labels_scale: float = 1.0
+    # Window placement preset plus inward pixel offsets from it.
+    overlay_anchor: str = "top-left"  # one of the OVERLAY_ANCHORS below
+    overlay_x: int = 0
+    overlay_y: int = 0
     overlay_show_kills: bool = True
     overlay_show_mighties: bool = True
     overlay_show_sc: bool = True
@@ -56,6 +71,8 @@ class Settings:
     overlay_show_deaths: bool = True
     overlay_show_xp_lost: bool = True
     overlay_show_xp_hr: bool = True
+    overlay_show_xp_pct: bool = True
+    overlay_show_xp_pct_hr: bool = True
     overlay_show_dps: bool = True
     # Per-field reset scope: each movable overlay field independently
     # chooses "visit" (reset on zone change) or "session" (persist
@@ -71,7 +88,7 @@ class Settings:
     overlay_field_order: list[str] = field(
         default_factory=lambda: ["kills", "mighties", "sc", "xp", "level",
                                    "zone", "deaths", "xp_lost", "xp_hr",
-                                   "dps"])
+                                   "xp_pct", "xp_pct_hr", "dps"])
     overlay_pos_x: int = 60
     overlay_pos_y: int = 60
     overlay_locked: bool = False
@@ -111,6 +128,31 @@ class Settings:
         clean = {k: v for k, v in d.items() if k in valid}
         merged = asdict(cls.defaults())
         merged.update(clean)
+        # Retired single text scale: fold a stored non-default value
+        # into the numbers scale so older files keep their sizing.
+        legacy_text = d.pop("overlay_text_scale", None)
+        if "overlay_numbers_scale" not in d:
+            try:
+                legacy_f = float(legacy_text)
+            except (TypeError, ValueError):
+                legacy_f = 1.0
+            if abs(legacy_f - 1.0) > 1e-9:
+                merged["overlay_numbers_scale"] = legacy_f
+        # Per-class text scales: clamp so junk files degrade cleanly.
+        for _k in ("overlay_numbers_scale", "overlay_title_scale",
+                   "overlay_labels_scale"):
+            try:
+                merged[_k] = min(
+                    2.0, max(0.5, float(merged.get(_k, 1.0))))
+            except (TypeError, ValueError):
+                merged[_k] = 1.0
+        if merged.get("overlay_anchor") not in OVERLAY_ANCHORS:
+            merged["overlay_anchor"] = "top-left"
+        for _k in ("overlay_x", "overlay_y"):
+            try:
+                merged[_k] = int(merged.get(_k, 0))
+            except (TypeError, ValueError):
+                merged[_k] = 0
         return cls(**merged)
 
 

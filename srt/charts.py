@@ -467,8 +467,8 @@ class SeriesChart(QWidget):
         dist = math.hypot(pos.x() - cx, pos.y() - cy)
         if dist < inner or dist > outer:
             return None
-        angle = (math.degrees(math.atan2(-(pos.y() - cy),
-                                         pos.x() - cx)) - 90.0) % 360.0
+        angle = (math.degrees(math.atan2(pos.y() - cy,
+                                         pos.x() - cx)) + 90.0) % 360.0
         acc = 0.0
         for idx, (pt, _color, _start, _span) in enumerate(slices):
             frac = max(pt.value, 0.0) / total
