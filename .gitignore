@@ -1,5 +1,8 @@
 build/
 dist/
+# Velopack pack output (nupkg, Portable.zip, feed manifests) — uploaded
+# to GitHub releases, never committed.
+Releases/
 data/
 # Per-session debug event logs.
 debug-*.log

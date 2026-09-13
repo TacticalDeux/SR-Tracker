@@ -93,6 +93,10 @@ class Settings:
     overlay_pos_y: int = 60
     overlay_locked: bool = False
     overlay_orientation: str = "vertical"  # "vertical" (stacked rows) or "horizontal" (strip)
+    # Automatic update checks (frozen builds only, every startup).
+    # The last-check stamp records when the last check ran.
+    update_check_auto: bool = True
+    update_last_check: str = ""
 
     @classmethod
     def defaults(cls) -> "Settings":

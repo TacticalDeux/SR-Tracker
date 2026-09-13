@@ -12,6 +12,7 @@ the whole main window; everything else is type and rules.
 from __future__ import annotations
 
 import html
+import sys
 import threading
 import time
 from datetime import datetime
@@ -32,6 +33,8 @@ from PySide6.QtWidgets import (
 from . import __version__ as _APP_VERSION
 from . import paths as _paths
 from . import theme
+from . import velo_update as _updater
+from . import names as _names
 try:
     from tools.private import inject as _inject_tool
 except ImportError:
@@ -387,6 +390,10 @@ _CONNECT_WARN_AFTER_MS = 15000
 
 
 class MainWindow(QMainWindow):
+    # Update-check results arrive from a worker thread; the slot runs
+    # on the UI thread (same pattern as the report-upload signal).
+    _update_done = Signal(str, object)
+
     def __init__(
         self,
         dll: TrackerDLL,
@@ -510,6 +517,15 @@ class MainWindow(QMainWindow):
         self._refresh_sessions_combo()
         self._refresh_overlay_tab()
         self._on_tick()
+        # Update channel: worker results marshal here; the check runs
+        # once at startup (window painted, background thread) plus
+        # on demand from the Overlay tab. The busy flag holds the
+        # status bar for update progress (see _refresh_summary).
+        self._update_manual = False
+        self._update_busy = False
+        self._update_done.connect(self._on_update_result)
+        QTimer.singleShot(2000, self,
+                          lambda: self.check_for_updates(manual=False))
 
     # ------------------------------------------------------------------
     # Layout
@@ -1001,7 +1017,7 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
 
-        title = QLabel("OVERLAY")
+        title = QLabel("SETTINGS")
         title.setFont(QFont("Georgia", 11))
         title.setStyleSheet(
             f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
@@ -1013,6 +1029,44 @@ class MainWindow(QMainWindow):
         rule.setFixedHeight(1)
         rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
         outer.addWidget(rule)
+
+        # Update checks live at the top of Settings: a startup toggle
+        # plus a manual check with the last-check date beside it.
+        updates_label = QLabel("UPDATES")
+        updates_label.setFont(QFont("Georgia", 9))
+        updates_label.setStyleSheet(
+            f"color: {theme.ASH_BRIGHT}; letter-spacing: 3px; font-weight: bold;"
+        )
+        outer.addWidget(updates_label)
+        self._update_auto_chk = QCheckBox(
+            "Automatically check for updates on startup")
+        self._update_auto_chk.setFont(QFont("Georgia", 10))
+        try:
+            self._update_auto_chk.setChecked(
+                bool(self._settings_store.load().update_check_auto))
+        except Exception:
+            self._update_auto_chk.setChecked(True)
+        self._update_auto_chk.toggled.connect(self._on_update_auto_toggled)
+        outer.addWidget(self._update_auto_chk)
+        update_row = QHBoxLayout()
+        self._btn_update_now = QPushButton("Check for updates now")
+        self._btn_update_now.setToolTip("Check GitHub for a newer release.")
+        self._btn_update_now.clicked.connect(
+            lambda: self.check_for_updates(manual=True))
+        update_row.addWidget(self._btn_update_now)
+        self._update_last_lbl = QLabel("")
+        self._update_last_lbl.setFont(QFont("Georgia", 10))
+        self._update_last_lbl.setStyleSheet(
+            f"color: {theme.ASH_BRIGHT}; font-style: italic;")
+        update_row.addWidget(self._update_last_lbl, 1)
+        outer.addLayout(update_row)
+        self._refresh_update_last_label()
+
+        updates_rule = QFrame()
+        updates_rule.setFrameShape(QFrame.NoFrame)
+        updates_rule.setFixedHeight(1)
+        updates_rule.setStyleSheet(f"background: {theme.RUNE_FAINT};")
+        outer.addWidget(updates_rule)
 
         form = QFormLayout()
         form.setSpacing(12)
@@ -1259,7 +1313,7 @@ class MainWindow(QMainWindow):
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
-        self._overlay_tab_idx = self._tabs.addTab(tab, "Overlay")
+        self._overlay_tab_idx = self._tabs.addTab(tab, "Settings")
 
     def _build_debug_tab(self) -> None:
         self._debug = DebugConsole()
@@ -1371,6 +1425,181 @@ class MainWindow(QMainWindow):
             "a channel (or change channels) at least once for the "
             "tracker to start.",
         )
+
+    # ------------------------------------------------------------------
+    # Updates (frozen builds only; dev runs pull source instead)
+    # ------------------------------------------------------------------
+    def check_for_updates(self, manual: bool = False) -> None:
+        """Check GitHub for a newer release, off the UI thread."""
+        self._update_manual = manual
+        if is_dev_mode() or not getattr(sys, "frozen", False):
+            if manual:
+                QMessageBox.information(
+                    self, "Check for updates",
+                    "Running from source — pull the latest code instead.",
+                )
+            return
+        if not manual:
+            try:
+                s = self._settings_store.load()
+            except Exception:
+                return
+            if not s.update_check_auto:
+                return
+        # Hold the status bar for the check/download so the 1s tick
+        # cannot overwrite update progress (footer flashing).
+        self._update_busy = True
+        self._set_status("Checking for updates…")
+        _updater.check_in_background(
+            _APP_VERSION,
+            lambda st, info: self._update_done.emit(st, info),
+        )
+
+    def _stamp_update_check(self) -> None:
+        from datetime import date as _date
+        try:
+            s = self._settings_store.load()
+            s.update_last_check = _date.today().isoformat()
+            self._settings_store.save(s)
+        except Exception:
+            pass
+        self._refresh_update_last_label()
+
+    def _refresh_update_last_label(self) -> None:
+        # Last-check readout beside the manual button ("never" when
+        # no check has been recorded yet).
+        if not hasattr(self, "_update_last_lbl"):
+            return
+        try:
+            last = self._settings_store.load().update_last_check or ""
+        except Exception:
+            last = ""
+        self._update_last_lbl.setText(
+            f"Last check: {last}" if last else "Last check: never")
+
+    def _on_update_auto_toggled(self, on: bool) -> None:
+        # Persist the startup-check toggle through the settings store.
+        try:
+            s = self._settings_store.load()
+            s.update_check_auto = bool(on)
+            self._settings_store.save(s)
+            self._settings = s
+        except Exception:
+            pass
+
+    def _on_update_result(self, status: str, info: object) -> None:
+        # Internal worker progress/status channel (not server statuses).
+        if status == "__progress__":
+            try:
+                self._on_update_progress(info[0], info[1])
+            except Exception:
+                pass
+            return
+        if status == "__failed__":
+            _updater.release_lock()
+            self._update_busy = False
+            # Surface the worker's error text (download/stage fault)
+            # instead of a bare generic line.
+            detail = str(info) if info else ""
+            text = ("Update failed — see the releases page "
+                    "for TacticalDeux/SR-Tracker.")
+            if detail:
+                text += f" ({detail[:200]})"
+            self._set_status(text)
+            return
+        if status == "__downloaded__":
+            try:
+                # Velopack owns recovery from here (it applies the
+                # staged package and restarts us into it); free the
+                # single-flight lock so later checks work.
+                _updater.release_lock()
+                self._update_busy = False
+                self._set_status("Restarting to finish the update…")
+                _updater.apply_and_restart(info)
+            except Exception as e:  # noqa: BLE001 — surface, never crash
+                _updater.release_lock()
+                self._update_busy = False
+                self._set_status("Update failed — see the releases page "
+                                 f"for TacticalDeux/SR-Tracker. ({e!r:.200})")
+            return
+        self._stamp_update_check()
+        if status == "available" and info is not None:
+            tag = getattr(info, "tag", "?")
+            notes = (getattr(info, "notes", "") or "").strip()
+            body = f"A newer release is available: {tag} (you have {_APP_VERSION})."
+            if notes:
+                body += f"\n\n{notes[:2000]}"
+            box = QMessageBox(self)
+            box.setWindowTitle("Update available")
+            box.setText(body)
+            btn_update = box.addButton("Update", QMessageBox.AcceptRole)
+            box.addButton("Later", QMessageBox.RejectRole)
+            box.exec()
+            if box.clickedButton() is btn_update:
+                self._install_update(info)
+                return
+        elif status == "current":
+            if getattr(self, "_update_manual", False):
+                QMessageBox.information(
+                    self, "Check for updates",
+                    f"You are up to date ({_APP_VERSION}).",
+                )
+            else:
+                self._set_status("Up to date.")
+        elif status == "rate-limited":
+            self._set_status("Update check limited — try again later.")
+        elif status == "unparseable":
+            self._set_status("Could not read the release version.")
+        elif status == "dev":
+            # Unpacked run (source checkout or dev build without a
+            # Velopack manifest): same pull-source message as the
+            # dev-mode guard in check_for_updates.
+            if getattr(self, "_update_manual", False):
+                QMessageBox.information(
+                    self, "Check for updates",
+                    "Running from source — pull the latest code instead.",
+                )
+        else:
+            self._set_status(
+                "Update check failed — see the releases page "
+                "for TacticalDeux/SR-Tracker."
+            )
+        # Terminal branch of the check: release the status-bar hold.
+        self._update_busy = False
+        self._update_manual = False
+
+    def _install_update(self, info: object) -> None:
+        """Download via Velopack, then apply and restart into it."""
+        if not _updater.acquire_lock():
+            self._set_status("An update is already in progress.")
+            return
+        # Hold the status bar through the download (see check_for_updates).
+        self._update_busy = True
+        self._set_status(f"Downloading {getattr(info, 'tag', 'update')}…")
+
+        def _work() -> None:
+            try:
+                _updater.download_update(
+                    info,
+                    progress=lambda got, total: self._update_done.emit(
+                        "__progress__", (got, total)),
+                )
+                self._update_done.emit("__downloaded__", info)
+            except Exception as e:  # noqa: BLE001 — report, never crash
+                self._update_done.emit("__failed__", repr(e))
+
+        threading.Thread(target=_work, daemon=True,
+                         name="UpdateDownload").start()
+
+    def _on_update_progress(self, got: int, total: int) -> None:
+        # Keep the hold while progress arrives (the 1s tick skips the
+        # status bar exactly while this flag is set).
+        self._update_busy = True
+        if total:
+            pct = min(100, int(got * 100 / total))
+            self._set_status(f"Downloading update… {pct}%")
+        else:
+            self._set_status("Downloading update…")
 
     def _open_report_dialog(self) -> None:
         c = self._consumer
@@ -1502,10 +1731,10 @@ class MainWindow(QMainWindow):
         self._refresh_overlay_tab()
 
     # ------------------------------------------------------------------
-    # Overlay tab (live settings)
+    # Settings tab (overlay live settings)
     # ------------------------------------------------------------------
     def _on_tab_changed(self, idx: int) -> None:
-        # Refresh the Overlay tab's controls when switched to, so they
+        # Refresh the Settings tab's controls when switched to, so they
         # never show values the overlay's own drawer changed earlier.
         # (The per-second tick deliberately leaves this tab alone — a
         # refresh mid-drag would fight the slider being dragged.)
@@ -1585,9 +1814,17 @@ class MainWindow(QMainWindow):
         self._sync_ov_color_button(s.overlay_text_color)
         self._sync_ov_locked_color_button(s.overlay_locked_text_color)
         self._refresh_ov_fields(s)
+        if hasattr(self, "_update_auto_chk"):
+            self._update_auto_chk.blockSignals(True)
+            try:
+                self._update_auto_chk.setChecked(bool(s.update_check_auto))
+            except Exception:
+                pass
+            self._update_auto_chk.blockSignals(False)
+        self._refresh_update_last_label()
 
     def _push_overlay_settings(self) -> None:
-        """Read the Overlay tab's controls into the settings store and
+        """Read the Settings tab's controls into the settings store and
         reload a visible overlay in place."""
         s = self._settings_store.load()
         s.overlay_orientation = (
@@ -1959,10 +2196,13 @@ class MainWindow(QMainWindow):
             s, scopes=scopes,
             session_rates=rates)
         sc_total = s["sc_picked"] + s["sc_unpicked"]
-        self._set_status(
-            f"Session #{sid}  ·  {s['my_kills']} yours / {s['kills']} session total kills"
-            f"  ·  {s['sc_picked']:,} picked up / {sc_total:,} total SC"
-        )
+        # While an update check/download owns the footer, leave its
+        # progress text alone (the tick would otherwise flash over it).
+        if not getattr(self, "_update_busy", False):
+            self._set_status(
+                f"Session #{sid}  ·  {s['my_kills']} yours / {s['kills']} session total kills"
+                f"  ·  {s['sc_picked']:,} picked up / {sc_total:,} total SC"
+            )
 
     def _refresh_sessions(self) -> None:
         rows = self._db.sessions()
@@ -2730,7 +2970,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_debug") and self._debug is not None:
             self._debug.append_consumer_status(msg)
         else:
-            # Frozen exe has no debug tab — still surface it in the status bar.
+            # Frozen exe has no debug tab — still surface it in the
+            # status bar, unless an update owns the footer right now.
+            if getattr(self, "_update_busy", False):
+                return
             self._set_status(msg)
 
     def _on_tick(self) -> None:
