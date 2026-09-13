@@ -14,6 +14,7 @@ message instead of touching the network.
 """
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -47,7 +48,10 @@ def release_lock() -> None:
 def _manager() -> Any:
     """Build an UpdateManager, or raise when this is not a packed app."""
     import velopack
-    source = velopack.GithubSource(REPO_URL)
+    feed = os.environ.get("SR_TRACKER_UPDATE_FEED", "").strip()
+    # Local end-to-end tests point at a static feed dir via env;
+    # default stays on the GitHub releases feed.
+    source = velopack.HttpSource(feed) if feed else velopack.GithubSource(REPO_URL)
     mgr = velopack.UpdateManager(source)
     # Touch the locator-backed state so unpacked runs (no manifest,
     # no packages dir) fail here instead of mid-check.
