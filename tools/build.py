@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -71,7 +72,29 @@ def build(clean: bool, console: bool, uac_admin: bool = True) -> int:
     return 0
 
 
-def pack(notes: str | Path | None = None) -> int:
+_VERSION_LINE_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.M)
+
+
+def _package_version(explicit: str | None = None) -> str:
+    """Version for the package: explicit wins, else read the file.
+
+    Never `from srt import __version__` here — inside a long-lived
+    process (e.g. tools.release, which bumps the file first) that
+    import can return the stale pre-bump value from sys.modules.
+    """
+    if explicit:
+        return explicit
+    text = (PROJECT_ROOT / "srt" / "__init__.py").read_text(
+        encoding="utf-8")
+    m = _VERSION_LINE_RE.search(text)
+    if not m:
+        print("ERROR: no __version__ assignment found")
+        sys.exit(1)
+    return m.group(1)
+
+
+def pack(notes: str | Path | None = None,
+         version: str | None = None) -> int:
     """Pack the PyInstaller output dir into Releases/ (portable only).
 
     Portable bundle is on by default; `--noInst` skips the Setup
@@ -81,7 +104,7 @@ def pack(notes: str | Path | None = None) -> int:
     becomes the package metadata and the GitHub release body on
     upload (without it the release page shows almost nothing).
     """
-    from srt import __version__ as _ver
+    _ver = _package_version(version)
 
     pack_dir = PROJECT_ROOT / "dist" / APP_NAME
     if not (pack_dir / f"{APP_NAME}.exe").exists():

@@ -265,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if _build(clean=True, console=False) != 0:
             return 1
-        if _pack(notes) != 0:
+        if _pack(notes, new) != 0:
             return 1
     if args.skip_upload:
         print("stopping before upload (--skip-upload).")
