@@ -937,6 +937,14 @@ SPIDER_COLORS = (
 )
 
 
+def _compact(v: float) -> str:
+    """116000000 -> "116M": axis-max tags stay inside their boxes."""
+    for suffix, div in (("M", 1_000_000.0), ("k", 1_000.0)):
+        if abs(v) >= div:
+            return f"{v / div:.1f}".rstrip("0").rstrip(".") + suffix
+    return f"{v:.0f}"
+
+
 class SpiderChart(QWidget):
     """Radar web comparing several series across normalized stats.
 
@@ -946,12 +954,10 @@ class SpiderChart(QWidget):
     axis labels carry the per-axis max so the scale isn't a mystery.
     """
 
-    def __init__(self, parent: QWidget | None = None,
-                 *, value_format: str = "{:.0f}"):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._axes: list[str] = []
         self._series: list[SpiderSeries] = []
-        self._value_format = value_format
         self.setMinimumHeight(300)
 
     def set_axes(self, axes: list[str]) -> None:
@@ -973,12 +979,6 @@ class SpiderChart(QWidget):
         self._series = series
         self.update()
 
-    def set_value_format(self, fmt: str) -> None:
-        if fmt == self._value_format:
-            return
-        self._value_format = fmt
-        self.update()
-
     def clear(self) -> None:
         if not self._series:
             return
@@ -998,11 +998,15 @@ class SpiderChart(QWidget):
             return
 
         n = len(self._axes)
-        # Legend reserves the bottom; the web takes the rest.
-        legend_h = len(self._series) * 20 + 12
+        # Legend reserves the bottom; the web takes the rest. Past
+        # four series the legend wraps to two columns — a single
+        # column of eight would starve the web out of existence.
+        cols = 2 if len(self._series) > 4 else 1
+        rows = (len(self._series) + cols - 1) // cols
+        legend_h = rows * 20 + 12
         side = min(self.width() - 24,
                    self.height() - legend_h - 70)
-        if side < 120:
+        if side < 80:
             p.end()
             return
         cx = self.width() / 2
@@ -1036,7 +1040,7 @@ class SpiderChart(QWidget):
         p.setFont(QFont("Segoe UI", 8))
         for a, name in enumerate(self._axes):
             v = vertex(a, 1.0)
-            tag = f"{name} · {self._value_format.format(maxima[a])}"
+            tag = f"{name} · {_compact(maxima[a])}"
             box = QRectF(v.x() - 80, v.y() - 24, 160, 28)
             # Push the text box outward from the web so it never sits
             # on a polygon edge.
@@ -1073,20 +1077,22 @@ class SpiderChart(QWidget):
                 p.drawEllipse(pt, 3.0, 3.0)
             p.setBrush(Qt.NoBrush)
 
-        # Legend under the web.
+        # Legend under the web, row-major across the columns.
         p.setFont(QFont("Segoe UI", 9))
         lm = QFontMetrics(p.font())
         ly = cy + radius + 26
-        for s in self._series:
+        col_w = (radius * 2 - 8) / cols
+        for k, s in enumerate(self._series):
             color = s.color or QColor(theme.CRYSTAL)
             chip = QColor(color)
             if s.dimmed:
                 chip.setAlpha(110)
-            p.fillRect(QRectF(cx - radius, ly, 10, 10), chip)
+            lx = cx - radius + (k % cols) * col_w
+            ty = ly + (k // cols) * 20
+            p.fillRect(QRectF(lx, ty, 10, 10), chip)
             p.setPen(QColor(theme.PARCH_BG if not s.dimmed else theme.ASH_BRIGHT))
-            p.drawText(QRectF(cx - radius + 16, ly - 4, radius * 2 - 16, 18),
+            p.drawText(QRectF(lx + 16, ty - 4, col_w - 24, 18),
                        Qt.AlignVCenter | Qt.AlignLeft,
                        lm.elidedText(s.label, Qt.ElideRight,
-                                     int(radius * 2 - 16)))
-            ly += 20
+                                     int(col_w - 24)))
         p.end()

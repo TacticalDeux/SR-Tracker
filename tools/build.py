@@ -71,12 +71,15 @@ def build(clean: bool, console: bool, uac_admin: bool = True) -> int:
     return 0
 
 
-def pack() -> int:
+def pack(notes: str | Path | None = None) -> int:
     """Pack the PyInstaller output dir into Releases/ (portable only).
 
     Portable bundle is on by default; `--noInst` skips the Setup
     installer per the portable-distribution decision. Expects
-    `dist/SR Tracker/` from build() to already exist.
+    `dist/SR Tracker/` from build() to already exist. `notes` is an
+    optional markdown file passed to vpk as `--releaseNotes` — it
+    becomes the package metadata and the GitHub release body on
+    upload (without it the release page shows almost nothing).
     """
     from srt import __version__ as _ver
 
@@ -94,6 +97,8 @@ def pack() -> int:
         "--noInst",
         "-o", str(PROJECT_ROOT / "Releases"),
     ]
+    if notes:
+        cmd += ["--releaseNotes", str(notes)]
     _run(cmd)
     print(f"\npack complete: {PROJECT_ROOT / 'Releases'}")
     return 0
@@ -106,13 +111,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-uac-admin", action="store_true", help="Skip the admin manifest (no UAC prompt)")
     parser.add_argument("--pack", action="store_true", help="Also run vpk pack into Releases/ (portable only)")
     parser.add_argument("--pack-only", action="store_true", help="Skip PyInstaller, only run vpk pack")
+    parser.add_argument("--release-notes", default=None,
+                        help="Markdown file for vpk --releaseNotes (release body)")
     args = parser.parse_args(argv)
     if not args.pack_only:
         rc = build(args.clean, args.console, uac_admin=not args.no_uac_admin)
         if rc != 0:
             return rc
     if args.pack or args.pack_only:
-        return pack()
+        return pack(args.release_notes)
     return 0
 
 

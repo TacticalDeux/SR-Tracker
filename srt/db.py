@@ -635,10 +635,10 @@ class Database:
     def visit_stats(self, session_id: int, visit_id: int) -> dict | None:
         """Aggregates scoped to one zone visit's time window.
 
-        Returns kills, my_kills, drops, my_drops, sc_picked, sc_unpicked,
-        xp, damage_mine, damage_total plus elapsed_s
-        (entered_at to left_at, or to now while open), dps, dps_mine
-        and xp_hr. None for an unknown visit."""
+        Returns kills, my_kills, mighty_kills, drops, my_drops,
+        sc_picked, sc_unpicked, xp, damage_mine, damage_total plus
+        elapsed_s (entered_at to left_at, or to now while open), dps,
+        dps_mine and xp_hr. None for an unknown visit."""
         with self._lock:
             cur = self._conn.execute(
                 "SELECT map_name, COALESCE(display_name, map_name), "
@@ -664,6 +664,9 @@ class Database:
             my_kills = one(
                 "SELECT COUNT(*) FROM kills WHERE session_id = ? "
                 f"AND is_mine = 1 AND {w}", (session_id,) + win)
+            mighty_kills = one(
+                "SELECT COUNT(*) FROM kills WHERE session_id = ? "
+                f"AND is_mighty = 1 AND {w}", (session_id,) + win)
             drops = one(f"SELECT COUNT(*) FROM drops WHERE session_id = ? AND {w}",
                         (session_id,) + win)
             my_drops = one(
@@ -696,6 +699,7 @@ class Database:
                 "entered_at": entered_at, "left_at": left_at,
                 "is_mirage": bool(vrow[4]),
                 "kills": kills, "my_kills": my_kills,
+                "mighty_kills": mighty_kills,
                 "drops": drops, "my_drops": my_drops,
                 "sc_picked": sc_picked, "sc_unpicked": sc_unpicked,
                 "xp": xp,

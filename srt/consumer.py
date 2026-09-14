@@ -252,6 +252,21 @@ class EventConsumer(QObject):
         self._current_zone = None
         self._current_visit_id = None
 
+    def reset_session_stats(self) -> None:
+        """Wipe per-run detection state but keep the channel linkage.
+
+        Reset-session keeps the same session id, so the identity the
+        link established (local account id, both link halves, current
+        zone/visit, portal sightings) stays valid — only the stats are
+        gone. The DLL-side cube and its derived key live in the game
+        process and are untouched by a reset either way. Enemy-specific
+        maps, strength baselines, notable flags and notice clocks are
+        dropped so post-reset arrivals record fresh."""
+        self._mob_of_enemy = {}
+        self._reset_visit_state()
+        self._last_notice_at = 0.0
+        self._notice_at_by_key = {}
+
     def start(self) -> int:
         if self._running:
             return self._session_id or -1

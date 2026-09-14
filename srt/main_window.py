@@ -19,12 +19,12 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QGuiApplication
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
+    QAbstractButton, QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
     QDialog, QDialogButtonBox, QFrame, QFileDialog, QGroupBox,
-    QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem,
+    QFormLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
+    QListWidget, QListWidgetItem, QMenu,
     QMainWindow, QMessageBox, QPushButton, QRadioButton, QScrollArea, QSlider, QStatusBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
     QSizePolicy, QSpinBox,
@@ -87,6 +87,98 @@ class _HeroCrystal(QLabel):
         self.setPixmap(crystal_pixmap(self.SIZE, dim=self._dim))
 
 
+class _ScopeToggle(QAbstractButton):
+    """Sliding per-zone/session switch with its state text beside it."""
+
+    TRACK_W = 40
+    TRACK_H = 20
+    KNOB = 14
+    GAP = 8
+    WIDTH = 108
+    HEIGHT = 24
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setFixedSize(self.WIDTH, self.HEIGHT)
+        self._hover = False
+        self._key_focus = False
+
+    def focusInEvent(self, event) -> None:
+        self._key_focus = event.reason() in (
+            Qt.TabFocusReason, Qt.BacktabFocusReason,
+            Qt.ShortcutFocusReason)
+        self.update()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        self._key_focus = False
+        self.update()
+        super().focusOutEvent(event)
+
+    def enterEvent(self, event) -> None:
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, _event) -> None:
+        checked = self.isChecked()
+        enabled = self.isEnabled()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        track_y = (self.height() - self.TRACK_H) / 2.0
+        track = (
+            1.0, track_y, float(self.TRACK_W), float(self.TRACK_H))
+        if enabled:
+            fill = QColor(theme.CRYSTAL if checked else theme.INK_1)
+            border = QColor(theme.RUNE if self._hover or self._key_focus
+                            else theme.CRYSTAL if checked
+                            else theme.INK_BORDER_2)
+            knob_fill = QColor(theme.PARCH_BG)
+        elif checked:
+            fill = QColor(theme.INK_2)
+            border = QColor(theme.CRYSTAL)
+            knob_fill = QColor(theme.CRYSTAL_LIGHT)
+        else:
+            fill = QColor(theme.INK_1)
+            border = QColor(theme.INK_BORDER)
+            knob_fill = QColor(theme.ASH)
+        painter.setBrush(fill)
+        painter.setPen(QPen(border, 1))
+        painter.drawRoundedRect(*track, self.TRACK_H / 2.0,
+                                self.TRACK_H / 2.0)
+        margin = (self.TRACK_H - self.KNOB) / 2.0
+        knob_x = (self.TRACK_W - margin - self.KNOB if checked
+                  else 1.0 + margin)
+        knob_y = track_y + margin
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(knob_fill)
+        painter.drawEllipse(knob_x, knob_y, float(self.KNOB),
+                            float(self.KNOB))
+        label = "PER-ZONE" if checked else "SESSION"
+        if enabled:
+            text = QColor(theme.CRYSTAL_LIGHT if checked
+                          else theme.ASH_BRIGHT)
+        else:
+            text = QColor(theme.ASH)
+        painter.setPen(text)
+        font = QFont("Segoe UI", 8, QFont.Bold)
+        font.setCapitalization(QFont.AllUppercase)
+        painter.setFont(font)
+        painter.drawText(
+            self.TRACK_W + self.GAP, 0,
+            self.width() - self.TRACK_W - self.GAP, self.height(),
+            Qt.AlignLeft | Qt.AlignVCenter, label)
+        painter.end()
+
+
 # ---------------------------------------------------------------------------
 # Summary "instrument" — a single, focused page that reads at a glance.
 # ---------------------------------------------------------------------------
@@ -143,12 +235,13 @@ class _SummaryPanel(QWidget):
         right.addWidget(self._visit_header)
 
         self._v_kills   = self._make_metric("PER-ZONE KILLS")
+        self._v_mighties = self._make_metric("PER-ZONE MIGHTIES")
         self._v_sc      = self._make_metric("PER-ZONE SOUL CRYSTALS")
         self._v_xp      = self._make_metric("PER-ZONE EXPERIENCE")
         self._v_xp_hr   = self._make_metric("PER-ZONE XP/HR")
         self._v_dps     = self._make_metric("PER-ZONE DPS")
-        self._visit_rows = (self._v_kills, self._v_sc, self._v_xp,
-                            self._v_xp_hr, self._v_dps)
+        self._visit_rows = (self._v_kills, self._v_mighties, self._v_sc,
+                            self._v_xp, self._v_xp_hr, self._v_dps)
         for w in self._visit_rows:
             w.hide()
             right.addWidget(w)
@@ -184,7 +277,8 @@ class _SummaryPanel(QWidget):
         # Metric key -> row widget, per side. The summary mirrors the
         # overlay's per-field scopes: each key shows on exactly one side.
         self._visit_widgets = {
-            "kills": self._v_kills, "sc": self._v_sc, "xp": self._v_xp,
+            "kills": self._v_kills, "mighties": self._v_mighties,
+            "sc": self._v_sc, "xp": self._v_xp,
             "xp_hr": self._v_xp_hr, "dps": self._v_dps,
         }
         self._session_widgets = {
@@ -270,12 +364,12 @@ class _SummaryPanel(QWidget):
         from .overlay import _compact_rate
 
         def eff(key: str) -> str:
-            # Fixed-home gauges bypass their stored scope: the notable
-            # count and the level gauges stay on the session side, as
-            # do the loss counters; the zone row always names the open
-            # visit. Everything else follows its stored scope,
-            # defaulting to session.
-            if key in ("level", "mighties", "deaths", "xp_lost"):
+            # Fixed-home gauges bypass their stored scope: the level
+            # gauges stay on the session side, as do the loss
+            # counters; the zone row always names the open visit.
+            # Everything else follows its stored scope, defaulting
+            # to session.
+            if key in ("level", "deaths", "xp_lost"):
                 return "session"
             if key == "zone":
                 return "visit"
@@ -300,6 +394,9 @@ class _SummaryPanel(QWidget):
                 _mine_total(visit["my_kills"], visit["kills"]))
             self._v_kills._num.setToolTip(
                 f"{visit['my_kills']} yours / {visit['kills']} in this zone")
+            self._v_mighties._num.setText(f"{visit['mighty_kills']:,}")
+            self._v_mighties._num.setToolTip(
+                f"{visit['mighty_kills']:,} notable kills in this zone")
             self._v_sc._num.setText(
                 _mine_total(visit["sc_picked"], sc_total))
             self._v_sc._num.setToolTip(
@@ -326,8 +423,8 @@ class _SummaryPanel(QWidget):
         # --- visit header: names the open visit while any visit-scoped
         # field (rows, or the zone row the overlay shows) reads from it ---
         want_visit = any(eff(k) == "visit"
-                         for k in ("kills", "sc", "xp", "zone",
-                                   "xp_hr", "dps"))
+                         for k in ("kills", "mighties", "sc", "xp",
+                                   "zone", "xp_hr", "dps"))
         if visit is not None and (any_visit_row or eff("zone") == "visit"):
             self._visit_header.show()
             header_on = True
@@ -448,11 +545,10 @@ class MainWindow(QMainWindow):
         self._build_graphs_tab()
         self._build_overlay_tab()
         # Dropdown popups track the mouse so the hovered row always
-        # highlights (see the QComboBox QAbstractItemView rules in
-        # theme.py) — without tracking, the list only marks the
-        # last-clicked row and hovering gives no feedback at all.
+        # highlights. Combos born later (dialogs, stock pickers) call
+        # _track_dropdown themselves — findChildren only sees today's.
         for _cb in self.findChildren(QComboBox):
-            _cb.view().setMouseTracking(True)
+            _track_dropdown(_cb)
         # Snapshot tab pages by role. Refreshes match on widget
         # identity, never on hardcoded indices — the Debug tab only
         # exists in dev mode, so indices shift between dev and frozen.
@@ -644,6 +740,18 @@ class MainWindow(QMainWindow):
         btn_wipe.setProperty("role", "destructive")
         btn_wipe.clicked.connect(self._wipe_database)
         header_row.addWidget(btn_wipe)
+        btn_export = QPushButton("Export CSV")
+        btn_export.setToolTip(
+            "Export to CSV: every session, or one picked session")
+        export_menu = QMenu(btn_export)
+        export_menu.addAction(
+            "All sessions…",
+            self._export_sessions_csv)
+        export_menu.addAction(
+            "One session…",
+            self._export_one_session_csv)
+        btn_export.setMenu(export_menu)
+        header_row.addWidget(btn_export)
         btn = QPushButton("Re-read")
         btn.clicked.connect(self._refresh_sessions)
         header_row.addWidget(btn)
@@ -695,7 +803,7 @@ class MainWindow(QMainWindow):
         )
         header_row.addWidget(title)
         header_row.addStretch(1)
-        self._kills_preset = QComboBox()
+        self._kills_preset = _track_dropdown(QComboBox())
         self._kills_preset.addItems(["All", "Mine", "Mighties", "Others"])
         self._kills_preset.setToolTip("Preset view for the kills list")
         self._kills_preset.currentIndexChanged.connect(
@@ -751,7 +859,7 @@ class MainWindow(QMainWindow):
         )
         header_row.addWidget(title)
         header_row.addStretch(1)
-        self._drops_preset = QComboBox()
+        self._drops_preset = _track_dropdown(QComboBox())
         self._drops_preset.addItems(
             ["All", "Mine", "Unclaimed", "Soul Crystals",
              "Picked up by me", "Gone"])
@@ -1658,8 +1766,9 @@ class MainWindow(QMainWindow):
         ans = QMessageBox.question(
             self,
             "Reset session?",
-            "All kills, drops, XP, and zone visits for the current session "
-            "will be deleted. The session continues under the same id.",
+            "All kills, drops, XP, damage, and notices for the current "
+            "session will be deleted. The session continues under the "
+            "same id and stays linked — no need to change channels.",
         )
         if ans != QMessageBox.Yes:
             return
@@ -1668,7 +1777,10 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Reset failed", str(e))
             return
-        self._consumer.reset_link()
+        # Keep the channel linkage (account id, zone, DLL-side cube/key):
+        # only the stats were wiped, so tracking continues without a
+        # re-link. Zone history rows are kept by reset_session as well.
+        self._consumer.reset_session_stats()
         self.tbl_kills.setRowCount(0)
         self._show_empty(self.tbl_kills, self._kills_empty, True)
         self.tbl_drops.setRowCount(0)
@@ -1863,11 +1975,12 @@ class MainWindow(QMainWindow):
             setattr(s, f"overlay_show_{key}",
                     row_w._chk.isChecked())
             # Fixed-home gauges bypass the toggle: the account gauge,
-            # the notable count and the level gauges always persist,
-            # as do the loss counters; the zone row always names the
-            # open visit.
-            if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
-                       "deaths", "xp_lost"):
+            # the level position and the loss counters always persist;
+            # the zone row always names the open visit. The notable
+            # count rides with the other farm stats (session by
+            # default). XP%/HR stays movable: per-zone projects the
+            # zone's pace onto the remaining level XP.
+            if key in ("level", "xp_pct", "deaths", "xp_lost"):
                 scopes[key] = "session"
             elif key == "zone":
                 scopes[key] = "visit"
@@ -1945,25 +2058,26 @@ class MainWindow(QMainWindow):
             self._overlay.reload_settings()
 
     @staticmethod
-    def _sync_scope_button(btn: QPushButton, is_visit: bool, key: str) -> None:
+    def _sync_scope_button(btn: QAbstractButton, is_visit: bool, key: str) -> None:
         """Paint a scope toggle: Per-zone (resets on zone change) or
         Session (persists). The button is checkable — checked reads
-        Per-zone, unchecked reads Session — so the pressed crystal
-        fill from the theme marks the per-zone side like any other
-        toggle. Fixed-home gauges stay parked and disabled: the
-        account gauge, the notable count, the level gauges and the
-        loss counters on Session; the zone row on Per-zone."""
+        Per-zone, unchecked reads Session — so the pill's crystal
+        fill marks the per-zone side. Fixed-home gauges stay parked
+        and disabled: the account gauge, the level position and the
+        loss counters on Session; the zone row on Per-zone. The
+        notable count rides with the other farm stats (session by
+        default). XP%/HR is movable: per-zone projects the zone's
+        pace onto the remaining level XP."""
         btn.blockSignals(True)
         try:
-            if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
-                       "deaths", "xp_lost"):
+            if key in ("level", "xp_pct", "deaths", "xp_lost"):
                 btn.setChecked(False)
                 btn.setText("Session")
                 btn.setToolTip(
                     "Level is account-wide and always persists"
                     if key == "level" else
                     "Session-wide count and always persists"
-                    if key in ("mighties", "deaths", "xp_lost") else
+                    if key in ("deaths", "xp_lost") else
                     "Session-wide gauge and always persists")
                 btn.setEnabled(False)
             elif key == "zone":
@@ -1983,8 +2097,9 @@ class MainWindow(QMainWindow):
 
     def _make_ov_field_row(self, key: str, label: str) -> QWidget:
         """One field row: visibility checkbox, name, compact scope toggle.
-        The scope button is checkable — checked reads Per-zone,
-        unchecked reads Session — and pinned to the wider label so
+        Names share one fixed-width column so the toggles line up in
+        their own column; the toggle is checkable — checked reads
+        Per-zone, unchecked reads Session — and keeps a fixed width so
         toggling never reflows the list."""
         row = QWidget()
         h = QHBoxLayout(row)
@@ -1994,15 +2109,18 @@ class MainWindow(QMainWindow):
         chk.setToolTip(f"Show {label} on the overlay")
         chk.toggled.connect(lambda _c: self._push_overlay_settings())
         h.addWidget(chk)
+        if not getattr(self, "_ov_name_w", 0):
+            self._ov_name_w = (
+                max(self._ov_fields.fontMetrics().horizontalAdvance(lbl)
+                    for _, lbl in OVERLAY_FIELDS)
+                + 6)
         name = QLabel(label)
-        h.addWidget(name, 1)
-        scope = QPushButton()
-        scope.setCheckable(True)
-        scope.setCursor(Qt.PointingHandCursor)
-        if getattr(self, "_ov_scope_btn_w", 0):
-            scope.setFixedWidth(self._ov_scope_btn_w)
+        name.setFixedWidth(self._ov_name_w)
+        h.addWidget(name)
+        scope = _ScopeToggle()
         scope.clicked.connect(self._on_ov_scope_clicked)
         h.addWidget(scope)
+        h.addStretch(1)
         row._chk = chk
         row._name = name
         row._scope = scope
@@ -2026,11 +2144,6 @@ class MainWindow(QMainWindow):
         change keeps the selection (and avoids fighting a drag in
         progress) on plain toggles."""
         labels = dict(OVERLAY_FIELDS)
-        if not getattr(self, "_ov_scope_btn_w", 0):
-            self._ov_scope_btn_w = (
-                max(self._ov_fields.fontMetrics().horizontalAdvance(t)
-                    for t in ("Per-zone", "Session"))
-                + 24)
         order = list(getattr(s, "overlay_field_order", None)
                      or [k for k, _ in OVERLAY_FIELDS])
         # Older settings files predate newer fields (xp/hr, DPS) — or
@@ -2055,9 +2168,11 @@ class MainWindow(QMainWindow):
                                   | Qt.ItemIsSelectable
                                   | Qt.ItemIsDragEnabled)
                     self._ov_fields.addItem(item)
-                    self._ov_fields.setItemWidget(
-                        item, self._make_ov_field_row(
-                            key, labels.get(key, key)))
+                    row_widget = self._make_ov_field_row(
+                        key, labels.get(key, key))
+                    self._ov_fields.setItemWidget(item, row_widget)
+                    # Item widgets don't size their rows on their own.
+                    item.setSizeHint(row_widget.sizeHint())
             finally:
                 self._ov_fields.blockSignals(False)
         scopes = getattr(s, "overlay_field_scope", None) or {}
@@ -2311,6 +2426,70 @@ class MainWindow(QMainWindow):
             return
         dlg = _SessionDetailDialog(self._db, self._names, int(sid), self)
         dlg.exec()
+
+    def _export_sessions_csv(self) -> None:
+        """Export every session's summary row to a picked CSV file."""
+        from . import export_csv as _export_csv
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export all sessions", "sr-sessions.csv",
+            "CSV files (*.csv);;All files (*)",
+        )
+        if not path:
+            return
+        try:
+            out = _export_csv.export_all_sessions(self._db, path)
+            count = len(self._db.past_sessions(10_000))
+        except Exception as e:
+            QMessageBox.critical(self, "Export failed", str(e))
+            return
+        QMessageBox.information(
+            self, "Export complete",
+            f"Exported {count} sessions to {out}.")
+        self._set_status(f"Exported sessions to {out}.")
+
+    def _export_one_session_csv(self) -> None:
+        """Export a picked session (all its tables) without opening it."""
+        from . import export_csv as _export_csv
+
+        rows = self._db.past_sessions(10_000)
+        if not rows:
+            QMessageBox.information(
+                self, "Nothing to export",
+                "No sessions recorded yet.")
+            return
+        items = [f"Session #{r['id']} — {r['started']}" for r in rows]
+        # Built by hand (not the getItem static) so the picker's own
+        # combo gets the same hover-highlight as every other dropdown.
+        picker = QInputDialog(self)
+        picker.setWindowTitle("Export one session")
+        picker.setLabelText("Session:")
+        picker.setComboBoxItems(items)
+        picker.setComboBoxEditable(False)
+        _picker_combo = picker.findChild(QComboBox)
+        if _picker_combo is not None:
+            _track_dropdown(_picker_combo)
+        if not picker.exec():
+            return
+        pick = picker.textValue()
+        sid = int(pick.split("#", 1)[1].split(" ", 1)[0])
+        path, _ = QFileDialog.getSaveFileName(
+            self, f"Export session #{sid}",
+            f"session-{sid}.csv",
+            "CSV files (*.csv);;All files (*)",
+        )
+        if not path:
+            return
+        try:
+            made = _export_csv.export_session(
+                self._db, self._names, sid, path)
+        except Exception as e:
+            QMessageBox.critical(self, "Export failed", str(e))
+            return
+        QMessageBox.information(
+            self, "Export complete",
+            "Wrote:\n" + "\n".join(str(p) for p in made))
+        self._set_status(f"Exported session #{sid} to {made[0].parent}.")
 
     def _wipe_database(self) -> None:
         if self._consumer.session_id is not None:
@@ -2858,7 +3037,6 @@ class MainWindow(QMainWindow):
                 self._graphs_section_title.setText(
                     "ZONES  COMPARED  (SPIDER)")
                 self.chart_spider.set_axes(list(self._SPIDER_AXES))
-                self.chart_spider.set_value_format("{:.0f}")
                 self.chart_spider.set_series(_spider_series or [])
             elif mode in ("line", "cumulative", "bars"):
                 if mode == "cumulative" and key != "minutes":
@@ -3503,6 +3681,14 @@ class _ReportBugDialog(QDialog):
             self._lbl_status.setText(f"{msg} You can Copy or Save instead.")
 
 
+def _track_dropdown(combo: QComboBox) -> QComboBox:
+    """Hover-highlight for a combo's popup list (see the QComboBox
+    QAbstractItemView rules in theme.py). Without mouse tracking the
+    popup only marks the last-clicked row and hovering shows nothing."""
+    combo.view().setMouseTracking(True)
+    return combo
+
+
 def _cell(text: str, *, align: Qt.AlignmentFlag = Qt.AlignLeft) -> QTableWidgetItem:
     """Helper: a table cell styled like a field-log entry (data voice)."""
     item = QTableWidgetItem(text)
@@ -3743,8 +3929,16 @@ class _SessionDetailDialog(QDialog):
     """Click-through detail for one session: totals, per-zone breakdown,
     and the session's kills/drops with ownership marked. Read-only."""
 
+    # Viewer tab titles to export_csv table names.
+    _TAB_TABLES = {"Summary": "summary", "Kills": "kills",
+                   "Drops": "drops", "Mighties": "mighties",
+                   "Zones": "zones"}
+
     def __init__(self, db, names, session_id: int, parent=None):
         super().__init__(parent)
+        self._db = db
+        self._names = names
+        self._sid = int(session_id)
         self.setWindowTitle(f"Session #{session_id}")
         # One tab per section instead of a scrolling stack, so each
         # table owns its space and Close stays pinned outside the tabs.
@@ -3754,6 +3948,7 @@ class _SessionDetailDialog(QDialog):
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
         tabs = QTabWidget(self)
+        self._tabs = tabs
 
         def _page(title: str) -> QVBoxLayout:
             # A tab page with the same air the stacked sections had.
@@ -3843,7 +4038,7 @@ class _SessionDetailDialog(QDialog):
         kills_lay.addWidget(_section_label("KILLS"))
         kills_filt_row = QHBoxLayout()
         kills_filt_row.addStretch(1)
-        self._kills_preset = QComboBox()
+        self._kills_preset = _track_dropdown(QComboBox())
         self._kills_preset.addItems(["All", "Mine", "Mighties", "Others"])
         self._kills_preset.setToolTip("Preset view for the kills list")
         self._kills_preset.currentIndexChanged.connect(
@@ -3895,7 +4090,7 @@ class _SessionDetailDialog(QDialog):
         drops_lay.addWidget(_section_label("DROPS"))
         filt_row = QHBoxLayout()
         filt_row.addStretch(1)
-        self._drops_preset = QComboBox()
+        self._drops_preset = _track_dropdown(QComboBox())
         self._drops_preset.addItems(
             ["All", "Mine", "Unclaimed", "Soul Crystals",
              "Picked up by me", "Gone"])
@@ -3927,7 +4122,60 @@ class _SessionDetailDialog(QDialog):
         outer.addWidget(tabs, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
+        btn_export = QPushButton("Export CSV…")
+        btn_export.setToolTip(
+            "Export this session (summary, zones, kills, drops, "
+            "mighties) to CSV files")
+        btn_export.clicked.connect(self._on_export_csv)
+        buttons.addButton(btn_export, QDialogButtonBox.ActionRole)
         outer.addWidget(buttons)
+
+    def _on_export_csv(self) -> None:
+        """Export menu: the currently viewed tab, or every tab (one CSV
+        per table next to the picked path, `session-12_kills.csv`, ...)."""
+        from . import export_csv as _export_csv
+
+        btn = self.sender()
+        cur = self._tabs.tabText(self._tabs.currentIndex())
+        menu = QMenu(self)
+        act_tab = menu.addAction(f"This tab ({cur})")
+        act_all = menu.addAction("All tabs")
+        chosen = (menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+                  if btn is not None else None)
+        if chosen is None:
+            return
+        if chosen == act_tab:
+            table = self._TAB_TABLES.get(cur, "summary")
+            path, _ = QFileDialog.getSaveFileName(
+                self, f"Export session #{self._sid} ({cur})",
+                f"session-{self._sid}_{table}.csv",
+                "CSV files (*.csv);;All files (*)",
+            )
+            if not path:
+                return
+            try:
+                made = [_export_csv.export_session_table(
+                    self._db, self._names, self._sid, table, path)]
+            except Exception as e:
+                QMessageBox.critical(self, "Export failed", str(e))
+                return
+        else:
+            path, _ = QFileDialog.getSaveFileName(
+                self, f"Export session #{self._sid}",
+                f"session-{self._sid}.csv",
+                "CSV files (*.csv);;All files (*)",
+            )
+            if not path:
+                return
+            try:
+                made = _export_csv.export_session(
+                    self._db, self._names, self._sid, path)
+            except Exception as e:
+                QMessageBox.critical(self, "Export failed", str(e))
+                return
+        QMessageBox.information(
+            self, "Export complete",
+            "Wrote:\n" + "\n".join(str(p) for p in made))
 
     def _populate_kills(self) -> None:
         """Fill the dialog's kills table, honoring the name filter."""

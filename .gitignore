@@ -20,3 +20,4 @@ issues/
 # history. They never match the mounted submodules themselves.
 dll/*
 tools/private/*
+.env

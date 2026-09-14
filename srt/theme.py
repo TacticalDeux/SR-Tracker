@@ -204,7 +204,6 @@ def _global_qss() -> str:
         color: {CRIMSON};
         border-color: {CRIMSON};
     }}
-
     QTableWidget {{
         background: {INK_1};
         alternate-background-color: {INK_0};
@@ -296,6 +295,27 @@ def _global_qss() -> str:
     QComboBox QAbstractItemView::item:selected {{
         background-color: {CRYSTAL};
         color: {INK_0};
+    }}
+
+    /* Button/popup menus (Export CSV, ...): the generic QWidget rule
+    above leaves menu items with no selected state, so hovering shows
+    nothing. Same crystal treatment as the dropdown popups. */
+    QMenu {{
+        background-color: {INK_1};
+        color: {PARCH_BG};
+        border: 1px solid {INK_BORDER_2};
+    }}
+    QMenu::item {{
+        padding: 6px 14px;
+        background: transparent;
+    }}
+    QMenu::item:selected {{
+        background-color: {CRYSTAL};
+        color: {INK_0};
+    }}
+    QMenu::separator {{
+        height: 1px;
+        background: {INK_BORDER_2};
     }}
 """
 

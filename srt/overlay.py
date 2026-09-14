@@ -60,12 +60,14 @@ def field_scope(settings, key: str) -> str:
     """Effective reset scope for one overlay field.
 
     Unknown/new fields and junk values default to "session" (today's
-    behavior). Account- and session-wide gauges always read
-    session-wide regardless of their stored entries; the zone row
-    always names the open visit, regardless of its stored entry.
+    behavior). The account gauge, the level position and the loss
+    counters always read session-wide regardless of their stored
+    entries; the zone row always names the open visit, regardless of
+    its stored entry. The notable count rides with the other farm
+    stats (session by default). XP%/HR is the paced projection (zone
+    pace onto remaining XP) so it may read either side.
     """
-    if key in ("level", "mighties", "xp_pct", "xp_pct_hr",
-               "deaths", "xp_lost"):
+    if key in ("level", "xp_pct", "deaths", "xp_lost"):
         return SESSION_SCOPE
     if key == "zone":
         return VISIT_SCOPE
@@ -1404,18 +1406,35 @@ class OverlayWindow(QWidget):
             zone_text = (visit.get("display_name")
                          or visit.get("map_name")
                          or s.get("current_zone") or "—")
+            # Per-zone XP%/HR: this zone's XP pace projected onto the
+            # remaining level XP (session-wide position). Blank until the
+            # feed carries running totals and both sides are measurable.
+            _req, _tot = s.get("xp_required"), s.get("xp_total")
+            if isinstance(_req, int) and isinstance(_tot, int):
+                _remaining: int | None = _req - _tot
+            else:
+                _remaining = None
+            if _remaining is not None and _remaining > 0 \
+                    and visit["xp_hr"] > 0:
+                visit_pct_hr = visit["xp_hr"] / float(_remaining)
+            else:
+                visit_pct_hr = None
             visit_vmap = {
                 "kills": _mine_total(visit["my_kills"], visit["kills"]),
+                "mighties": visit["mighty_kills"],
                 "sc": _mine_total(visit["sc_picked"], sc_total),
                 "xp": visit["xp"],
                 "level": s["level"],
                 "zone": zone_text,
                 "xp_hr": visit["xp_hr"],
+                "xp_pct_hr": visit_pct_hr,
                 "dps": visit["dps_mine"],
             }
             visit_exact = {
                 "kills": _exact_mine_total(visit["my_kills"],
                                            visit["kills"]),
+                "mighties": (f"{visit['mighty_kills']:,} notable kills "
+                             "in this zone"),
                 "sc": _exact_mine_total(visit["sc_picked"], sc_total),
                 "xp": _exact_number(visit["xp"])
                 if isinstance(visit["xp"], int) else str(visit["xp"]),
@@ -1423,6 +1442,9 @@ class OverlayWindow(QWidget):
                 "zone": _escape(zone_text) + (" — mirage run" if visit.get(
                     "is_mirage") else ""),
                 "xp_hr": f"{visit['xp_hr']:,.1f} XP/hr per-zone (this zone)",
+                "xp_pct_hr": (f"{visit_pct_hr:+.1%} per hour toward next level "
+                              "(this zone's pace)")
+                if isinstance(visit_pct_hr, (int, float)) else "—",
                 "dps": (f"{visit['dps_mine']:,.1f} yours / "
                         f"{visit['dps']:,.1f} total DPS per-zone (this zone)"),
             }
